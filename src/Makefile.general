@@ -12,7 +12,7 @@ vpath %.P $(DEPDIR)
 #CFLAGS = -g3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -pthread
 CFLAGS = -g -O6 -fomit-frame-pointer -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -pthread -fno-tree-vectorize
 
-TBOBJS = tbgen.o tbgenp.o permute.o compress.o threads.o lz4.o tbver.o tbverp.o decompress.o checksum.o city-c.o
+TBOBJS = tbgen.o tbgenp.o permute.o compress.o threads.o lz4.o tbver.o tbverp.o decompress.o checksum.o city-c.o tbcheck.o
 GENTBOBJS = tbgen.o permute.o compress.o threads.o lz4.o checksum.o city-c.o
 GENTBPOBJS = tbgenp.o permute.o compress.o threads.o lz4.o checksum.o city-c.o
 VERTBOBJS = tbver.o decompress.o threads.o checksum.o city-c.o

@@ -7,8 +7,6 @@
 #ifndef DEFS_H
 #define DEFS_H
 
-#include <linux/types.h>
-
 typedef unsigned long long bitboard;
 typedef unsigned long long long64;
 typedef unsigned int uint32;
