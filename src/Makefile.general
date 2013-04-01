@@ -1,0 +1,57 @@
+SHELL = /bin/sh
+
+.SUFFIXES:
+.SUFFIXES: .c .o .P
+
+vpath %.o
+vpath %.o $(OBJDIR)
+
+vpath %.P
+vpath %.P $(DEPDIR)
+
+#CFLAGS = -g3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -pthread
+CFLAGS = -g -O6 -fomit-frame-pointer -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -pthread -fno-tree-vectorize
+
+TBOBJS = tbgen.o tbgenp.o permute.o compress.o threads.o lz4.o tbver.o tbverp.o decompress.o checksum.o city-c.o
+GENTBOBJS = tbgen.o permute.o compress.o threads.o lz4.o checksum.o city-c.o
+GENTBPOBJS = tbgenp.o permute.o compress.o threads.o lz4.o checksum.o city-c.o
+VERTBOBJS = tbver.o decompress.o threads.o checksum.o city-c.o
+VERTBPOBJS = tbverp.o decompress.o threads.o checksum.o city-c.o
+
+TBCHECKOBJS = tbcheck.o threads.o checksum.o city-c.o
+
+CFILES = $(filter $(wildcard *.c), $(OBJS:%.o=%.c))
+
+include $(CFILES:%.c=$(DEPDIR)/%.P)
+include $(TBOBJS:%.o=$(DEPDIR)/%.P)
+
+$(NAME): $(OBJS) # $(OBJS:%=$(OBJDIR)/%)
+	$(CC) $(CFLAGS) -o $(NAME) $(OBJS:%=$(OBJDIR)/%)
+
+%.o $(OBJDIR)/%.o: %.c
+	@mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $*.c $(FLAGS) -o $(OBJDIR)/$*.o
+
+$(DEPDIR)/%.P: %.c
+	@mkdir -p $(DEPDIR)
+	$(SHELL) -ec '$(CC) -M $(FLAGS) -msse4.2 -march=corei7 $*.c \
+		| sed s/$*\.o/$*\.o\ $*\.P/ >$@'
+
+$(CLEAN):
+	rm -f $(TBOBJS:%=$(OBJDIR)/%)
+
+$(GENTBNAME): $(GENTBOBJS)
+	$(CC) $(CFLAGS) -o $(GENTBNAME) $(GENTBOBJS:%=$(OBJDIR)/%)
+
+$(GENTBPNAME): $(GENTBPOBJS)
+	$(CC) $(CFLAGS) -o $(GENTBPNAME) $(GENTBPOBJS:%=$(OBJDIR)/%)
+
+$(VERTBNAME): $(VERTBOBJS)
+	$(CC) $(CFLAGS) -o $(VERTBNAME) $(VERTBOBJS:%=$(OBJDIR)/%)
+
+$(VERTBPNAME): $(VERTBPOBJS)
+	$(CC) $(CFLAGS) -o $(VERTBPNAME) $(VERTBPOBJS:%=$(OBJDIR)/%)
+
+tbcheck: $(TBCHECKOBJS)
+	$(CC) $(CFLAGS) -o tbcheck $(TBCHECKOBJS:%=$(OBJDIR)/%)
+

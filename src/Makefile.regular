@@ -1,0 +1,14 @@
+GENTBNAME = rtbgen
+GENTBPNAME = rtbgenp
+VERTBNAME = rtbver
+VERTBPNAME = rtbverp
+CLEAN = clean
+
+DEPDIR = .depsr
+OBJDIR = objsr
+FLAGS = -DREGULAR
+
+CC = gcc
+
+include Makefile.general
+
