@@ -412,7 +412,7 @@ void probe_captures_b(struct thread_data *thread)
 	LOOP_BLACK_PIECES(mark_capt_draws);
 	break;
       case 1:
-	has_cursed |= 1;
+	has_cursed |= 2;
 	LOOP_BLACK_PIECES(mark_capt_cursed_losses);
 	break;
       case 2:
@@ -496,7 +496,6 @@ void calc_captures_w(void)
   int i, j, k;
   int n = numpcs;
 
-#if 1
   captured_piece = black_king;
   run_threaded(calc_illegal_w, work_g, 1);
 
@@ -505,7 +504,6 @@ void calc_captures_w(void)
     capturing_pawn = i;
     run_threaded(calc_pawn_illegal_w, work_g, 1);
   }
-#endif
 
   for (i = 0; i < n; i++) { // loop over black pieces
     if (!(pt[i] & 0x08) || i == black_king) continue;
@@ -526,7 +524,6 @@ void calc_captures_b(void)
   int i, j, k;
   int n = numpcs;
 
-#if 1
   captured_piece = white_king;
   run_threaded(calc_illegal_b, work_g, 1);
 
@@ -535,7 +532,6 @@ void calc_captures_b(void)
     capturing_pawn = i;
     run_threaded(calc_pawn_illegal_b, work_g, 1);
   }
-#endif
 
   for (i = 0; i < n; i++) { // loop over white pieces
     if ((pt[i] & 0x08) || i == white_king) continue;
@@ -1129,7 +1125,7 @@ void reset_pivot_captures(struct thread_data *thread)
     FILL_OCC_CAPTS_PIVOT {
       CHECK_PIECES_PIVOT;
       if (is_attacked(p[king], pcs2, occ, p)) continue;
-      int v = probe_tb(pt2, p, wtm, occ, -2, 2);
+      int v = probe_tb(pt2, p, wtm, occ, 0, 2);
       if (v == 1) {
 	MAKE_IDX2_PIVOT;
 	LOOP_PIECES_PIVOT(reset_capt_closs);
@@ -1317,8 +1313,6 @@ void fix_closs_w(struct thread_data *thread)
     if (table_w[idx] != CAPT_CLOSS) continue;
     FILL_OCC;
     int v = compute_capt_closs(white_pcs, idx, table_b, occ, p);
-    for (i = 0; i < numpawns; i++) {
-    }
     table_w[idx] = win_loss[v];
   }
 }
