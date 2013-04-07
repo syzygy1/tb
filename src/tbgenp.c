@@ -6,9 +6,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <sys/time.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include "defs.h"
 #include "threads.h"
 
@@ -264,7 +264,7 @@ void calc_pawn_table_threaded(void)
 #endif
 }
 
-static pthread_mutex_t tc_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LOCK_T tc_mutex;
 static ubyte *tc_table;
 static ubyte *tc_v;
 static int tc_capt_closs, tc_closs;
@@ -279,7 +279,7 @@ static void tc_loop(struct thread_data *thread)
 
   for (; idx < end; idx++)
     if (v[table[idx]]) {
-      pthread_mutex_lock(&tc_mutex);
+      LOCK(tc_mutex);
       switch (v[table[idx]]) {
       case 1:
 	tc_capt_closs = 1;
@@ -297,7 +297,7 @@ static void tc_loop(struct thread_data *thread)
       }
       if (tc_capt_closs && tc_closs)
 	idx = end;
-      pthread_mutex_unlock(&tc_mutex);
+      UNLOCK(tc_mutex);
     }
 }
 
@@ -877,17 +877,14 @@ int main(int argc, char **argv)
   }
 #endif
 
-  posix_memalign((void *)&table_w, HUGEPAGESIZE, 2 * size);
-  if (table_w)
-    madvise((void *)table_w, 2 * size, MADV_HUGEPAGE);
-  else {
-    printf("Could not allocate sufficient memory.\n");
-    exit(1);
-  }
+  table_w = alloc_huge(2 * size);
   table_b = table_w + size;
 
   init_threads(1);
   init_tables();
+
+  LOCK_INIT(tc_mutex);
+  LOCK_INIT(stats_mutex);
 
   gettimeofday(&start_time, NULL);
   cur_time = start_time;

@@ -10,25 +10,26 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
+//#include <sys/mman.h>
 #include <fcntl.h>
 
 #include "defs.h"
 #include "checksum.h"
 #include "threads.h"
 #include "citycrc.h"
+#include "util.h"
 
 #define CHUNK (1ULL << 24)
 
 extern int total_work;
 
-uint64 checksum1[2];
-uint64 checksum2[2];
-uint64 *results;
-char *data;
-long64 size;
-int checksum_found;
-int checksum_match;
+static uint64 checksum1[2];
+static uint64 checksum2[2];
+static uint64 *results = NULL;
+static char *data;
+static long64 size;
+static int checksum_found;
+static int checksum_match;
 
 static void checksum_worker(struct thread_data *thread)
 {
@@ -46,16 +47,10 @@ static void checksum_worker(struct thread_data *thread)
 
 static void calc_checksum(char *name)
 {
-  struct stat statbuf;
-  int fd = open(name, O_RDONLY);
-  if (fd < 0) {
-    printf("Could not open %s for reading.\n", name);
-    exit(1);
-  }
-  fstat(fd, &statbuf);
-  size = statbuf.st_size;
-  data = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
-  close(fd);
+  long64 orig_size;
+
+  data = map_file(name, 0, &size);
+  orig_size = size;
   if ((size & 0x3f) == 0x10) {
     size &= ~0x3fULL;
     memcpy(checksum1, data + size, 16);
@@ -69,10 +64,11 @@ static void calc_checksum(char *name)
   }
 
   int chunks = (size + CHUNK - 1) / CHUNK;
-  results = (uint64 *)malloc(32 * chunks);
+  if (!results)
+    results = (uint64 *)malloc(32 * chunks);
   long64 *work = create_work(total_work, chunks, 0);
   run_threaded(checksum_worker, work, 0);
-  munmap(data, statbuf.st_size);
+  unmap_file(data, orig_size);
   free(work);
 
   CityHashCrc128((char *)results, 32 * chunks, checksum2);
@@ -84,26 +80,15 @@ static void calc_checksum(char *name)
 
 void print_checksum(char *name)
 {
-  struct stat statbuf;
-
   printf("%s: ", name);
-  int fd = open(name, O_RDONLY);
-  if (fd < 0) {
-    printf("Could not open %s for reading.\n", name);
-    exit(1);
-  }
-  fstat(fd, &statbuf);
-  size = statbuf.st_size;
-  data = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-  close(fd);
+  data = map_file(name, 0, &size);
   if ((size & 0x3f) == 0x10) {
-    size &= ~0x3fULL;
-    memcpy(checksum1, data + size, 16);
+    memcpy(checksum1, data + (size & ~0x3fULL), 16);
   } else {
     printf("No checksum found.\n");
     exit(1);
   }
-  munmap(data, statbuf.st_size);
+  unmap_file(data, size);
 
   int i;
   static char nibble[16] = "0123456789abcdef";
@@ -124,16 +109,13 @@ void add_checksum(char *name)
     printf("%s checksum already present.\n", checksum_match ? "Matching" : "Non-matching");
     exit(1);
   }
-  int fd = open(name, O_WRONLY | O_APPEND);
-  if (fd < 0) {
+  FILE *F = fopen(name, "ab");
+  if (!F) {
     printf("Could not open %s for appending.\n", name);
     exit(1);
   }
-  if (write(fd, checksum2, 16) < 16) {
-    perror("write");
-    exit(1);
-  }
-  close(fd);
+  fwrite(checksum2, 16, 1, F);
+  fclose(F);
 }
 
 void verify_checksum(char *name)
@@ -144,9 +126,9 @@ void verify_checksum(char *name)
     printf("No checksum present.\n");
     exit(1);
   }
-  if (!checksum_match) {
+  if (!checksum_match)
     printf("FAIL!\n");
-  }
-  printf("OK!\n");
+  else
+    printf("OK!\n");
 }
 

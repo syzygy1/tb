@@ -6,14 +6,28 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef __WIN32__
 #include <pthread.h>
+#else
+#include <windows.h>
+#endif
 #include <sys/time.h>
 #include "threads.h"
+#include "util.h"
 
-pthread_t threads[MAX_THREADS];
 struct thread_data thread_data[MAX_THREADS];
+
+#ifndef __WIN32__
+pthread_t threads[MAX_THREADS - 1];
 static pthread_attr_t thread_attr;
 static pthread_barrier_t barrier_start, barrier_end;
+#define THREAD_FUNC void*
+#else
+HANDLE threads[MAX_THREADS - 1];
+HANDLE start_event[MAX_THREADS - 1];
+HANDLE stop_event[MAX_THREADS - 1];
+#define THREAD_FUNC DWORD
+#endif
 
 static struct {
   void (*func)(struct thread_data *);
@@ -53,44 +67,71 @@ long64 *create_work(int n, long64 size, long64 mask)
   return w;
 }
 
-void *worker(void *arg);
+THREAD_FUNC worker(void *arg);
 
 void init_threads(int pawns)
 {
-  int i, rc;
-
-  pthread_attr_init(&thread_attr);
-  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
+  int i;
 
   for (i = 0; i < numthreads; i++)
     thread_data[i].thread = i;
 
   if (pawns) {
-    void *p;
-    posix_memalign(&p, 64, 64 * numthreads);
+    void *p = (void *)alloc_aligned(64 * numthreads, 64);
     for (i = 0; i < numthreads; i++)
       thread_data[i].p = (int *)(((ubyte *)p) + 64 * i);
   }
 
+#ifndef __WIN32__
+  pthread_attr_init(&thread_attr);
+  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   pthread_barrier_init(&barrier_start, NULL, numthreads);
   pthread_barrier_init(&barrier_end, NULL, numthreads);
 
   for (i = 0; i < numthreads - 1; i++) {
-    rc = pthread_create(&threads[i], NULL, worker, (void *)&(thread_data[i]));
+    int rc = pthread_create(&threads[i], NULL, worker,
+				  (void *)&(thread_data[i]));
     if (rc) {
       printf("ERROR: pthread_create() returned %d\n", rc);
-      exit(-1);
+      exit(1);
     }
   }
+#else
+  for (i = 0; i < numthreads - 1; i++) {
+    threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
+				  0, NULL);
+    if (threads[i] == NULL) {
+      printf("CreateThread() failed.\n");
+      exit(1);
+    }
+    start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+    stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!start_event[i] || !stop_event[i]) {
+      printf("CreateEvent() failed.\n");
+      exit(1);
+    }
+  }
+#endif
 }
 
-void *worker(void *arg)
+THREAD_FUNC worker(void *arg)
 {
   struct thread_data *thread = (struct thread_data *)arg;
+  int t = thread->thread;
   int w;
 
   do {
+#ifndef __WIN32__
     pthread_barrier_wait(&barrier_start);
+#else
+    if (t != numthreads - 1)
+      WaitForSingleObject(start_event[t], INFINITE);
+    else {
+      int i;
+      for (i = 0; i < numthreads - 1; i++)
+	SetEvent(start_event[i]);
+    }
+#endif
 
     int total = queue.total;
 
@@ -102,8 +143,15 @@ void *worker(void *arg)
       queue.func(thread);
     }
 
+#ifndef __WIN32__
     pthread_barrier_wait(&barrier_end);
-  } while (thread->thread != numthreads - 1);
+#else
+  if (t != numthreads - 1)
+    SetEvent(stop_event[t]);
+  else
+    WaitForMultipleObjects(numthreads - 1, stop_event, TRUE, INFINITE);
+#endif
+  } while (t != numthreads - 1);
 
   return 0;
 }

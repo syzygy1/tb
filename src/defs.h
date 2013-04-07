@@ -14,6 +14,14 @@ typedef unsigned char ubyte;
 typedef unsigned short ushort;
 typedef ushort Move;
 
+#ifndef __WIN32__
+// hack to avoid warnings on Linux that seem to be incorrect.
+// inttypes.h makes PRIu64 "lu", which in itself is fine given that
+// long on 64-bit Linux is 64 bits. However, gcc insists on llu...
+#undef PRIu64
+#define PRIu64 "llu"
+#endif
+
 #define PAWN 1
 #define KNIGHT 2
 #define BISHOP 3

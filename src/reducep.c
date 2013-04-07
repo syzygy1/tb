@@ -174,7 +174,8 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   int verify_ok = 1;
   for (i = 0; i < 256; i++)
     if (stats[i] != stats2[i] && i != map->max_num) {
-      printf("stats[%d] = %llu; stats2[%d] = %llu\n", i, stats[i], i, stats2[i]);
+      printf("stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
+		    i, stats[i], i, stats2[i]);
       int j;
       for (j = 0; j < 4; j++)
 	printf("map[%d][%d]=%d\n", j, i, map->map[j][i]);

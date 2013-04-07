@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include "defs.h"
 #include "threads.h"
 
@@ -138,7 +139,7 @@ void transform_table(struct thread_data *thread)
 
 #include "reduce.c"
 
-static pthread_mutex_t tc_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LOCK_T tc_mutex;
 static ubyte *tc_table;
 static ubyte *tc_v;
 static int tc_capt_closs, tc_closs;
@@ -153,7 +154,7 @@ static void tc_loop(struct thread_data *thread)
 
   for (; idx < end; idx++)
     if (v[table[idx]]) {
-      pthread_mutex_lock(&tc_mutex);
+      LOCK(tc_mutex);
       switch (v[table[idx]]) {
       case 1:
 	tc_capt_closs = 1;
@@ -171,7 +172,7 @@ static void tc_loop(struct thread_data *thread)
       }
       if (tc_capt_closs && tc_closs)
 	idx = end;
-      pthread_mutex_unlock(&tc_mutex);
+      UNLOCK(tc_mutex);
     }
 }
 
@@ -694,19 +695,15 @@ int main(int argc, char **argv)
     cursed_capt[i] = 0;
   has_cursed_capts = 0;
 
-  posix_memalign((void *)&table_w, HUGEPAGESIZE, size);
-  posix_memalign((void *)&table_b, HUGEPAGESIZE, size);
-  if (table_w && table_b) {
-    madvise((void *)table_w, size, MADV_HUGEPAGE);
-    madvise((void *)table_b, size, MADV_HUGEPAGE);
-  } else {
-    printf("Could not allocate sufficient memory.\n");
-    exit(1);
-  }
+  table_w = alloc_huge(size);
+  table_b = alloc_huge(size);
 //  table_b = table_w + size;
 
   init_threads(0);
   init_tables();
+
+  LOCK_INIT(tc_mutex);
+  LOCK_INIT(stats_mutex);
 
   gettimeofday(&start_time, NULL);
   cur_time = start_time;

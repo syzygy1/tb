@@ -7,8 +7,8 @@ all tablebases for up to 6 pieces.
 Requirements for the generator:
 * 32GB of RAM for 6-piece tables (much less for 5-piece tables).
 * x86-64 CPU with popcnt support.
-* 64-bit Linux OS.
-
+* 64-bit OS.
+* Sufficiently recent gcc (producing 64-bit executables).
 
 ### Tablebase files
 
@@ -33,8 +33,8 @@ tables are stored on an SSD.
 ### Tablebase generator
 
 The directory src/ contains the tablebase generator code. It should be
-easy to build on a x86-64 Linux system ("make all"). There are five
-programs:
+easy to build on x86-64 Linux system and on 64-bit Windows with MinGW
+("make all"). There are five programs:
 * rtbgen for generating pawnless tablebases.
 * rtbgenp for generating pawnful tablebases.
 * rtbver for verifying pawnless tablebases.

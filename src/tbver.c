@@ -6,14 +6,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <sys/time.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include "defs.h"
 #include "threads.h"
-
 #include "board.h"
+#include "util.h"
+
 #include "probe.c"
 #include "board.c"
 
@@ -283,13 +284,7 @@ int main(int argc, char **argv)
       black_king = i;
 #endif
 
-  posix_memalign((void *)&table_w, HUGEPAGESIZE, 2 * size);
-  if (table_w)
-    madvise((void *)table_w, 2 * size, MADV_HUGEPAGE);
-  else {
-    printf("Could not allocate sufficient memory.\n");
-    exit(1);
-  }
+  table_w = alloc_huge(2 * size);
   table_b = table_w + size;
 
   printf("Verifying %s.\n", tablename);

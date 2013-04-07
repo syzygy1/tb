@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <inttypes.h>
 #include "defs.h"
 #include "probe.h"
 #include "threads.h"
@@ -1223,7 +1223,7 @@ void calc_block_sizes(ubyte *data, long64 size, struct HuffCode *c, int maxsize)
   uint32 avg;
 
   long64 rawsize = calc_size(c);
-  printf("calc_size: %llu\n", rawsize);
+  printf("calc_size: %"PRIu64"\n", rawsize);
 
   long64 optsize, compsize;
 
@@ -1270,7 +1270,7 @@ void calc_block_sizes(ubyte *data, long64 size, struct HuffCode *c, int maxsize)
     else t = 0;
     compsize += 2 * block + 6 * num_indices;
 
-    printf("bits = %d; blocks = %llu (%d); size = %llu\n", blocksize, block-((t+65535)>>16), (t+65535)>>16, compsize);
+    printf("bits = %d; blocks = %"PRIu64" (%d); size = %"PRIu64"\n", blocksize, block-((t+65535)>>16), (t+65535)>>16, compsize);
 
   } while (compsize < optsize);
 
@@ -1368,7 +1368,7 @@ void calc_block_sizes(ubyte *data, long64 size, struct HuffCode *c, int maxsize)
     idx2 += 1ULL << idxbits;
   }
 
-  printf("real_num_blocks = %llu; num_blocks = %llu\n", real_num_blocks, num_blocks);
+  printf("real_num_blocks = %"PRIu64"; num_blocks = %"PRIu64"\n", real_num_blocks, num_blocks);
   printf("idxbits = %d\n", idxbits);
   printf("num_indices = %d\n", num_indices);
 }

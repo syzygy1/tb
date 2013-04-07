@@ -36,10 +36,10 @@ static void print_fen(FILE *F, long64 idx, int wtm, int switched)
       fprintf(F, "%c", '0' + cnt);
     if (i) fprintf(F, "/");
   }
-  fprintf(F, " %c\n", wtm ? 'w' : 'b');
+  fprintf(F, " %c - -\n", wtm ? 'w' : 'b');
 }
 
-static pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LOCK_T stats_mutex;
 
 long64 found_idx;
 ubyte *find_val_table;
@@ -58,10 +58,10 @@ static void find_loop(struct thread_data *thread)
     if (table[idx] == v) break;
 
   if (idx < end) {
-    pthread_mutex_lock(&stats_mutex);
+    LOCK(stats_mutex);
     if (idx < end && idx < found_idx)
       found_idx = idx;
-    pthread_mutex_unlock(&stats_mutex);
+    UNLOCK(stats_mutex);
   }
 }
 
@@ -292,7 +292,7 @@ void collect_stats(int phase)
   int i;
 
   if (thread_stats == NULL) {
-    posix_memalign((void **)&thread_stats, 64, 8 * 256 * numthreads);
+    thread_stats = (long64 *)alloc_aligned(8 * 256 * numthreads, 64);
     for (i = 0; i < numthreads; i++)
       thread_data[i].stats = thread_stats + i * 256;
 
@@ -317,32 +317,32 @@ void print_stats(FILE *F, long64 *stats, int wtm)
   fprintf(F, "%s to move:\n\n", wtm ? "White" : "Black");
 
   if (stats[0])
-    fprintf(F, "%llu positions win in %d ply.\n", stats[0] >> 1, 0);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[0] >> 1, 0);
 #ifndef SUICIDE
   if (stats[1] + stats[511])
-    fprintf(F, "%llu positions win in %d ply.\n", (stats[1] + stats[511]) >> 1, 1);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[1] + stats[511]) >> 1, 1);
 #else
   if (stats[1])
-    fprintf(F, "%llu positions win in %d ply.\n", stats[1] >> 1, 1);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[1] >> 1, 1);
 #endif
   for (i = 2; i <= DRAW_RULE; i++)
     if (stats[i])
-      fprintf(F, "%llu positions win in %d ply.\n", stats[i] >> 1, i);
+      fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[i] >> 1, i);
 #ifndef SUICIDE
   if (stats[i] + stats[510])
-    fprintf(F, "%llu positions win in %d ply.\n", (stats[i] + stats[510]) >> 1, i);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[510]) >> 1, i);
   i++;
 #else
   if (stats[i] + stats[511] + stats[510])
-    fprintf(F, "%llu positions win in %d ply.\n", (stats[i] + stats[511] + stats[510]) >> 1, i);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[511] + stats[510]) >> 1, i);
   i++;
   if (stats[i] + stats[509])
-    fprintf(F, "%llu positions win in %d ply.\n", (stats[i] + stats[509]) >> 1, i);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[509]) >> 1, i);
   i++;
 #endif
   for (; i <= MAX_PLY; i++)
     if (stats[i])
-      fprintf(F, "%llu positions win in %d ply.\n", stats[i] >> 1, i);
+      fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[i] >> 1, i);
 
 #ifndef SUICIDE
   sum = stats[511];
@@ -351,7 +351,7 @@ void print_stats(FILE *F, long64 *stats, int wtm)
 #endif
   for (i = 0; i <= DRAW_RULE; i++)
     sum += stats[i];
-  fprintf(F, "\n%llu positions are wins.\n", sum >> 1);
+  fprintf(F, "\n%"PRIu64" positions are wins.\n", sum >> 1);
 
 #ifndef SUICIDE
   sum = stats[510];
@@ -360,12 +360,12 @@ void print_stats(FILE *F, long64 *stats, int wtm)
 #endif
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     sum += stats[i];
-  if (sum) fprintf(F, "%llu positions are cursed wins.\n", sum >> 1);
+  if (sum) fprintf(F, "%"PRIu64" positions are cursed wins.\n", sum >> 1);
 
 #ifndef SUICIDE
-  fprintf(F, "%llu positions are draws.\n", (stats[512] + stats[513]) >> 1);
+  fprintf(F, "%"PRIu64" positions are draws.\n", (stats[512] + stats[513]) >> 1);
 #else
-  fprintf(F, "%llu positions are draws.\n", (stats[512] + stats[513] + stats[514]) >> 1);
+  fprintf(F, "%"PRIu64" positions are draws.\n", (stats[512] + stats[513] + stats[514]) >> 1);
 #endif
 
 #ifndef SUICIDE
@@ -375,24 +375,24 @@ void print_stats(FILE *F, long64 *stats, int wtm)
 #endif
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     sum += stats[1023 - i];
-  if (sum) fprintf(F, "%llu positions are cursed losses.\n", sum >> 1);
+  if (sum) fprintf(F, "%"PRIu64" positions are cursed losses.\n", sum >> 1);
 
   sum = 0;
   for (i = 0; i <= DRAW_RULE; i++)
     sum += stats[1023 - i];
-  fprintf(F, "%llu positions are losses.\n\n", sum >> 1);
+  fprintf(F, "%"PRIu64" positions are losses.\n\n", sum >> 1);
 
   for (i = 0; i <= DRAW_RULE; i++)
     if (stats[1023 - i])
-      fprintf(F, "%llu positions lose in %d ply.\n", stats[1023 - i] >> 1, i);
+      fprintf(F, "%"PRIu64" positions lose in %d ply.\n", stats[1023 - i] >> 1, i);
 #ifdef SUICIDE
   if (stats[1023 - i] + stats[515])
-    fprintf(F, "%llu positions lose in %d ply.\n", (stats[1023 - i] + stats[515]) >> 1, i);
+    fprintf(F, "%"PRIu64" positions lose in %d ply.\n", (stats[1023 - i] + stats[515]) >> 1, i);
   i++;
 #endif
   for (; i <= MAX_PLY; i++)
     if (stats[1023 - i])
-      fprintf(F, "%llu positions lose in %d ply.\n", stats[1023 - i] >> 1, i);
+      fprintf(F, "%"PRIu64" positions lose in %d ply.\n", stats[1023 - i] >> 1, i);
   fprintf(F, "\n");
 }
 

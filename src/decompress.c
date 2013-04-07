@@ -8,15 +8,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <pthread.h>
-#include <asm/byteorder.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include "defs.h"
 #include "probe.h"
 #include "threads.h"
+#include "util.h"
 
 #define TBPIECES 6
 
@@ -482,7 +480,7 @@ static void decompress_worker(struct thread_data *thread)
     if (blockend > table_size) blockend = table_size;
 
     uint32 *ptr = (uint32 *)data;
-    long64 code = __swab64(*(long64 *)ptr);
+    long64 code = byteswap64(*(long64 *)ptr);
     ptr += 2;
     bitcnt = 0;
     while (idx < blockend) {
@@ -494,7 +492,7 @@ static void decompress_worker(struct thread_data *thread)
       bitcnt += l;
       if (bitcnt >= 32) {
 	bitcnt -= 32;
-	code |= ((long64)(__swab32(*ptr++))) << bitcnt;
+	code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
       }
     }
     data += 1 << d->blocksize;
@@ -526,8 +524,6 @@ ubyte *decompress_table(struct tb_handle *H, int bside, int f)
 
 struct tb_handle *open_tb(char *tablename, int wdl)
 {
-  int fd;
-  struct stat statbuf;
   char name[128];
   struct tb_handle *H = malloc(sizeof(struct tb_handle));
 
@@ -539,16 +535,12 @@ struct tb_handle *open_tb(char *tablename, int wdl)
   strcat(name, "/");
   strcat(name, tablename);
   strcat(name, wdl ? WDLSUFFIX : DTZSUFFIX);
-  if (!(H->F = fopen(name, "rb")) || (fd = open(name, O_RDONLY)) < 0) {
+  if (!(H->F = fopen(name, "rb"))) {
     printf("Could not open %s for reading.\n", name);
     exit(1);
   }
+  H->data = (ubyte *)map_file(name, 1, &(H->data_size));
   H->wdl = wdl;
-
-  fstat(fd, &statbuf);
-  H->data_size = statbuf.st_size;
-  H->data = (ubyte *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
 
   return H;
 }
@@ -559,7 +551,7 @@ void close_tb(struct tb_handle *H)
   int f;
 
   fclose(H->F);
-  munmap(H->data, H->data_size);
+  unmap_file((char *)H->data, H->data_size);
 
   if (!H->has_pawns) {
     struct TBEntry_piece *entry = &(H->entry_piece);

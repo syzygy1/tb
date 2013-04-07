@@ -10,16 +10,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include <asm/byteorder.h>
-#include <pthread.h>
 
 #define LOOKUP
 #define LUBITS 12
 
 #include "board.h"
 #include "probe.h"
+#include "util.h"
 
 #if defined(SUICIDE)
 // 5-piece:
@@ -98,7 +96,7 @@ long64 tb_piece_key[] = {
 
 #define Swap(a,b) {int tmp=a;a=b;b=tmp;}
 
-static pthread_mutex_t TB_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LOCK_T TB_mutex, fail_mutex;
 
 char WDLdir[128];
 
@@ -234,6 +232,9 @@ void init_tablebases(void)
 #ifdef SUICIDE
   int m;
 #endif
+
+  LOCK_INIT(TB_mutex);
+  LOCK_INIT(fail_mutex);
 
   TBnum_piece = TBnum_pawn = 0;
 
@@ -2070,7 +2071,6 @@ static void init_table(struct TBEntry *entry, long64 key)
   char file[256];
   int i;
   long64 k1, k2, key2;
-  struct stat statbuf;
   key2 = 0ULL;
   k1 = key;
 #if defined(SUICIDE)
@@ -2116,19 +2116,8 @@ static void init_table(struct TBEntry *entry, long64 key)
 #endif
   *str++ = 0;
   strcat(file, WDLSUFFIX);
-  int fd = open(file, O_RDONLY);
-  if (fd < 0) {
-    printf("Could not open %s.\n", file);
-    exit(1);
-  }
-  fstat(fd, &statbuf);
-  entry->data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
-  if (entry->data == (char *)(-1)) {
-    perror("mmap");
-    exit(1);
-  }
-
+  long64 dummy;
+  entry->data = map_file(file, 1, &dummy);
   ubyte *data = (ubyte *)entry->data;
   if (((uint32 *)data)[0] != WDL_MAGIC) {
     printf("Corrupted table.\n");
@@ -2260,7 +2249,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
   int sym, bitcnt;
 
 #ifndef LOOKUP
-  long64 code = __swab64(*((long64 *)ptr));
+  long64 code = byteswap64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2273,11 +2262,11 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__swab32(*ptr++))) << bitcnt;
+      code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
     }
   }
 #else
-  long64 code = __swab64(*((long64 *)ptr));
+  long64 code = byteswap64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2307,7 +2296,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__swab32(*ptr++))) << bitcnt;
+      code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
     }
   }
 #endif
@@ -2371,12 +2360,12 @@ int probe_table(int *pieces, int *gpos, int wtm)
 
   ptr = ptr2[i].ptr;
   if (!ptr->ready) {
-    pthread_mutex_lock(&TB_mutex);
+    LOCK(TB_mutex);
     if (!ptr->ready) {
       init_table(ptr, key);
       ptr->ready = 1;
     }
-    pthread_mutex_unlock(&TB_mutex);
+    UNLOCK(TB_mutex);
   }
 
   int bside, mirror, cmirror;
@@ -3018,14 +3007,12 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
 }
 #endif
 
-static pthread_mutex_t fail_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 static __attribute__ ((noinline)) void probe_failed(int *pieces)
 {
   int i, j, k;
   char str[32];
 
-  pthread_mutex_lock(&fail_mutex);
+  LOCK(fail_mutex);
   k = 0;
   for (i = 0; i < 6; i++)
     for (j = 0; j < numpcs; j++)

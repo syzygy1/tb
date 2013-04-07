@@ -771,7 +771,7 @@ void load_wdl(struct thread_data *thread)
     if (v2 > 4) table[idx_p] = WDL_ERROR;
     else table[idx_p] = wdl_matrix[v2][v1_p];
 if(table[idx_p]==WDL_ERROR)
-printf("WDL_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
+printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
     v1_p = v1;
     idx_p = idx;
     idx2_p = idx2;
@@ -781,7 +781,7 @@ printf("WDL_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
   if (v2 > 4) table[idx_p] = WDL_ERROR;
   else table[idx_p] = wdl_matrix[v2][v1_p];
 if(table[idx_p]==WDL_ERROR)
-printf("WDL_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
+printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
 }
 #else
 void load_wdl(struct thread_data *thread)
@@ -809,7 +809,7 @@ void load_wdl(struct thread_data *thread)
     if (v2 > 4) table[idx] = WDL_ERROR;
     else table[idx] = wdl_matrix[v2][v1];
 if(table[idx]==WDL_ERROR)
-printf("WDL_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx, v2, v1);
+printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }
 #endif
@@ -856,7 +856,7 @@ void load_dtz(struct thread_data *thread)
     v2 = src[idx2_p];
     table[idx_p] = wdl_to_dtz[v1_p][v2];
 if(table[idx_p]==DTZ_ERROR)
-error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx_p, v1_p, v2, idx2_p);
+error("DTZ_ERROR: idx = %"PRIu64", v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx_p, v1_p, v2, idx2_p);
     v1_p = v1;
     idx_p = idx;
     idx2_p = idx2;
@@ -865,7 +865,7 @@ error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx_p, v1_p, v2,
   v2 = src[idx2_p];
   table[idx_p] = wdl_to_dtz[v1_p][v2];
 if(table[idx_p]==DTZ_ERROR)
-error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx_p, v1_p, v2, idx2_p);
+error("DTZ_ERROR: idx = %"PRIu64", v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx_p, v1_p, v2, idx2_p);
 }
 
 void load_dtz_mapped(struct thread_data *thread)
@@ -897,7 +897,7 @@ void load_dtz_mapped(struct thread_data *thread)
     v2 = map[wdl][src[idx2]];
     table[idx] = wdl_to_dtz[v1][v2];
 if(table[idx]==DTZ_ERROR)
-error("DTZ_ERROR: idx = %llu, wdl = %d, v1 = %d, v2 = %d, idx2 = %llu\n", idx, wdl, v1, v2, idx2);
+error("DTZ_ERROR: idx = %"PRIu64", wdl = %d, v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx, wdl, v1, v2, idx2);
   }
 }
 
@@ -936,7 +936,7 @@ void verify_opp(struct thread_data *thread)
     if (v >= WDL_ILLEGAL) {
       opp_table[idx] = wdl_to_dtz_c[v - WDL_ERROR];
       if (v == WDL_ERROR)
-	error("ERROR: opp table, idx = %llu, v = WDL_ERROR\n", idx);
+	error("ERROR: opp table, idx = %"PRIu64", v = WDL_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
@@ -944,7 +944,7 @@ void verify_opp(struct thread_data *thread)
     int z = dtz_to_opp[v][w];
     opp_table[idx] = z;
     if (z == DTZ_ERROR)
-      error("ERROR: opp table, idx = %llu, v = %d, w = %d\n", idx, v, w);
+      error("ERROR: opp table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
 
@@ -959,13 +959,13 @@ void verify_dtz(struct thread_data *thread)
     int v = dtz_table[idx];
     if (v == DTZ_ILLEGAL || v >= DTZ_ERROR) {
       if (v == DTZ_ERROR)
-	error("ERROR: dtz table, idx = %llu, v = DTZ_ERROR\n", idx);
+	error("ERROR: dtz table, idx = %"PRIu64", v = DTZ_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
     int w = compute(dtz_pieces, idx, opp_table, occ, p);
     if (!dtz_matrix[v][w])
-      error("ERROR: dtz table, idx = %llu, v = %d, w = %d\n", idx, v, w);
+      error("ERROR: dtz table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
 
@@ -982,7 +982,7 @@ void verify_wdl(struct thread_data *thread)
     FILL_OCC;
     int w = compute(pieces, idx, opp_table, occ, p);
     if (!w_matrix[v][w])
-      error("ERROR: wdl table, idx = %llu, v = %d, w = %d\n", idx, v, w);
+      error("ERROR: wdl table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
 
@@ -1014,6 +1014,6 @@ void wdl_load_wdl(struct thread_data *thread)
     if (v2 > 4) table[idx] = W_ERROR;
     else table[idx] = w_wdl_matrix[v2][v1];
 if(table[idx]==W_ERROR)
-printf("W_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx, v2, v1);
+printf("W_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }

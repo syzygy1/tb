@@ -12,8 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <pthread.h>
+#include <inttypes.h>
 #include "defs.h"
 #include "threads.h"
 #include "probe.h"
@@ -664,7 +663,7 @@ void estimate_compression_piece(ubyte *table, int *pcs, int wdl, int num_cands)
     printf("; perm:");
     for (i = 0; i < num_types; i++)
       printf(" %2d", type_perm_list[trylist[p]][i]);
-    printf("; %llu\n", csize);
+    printf("; %"PRIu64"\n", csize);
     compest[trylist[p]] = csize;
   }
 
@@ -700,7 +699,7 @@ void estimate_compression_pawn(ubyte *table, int *pcs, int file, int wdl, int nu
     printf("; perm:");
     for (i = 0; i < num_types; i++)
       printf(" %2d", type_perm_list[trylist[p]][i]);
-    printf("; %llu\n", csize);
+    printf("; %"PRIu64"\n", csize);
     compest[trylist[p]] = csize;
   }
 
@@ -909,7 +908,7 @@ ubyte *init_permute_piece(int *pcs, int *pt)
   set_norm_piece(pcs, type_perm_list[0], norm, order_list[0]);
   calc_order_piece(entry_piece.num, order_list[0], order, norm);
   tb_size = calc_factors_piece(factor, entry_piece.num, order_list[0], norm, entry_piece.enc_type);
-  printf("tb_size = %llu\n", tb_size);
+  printf("tb_size = %"PRIu64"\n", tb_size);
 
   generate_test_list(tb_size, entry_piece.num);
   ubyte *tb_table = malloc(tb_size);
@@ -1096,7 +1095,7 @@ ubyte *init_permute_file(int *pcs, int file)
   set_norm_pawn(pcs, type_perm_list[0], norm, order_list[0], order2_list[0]);
   calc_order_pawn(entry_pawn.num, order_list[0], order2_list[0], order, norm);
   tb_size = calc_factors_pawn(factor, entry_pawn.num, order_list[0], order2_list[0], norm, file);
-  printf("tb_size = %llu\n", tb_size);
+  printf("tb_size = %"PRIu64"\n", tb_size);
 
   generate_test_list(tb_size, entry_pawn.num);
 
