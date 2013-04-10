@@ -14,10 +14,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef __WIN32__
 #include <sys/mman.h>
-#include <asm/byteorder.h>
-#include <pthread.h>
-
+#endif
 #include "tbcore.h"
 
 #define TBMAX_PIECE 254
@@ -39,7 +38,7 @@
 #define TB_WPAWN TB_PAWN
 #define TB_BPAWN (TB_PAWN | 8)
 
-static pthread_mutex_t TB_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LOCK_T TB_mutex;
 
 static char TBdir[128];
 static char WDLdir[128];
@@ -56,6 +55,60 @@ static struct DTZTableEntry DTZ_table[DTZ_ENTRIES];
 
 static void init_indices(void);
 static uint64 calc_key_from_pcs(int *pcs, int mirror);
+
+static char *map_file(char *name, uint64 *size)
+{
+#ifndef __WIN32__
+  struct stat statbuf;
+  int fd = open(name, O_RDONLY);
+  if (fd < 0) {
+    printf("Could not open %s for reading.\n", name);
+    exit(1);
+  }
+  fstat(fd, &statbuf);
+  *size = statbuf.st_size;
+  char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ,
+			      MAP_SHARED, fd, 0);
+  if (data == (char *)(-1)) {
+    printf("Could not mmap() %s.\n", name);
+    exit(1);
+  }
+  close(fd);
+  return data;
+#else
+  HANDLE h = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
+			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (h == INVALID_HANDLE_VALUE) {
+    printf("Could not open %s for reading.\n", name);
+    exit(1);
+  }
+  DWORD size_low, size_high;
+  size_low = GetFileSize(h, &size_high);
+  *size = ((uint64)size_high) << 32 | ((uint64)size_low);
+  HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
+				  NULL);
+  if (map == NULL) {
+    printf("CreateFileMapping() failed.\n");
+    exit(1);
+  }
+  char *data = (char *)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
+  if (data == NULL) {
+    printf("MapViewOfFile() failed.\n");
+    exit(1);
+  }
+  CloseHandle(h);
+  return data;
+#endif
+}
+
+static void unmap_file(char *data, uint64 size)
+{
+#ifndef __WIN32__
+  munmap(data, size);
+#else
+  UnmapViewOfFile(data);
+#endif
+}
 
 static void add_to_hash(struct TBEntry *ptr, uint64 key)
 {
@@ -178,6 +231,8 @@ void init_tablebases(void)
 {
   char str[16], *dirptr;
   int i, j, k, l;
+
+  LOCK_INIT(TB_mutex);
 
   TBnum_piece = TBnum_pawn = 0;
 
@@ -1151,25 +1206,12 @@ static int init_table_wdl(struct TBEntry *entry, char *str)
 
   // first mmap the table into memory
   char file[256];
-  struct stat statbuf;
-
   strcpy(file, WDLdir);
   strcat(file, "/");
   strcat(file, str);
-
   strcat(file, WDLSUFFIX);
-  int fd = open(file, O_RDONLY);
-  if (fd < 0) {
-    printf("Could not open %s.\n", file);
-    return 0;
-  }
-  fstat(fd, &statbuf);
-  entry->data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
-  if (entry->data == (char *)(-1)) {
-    perror("mmap");
-    return 0;
-  }
+  uint64 dummy;
+  entry->data = map_file(file, &dummy);
 
   ubyte *data = (ubyte *)entry->data;
   if (((uint32 *)data)[0] != WDL_MAGIC) {
@@ -1388,7 +1430,7 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
   ubyte *symlen = d->symlen;
   int sym, bitcnt;
 
-  uint64 code = __swab64(*((uint64 *)ptr));
+  uint64 code = __builtin_bswap64(*((uint64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -1401,7 +1443,7 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((uint64)(__swab32(*ptr++))) << bitcnt;
+      code |= ((uint64)(__builtin_bswap32(*ptr++))) << bitcnt;
     }
   }
 
@@ -1426,7 +1468,6 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
   int i;
   struct TBEntry *ptr, *ptr3;
   struct TBHashEntry *ptr2;
-  struct stat statbuf;
 
   DTZ_table[0].key1 = key1;
   DTZ_table[0].key2 = key2;
@@ -1447,18 +1488,8 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
   strcat(file, "/");
   strcat(file, str);
   strcat(file, DTZSUFFIX);
-  int fd = open(file, O_RDONLY);
-  if (fd == -1) {
-    free(ptr3);
-    return;
-  }
-  fstat(fd, &statbuf);
-  ptr3->data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
-  if (ptr3->data == (char *)(-1)) {
-    free(ptr3);
-    return;
-  }
+  uint64 size;
+  ptr3->data = map_file(file, &size);
   ptr3->key = ptr->key;
   ptr3->num = ptr->num;
   ptr3->symmetric = ptr->symmetric;
@@ -1467,11 +1498,11 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
     struct DTZEntry_pawn *entry = (struct DTZEntry_pawn *)ptr3;
     entry->pawns[0] = ((struct TBEntry_pawn *)ptr)->pawns[0];
     entry->pawns[1] = ((struct TBEntry_pawn *)ptr)->pawns[1];
-    entry->mapped_size = statbuf.st_size;
+    entry->mapped_size = size;
   } else {
     struct DTZEntry_piece *entry = (struct DTZEntry_piece *)ptr3;
     entry->enc_type = ((struct TBEntry_piece *)ptr)->enc_type;
-    entry->mapped_size = statbuf.st_size;
+    entry->mapped_size = size;
   }
   if (!init_table_dtz(ptr3))
     free(ptr3);
@@ -1484,13 +1515,13 @@ static void free_dtz_entry(struct TBEntry *entry)
   if (!entry->has_pawns) {
     struct DTZEntry_piece *ptr = (struct DTZEntry_piece *)entry;
     free(ptr->precomp);
-    munmap(ptr->data, ptr->mapped_size);
+    unmap_file(ptr->data, ptr->mapped_size);
   } else {
     struct DTZEntry_pawn *ptr = (struct DTZEntry_pawn *)entry;
     int f;
     for (f = 0; f < 4; f++)
       free(ptr->file[f].precomp);
-    munmap(ptr->data, ptr->mapped_size);
+    unmap_file(ptr->data, ptr->mapped_size);
   }
   free(entry);
 }

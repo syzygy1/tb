@@ -2249,7 +2249,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
   int sym, bitcnt;
 
 #ifndef LOOKUP
-  long64 code = byteswap64(*((long64 *)ptr));
+  long64 code = __builtin_bswap64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2262,11 +2262,11 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
+      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
     }
   }
 #else
-  long64 code = byteswap64(*((long64 *)ptr));
+  long64 code = __builtin_bswap64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2296,7 +2296,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
+      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
     }
   }
 #endif

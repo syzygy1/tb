@@ -10,7 +10,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-//#include <sys/mman.h>
 #include <fcntl.h>
 
 #include "defs.h"
@@ -30,6 +29,7 @@ static char *data;
 static long64 size;
 static int checksum_found;
 static int checksum_match;
+static long64 *work = NULL;
 
 static void checksum_worker(struct thread_data *thread)
 {
@@ -49,6 +49,8 @@ static void calc_checksum(char *name)
 {
   long64 orig_size;
 
+  if (!work) work = alloc_work(total_work);
+
   data = map_file(name, 0, &size);
   orig_size = size;
   if ((size & 0x3f) == 0x10) {
@@ -64,14 +66,12 @@ static void calc_checksum(char *name)
   }
 
   int chunks = (size + CHUNK - 1) / CHUNK;
-  if (!results)
-    results = (uint64 *)malloc(32 * chunks);
-  long64 *work = create_work(total_work, chunks, 0);
+  results = (uint64 *)malloc(32 * chunks);
+  fill_work(total_work, chunks, 0, work);
   run_threaded(checksum_worker, work, 0);
-  unmap_file(data, orig_size);
-  free(work);
-
   CityHashCrc128((char *)results, 32 * chunks, checksum2);
+  unmap_file(data, orig_size);
+  free(results);
 
   if (checksum_found)
     checksum_match = (checksum1[0] == checksum2[0]

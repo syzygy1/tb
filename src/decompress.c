@@ -480,7 +480,7 @@ static void decompress_worker(struct thread_data *thread)
     if (blockend > table_size) blockend = table_size;
 
     uint32 *ptr = (uint32 *)data;
-    long64 code = byteswap64(*(long64 *)ptr);
+    long64 code = __builtin_bswap64(*(long64 *)ptr);
     ptr += 2;
     bitcnt = 0;
     while (idx < blockend) {
@@ -492,7 +492,7 @@ static void decompress_worker(struct thread_data *thread)
       bitcnt += l;
       if (bitcnt >= 32) {
 	bitcnt -= 32;
-	code |= ((long64)(byteswap32(*ptr++))) << bitcnt;
+	code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
       }
     }
     data += 1 << d->blocksize;

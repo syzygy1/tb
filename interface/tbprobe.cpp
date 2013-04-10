@@ -110,7 +110,7 @@ static int probe_wdl_table(Position& pos, int *success)
 
   ptr = ptr2[i].ptr;
   if (!ptr->ready) {
-    pthread_mutex_lock(&TB_mutex);
+    LOCK(TB_mutex);
     if (!ptr->ready) {
       char str[16];
       prt_str(pos, str, ptr->key != key);
@@ -122,7 +122,7 @@ static int probe_wdl_table(Position& pos, int *success)
       }
       ptr->ready = 1;
     }
-    pthread_mutex_unlock(&TB_mutex);
+    UNLOCK(TB_mutex);
   }
 
   int bside, mirror, cmirror;
@@ -141,7 +141,7 @@ static int probe_wdl_table(Position& pos, int *success)
     bside = 0;
   }
 
-  // p[i] should contain the square 0-63 for a piece of type
+  // p[i] is to contain the square 0-63 (A1-H8) for a piece of type
   // pc[i] ^ cmirror, where 1 = white pawn, ..., 14 = black king.
   // Pieces of the same type are guaranteed to be consecutive.
   if (!ptr->has_pawns) {
