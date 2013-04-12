@@ -98,16 +98,18 @@ void init_threads(int pawns)
   }
 #else
   for (i = 0; i < numthreads - 1; i++) {
-    threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
-				  0, NULL);
-    if (threads[i] == NULL) {
-      printf("CreateThread() failed.\n");
-      exit(1);
-    }
     start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (!start_event[i] || !stop_event[i]) {
       printf("CreateEvent() failed.\n");
+      exit(1);
+    }
+  }
+  for (i = 0; i < numthreads - 1; i++) {
+    threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
+				  0, NULL);
+    if (threads[i] == NULL) {
+      printf("CreateThread() failed.\n");
       exit(1);
     }
   }
