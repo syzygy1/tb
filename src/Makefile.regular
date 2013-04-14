@@ -12,10 +12,10 @@ FLAGS = -DREGULAR
 # When compiling for On non-Windows systems, add -pthread.
 
 # regular Linux
-#CC = gcc -pthread
+CC = gcc -pthread
 
 # cross compiling from Linux to Windows
-CC = x86_64-w64-mingw32-gcc
+#CC = x86_64-w64-mingw32-gcc
 
 include Makefile.general
 

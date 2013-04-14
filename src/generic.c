@@ -4,7 +4,8 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-static long64 mask_a1h1, mask_a1a8, mask_a1h8;
+//static long64 mask_a1h1, mask_a1a8, mask_a1h8;
+static long64 mask_a1h8;
 static long64 idx_mask1[8], idx_mask2[8];
 
 static const char mirror[] = {
@@ -35,10 +36,13 @@ static const ubyte tri0x40_init[32] = {
   0, 0, 0, 9, 0, 0, 0, 0
 };
 
+#define diagonal (tri0x40[0])
+
 void init_tables(void)
 {
   int i, sq;
 
+  long64 mask_a1h1, mask_a1a8;
   mask_a1h1 = mask_a1a8 = mask_a1h8 = 0;
   for (i = 1; i < numpcs; i++) {
     mask_a1h1 = (mask_a1h1 << 6) | 0x07;
@@ -67,8 +71,8 @@ void init_tables(void)
   set_up_tables();
 }
 
-#define MIRROR_A1H1(x) ((x) ^ mask_a1h1)
-#define MIRROR_A1A8(x) ((x) ^ mask_a1a8)
+//#define MIRROR_A1H1(x) ((x) ^ mask_a1h1)
+//#define MIRROR_A1A8(x) ((x) ^ mask_a1a8)
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
 static long64 __inline__ MakeMove0(long64 idx, int sq)
@@ -92,7 +96,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 }
 
 #define CHECK_DIAG int flag = mirror[p[0]]
-#define PIVOT_ON_DIAG(idx) (flag && idx >= tri0x40[0])
+#define PIVOT_ON_DIAG(idx) (flag && idx >= diagonal)
 #define PIVOT_MIRROR(idx) (MIRROR_A1H8(idx) | (idx & mask[0]))
 
 // use bit_set
@@ -121,7 +125,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   occ = 0; \
   for (i = n - 2, idx2 = idx >> 6; i > 0; i--, idx2 >>= 6) \
     bit_set(occ, p[i] = idx2 & 0x3f); \
-  bit_set(occ, p[i] = inv_tri0x40[idx2]); \
+  bit_set(occ, p[0] = inv_tri0x40[idx2]); \
   if (PopCount(occ) == n - 1)
 
 #define FILL_OCC64_asmgoto \

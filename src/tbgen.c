@@ -24,7 +24,11 @@ void transform_table(struct thread_data *thread);
 extern int total_work;
 extern struct thread_data thread_data[];
 static long64 *work_g;
+#ifndef SMALL
 static long64 *work_piv;
+#else
+static long64 *work_piv0, *work_piv1;
+#endif
 
 struct tb_handle;
 ubyte *table_w, *table_b;
@@ -67,7 +71,11 @@ ubyte *transform_tbl;
 #define COPYSIZE 10*1024*1024
 ubyte *copybuf = NULL;
 
+#ifndef SMALL
 #include "generic.c"
+#else
+#include "generics.c"
+#endif
 
 #if defined(REGULAR)
 #include "rtbgen.c"
@@ -76,7 +84,11 @@ ubyte *copybuf = NULL;
 #elif defined(ATOMIC)
 #include "atbgen.c"
 #elif defined(LOSER)
+#ifndef SMALL
 #include "ltbgen.c"
+#else
+#include "ltbgens.c"
+#endif
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -618,15 +630,27 @@ int main(int argc, char **argv)
   else
     total_work = 100 + 10 * numthreads;
 
-  size = 10ULL << (6 * (numpcs-1));
-
   for (i = 0; i < numpcs; i++) {
     shift[i] = (numpcs - i - 1) * 6;
     mask[i] = 0x3fULL << shift[i];
   }
 
+#ifndef SMALL
+  size = 10ULL << (6 * (numpcs-1));
+#else
+  size = 462ULL << (6 * (numpcs-2));
+
+  mask[0] = 0x1ffULL << shift[1];
+#endif
+
   work_g = create_work(total_work, size, 0x3f);
+#ifndef SMALL
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
+#else
+  work_piv0 = create_work(total_work, 1ULL << shift[0], 0);
+  work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+#endif
+
 #if 1
   static int piece_order[16] = {
     0, 0, 3, 5, 7, 9, 1, 0,
@@ -684,6 +708,13 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     if (pt[i] == BKING)
       black_king = i;
+#endif
+
+#ifdef SMALL
+  if (white_king != 0 || black_king != 1) {
+    printf("ERROR: white_king = %d, black_king = %d\n", white_king, black_king);
+    exit(1);
+  }
 #endif
 
   for (i = 0; i < 8; i++)

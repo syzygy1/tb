@@ -16,9 +16,16 @@ static void print_fen(FILE *F, long64 idx, int wtm, int switched)
 
   memset(bd, 0, 64);
 
+#ifndef SMALL
   for (i = n - 1; i > 0; i--, idx2 >>= 6)
     bd[p[i] = idx2 & 0x3f] = i + 1;
   bd[p[0] = inv_tri0x40[idx2]] = 1;
+#else
+  for (i = n - 1; i > 1; i--, idx2 >>= 6)
+    bd[p[i] = idx2 & 0x3f] = i + 1;
+  bd[p[0] = KK_inv[idx2][0]] = 1;
+  bd[p[1] = KK_inv[idx2][1]] = 2;
+#endif
 
   for (i = 56; i >= 0; i -= 8) {
     int cnt = 0;
@@ -88,11 +95,11 @@ static void count_stats(struct thread_data *thread)
   long64 *stats = thread->stats;
   ubyte *table = count_stats_table;
 
-  if (end <= tri0x40[0]) {
+  if (end <= diagonal) {
     for (idx = thread->begin; idx < end; idx++)
       stats[table[idx]] += 2;
   } else {
-    for (idx = thread->begin; idx < tri0x40[0]; idx++)
+    for (idx = thread->begin; idx < diagonal; idx++)
       stats[table[idx]] += 2;
     for (; idx < end; idx++) {
       long64 idx2 = MIRROR_A1H8(idx) | (idx & mask[0]);

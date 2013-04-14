@@ -81,7 +81,7 @@ static void calc_checksum(char *name)
 void print_checksum(char *name)
 {
   printf("%s: ", name);
-  data = map_file(name, 0, &size);
+  data = map_file(name, 1, &size);
   if ((size & 0x3f) == 0x10) {
     memcpy(checksum1, data + (size & ~0x3fULL), 16);
   } else {

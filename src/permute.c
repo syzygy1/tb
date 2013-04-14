@@ -30,6 +30,13 @@ extern int numthreads;
 extern long64 sq_mask[64];
 extern int compress_type;
 
+#ifdef SMALL
+extern short KK_map[64][64];
+extern char mirror[64][64];
+extern long64 diagonal;
+extern int shift[];
+#endif
+
 char name[64];
 long64 tb_size;
 
@@ -177,12 +184,11 @@ void generate_test_list(long64 size, int n)
   }
 }
 
-static long64 mask_a1h1, mask_a1a8, mask_a1h8;
+static long64 mask_a1h1, mask_a1h8;
 
-#define MIRROR_A1H1(x) ((x) ^ mask_a1h1)
-#define MIRROR_A1A8(x) ((x) ^ mask_a1a8)
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
+#ifndef SMALL
 static const char mirror[] = {
   0, 1, 1, 1, 1, 1, 1, 0,
  -1, 0, 1, 1, 1, 1, 0,-1,
@@ -204,6 +210,7 @@ static long64 tri0x40[] = {
   0, 7, 3, 4, 4, 3, 7, 0,
   6, 0, 1, 2, 2, 1, 0, 6
 };
+#endif
 
 static long64 sq_mask_pawn[64];
 
@@ -216,7 +223,6 @@ void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor,
 long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor);
 void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx, int file);
 
-// char v[256];
 ubyte *permute_v;
 
 static void set_norm_piece(int *pcs, ubyte *type_perm, ubyte *norm, int order)
@@ -285,6 +291,9 @@ void convert_data_piece(struct thread_data *thread)
   long64 idx1, idx2, idx3;
   int i;
   int sq;
+#ifdef SMALL
+  int sq2;
+#endif
   int n = entry_piece.num;
   int pos[TBPIECES];
   int order[TBPIECES];
@@ -303,6 +312,7 @@ void convert_data_piece(struct thread_data *thread)
   idx1 = thread->begin;
 
   decode_piece(&entry_piece, norm, pos, factor, order, idx1);
+#ifndef SMALL
   idx3 = pos[pidx[1]];
   for (i = 2; i < n; i++)
     idx3 = (idx3 << 6) | pos[pidx[i]];
@@ -311,10 +321,26 @@ void convert_data_piece(struct thread_data *thread)
   if (mirror[sq] < 0)
     idx3 = MIRROR_A1H8(idx3);
   idx3 |= tri0x40[sq];
+#else
+  idx3 = pos[pidx[2]];
+  for (i = 3; i < n; i++)
+    idx3 = (idx3 << 6) | pos[pidx[i]];
+  sq = pos[pidx[0]];
+  idx3 ^= sq_mask[sq];
+  sq2 = pos[pidx[1]];
+  if (KK_map[sq][sq2] < 0)
+    idx3 = diagonal;
+  else {
+    if (mirror[sq][sq2] < 0)
+      idx3 = MIRROR_A1H8(idx3);
+    idx3 |= ((long64)KK_map[sq][sq2]) << shift[1];
+  }
+#endif
   __builtin_prefetch(&src[idx3], 0, 3);
 
   for (idx1++; idx1 < end; idx1++) {
     decode_piece(&entry_piece, norm, pos, factor, order, idx1);
+#ifndef SMALL
     idx2 = pos[pidx[1]];
     for (i = 2; i < n; i++)
       idx2 = (idx2 << 6) | pos[pidx[i]];
@@ -323,6 +349,21 @@ void convert_data_piece(struct thread_data *thread)
     if (mirror[sq] < 0)
       idx2 = MIRROR_A1H8(idx2);
     idx2 |= tri0x40[sq];
+#else
+    idx2 = pos[pidx[2]];
+    for (i = 3; i < n; i++)
+      idx2 = (idx2 << 6) | pos[pidx[i]];
+    sq = pos[pidx[0]];
+    idx2 ^= sq_mask[sq];
+    sq2 = pos[pidx[1]];
+    if (KK_map[sq][sq2] < 0)
+      idx2 = diagonal;
+    else {
+      if (mirror[sq][sq2] < 0)
+	idx2 = MIRROR_A1H8(idx2);
+      idx2 |= ((long64)KK_map[sq][sq2]) << shift[1];
+    }
+#endif
     __builtin_prefetch(&src[idx2], 0, 3);
     dst[idx1 - 1] = v[src[idx3]];
     idx3 = idx2;
@@ -383,16 +424,17 @@ void init_0x40(int numpcs)
 
   if (done) return;
 
+#ifndef SMALL
   for (i = 0; i < 64; i++)
     tri0x40[i] <<= 6ULL * (numpcs - 1);
+#endif
 
   for (i = 0; i < 8; i++)
     flip0x40[i] <<= 6ULL * (numpcs - 1);
 
-  mask_a1h1 = mask_a1a8 = mask_a1h8 = 0;
+  mask_a1h1 = mask_a1h8 = 0;
   for (i = 1; i < numpcs; i++) {
     mask_a1h1 = (mask_a1h1 << 6) | 0x07;
-    mask_a1a8 = (mask_a1a8 << 6) | 0x38;
     mask_a1h8 = (mask_a1h8 << 6) | 0x07;
   }
 
@@ -421,6 +463,9 @@ void convert_est_data_piece(struct thread_data *thread)
   long64 idx;
   int n = entry_piece.num;
   int sq;
+#ifdef SMALL
+  int sq2;
+#endif
   int pos[TBPIECES];
   int factor[TBPIECES];
   int order[TBPIECES];
@@ -443,6 +488,7 @@ void convert_est_data_piece(struct thread_data *thread)
       decode_piece(&entry_piece, norm, pos, factor, order, segs[i]);
       for (r = p; r < q; r++) {
 	l = trylist[r];
+#ifndef SMALL
 	idx = pos[pidx_list[l][1]];
 	for (m = 2; m < n; m++)
 	  idx = (idx << 6) | pos[pidx_list[l][m]];
@@ -451,6 +497,21 @@ void convert_est_data_piece(struct thread_data *thread)
 	if (mirror[sq] < 0)
 	  idx = MIRROR_A1H8(idx);
 	idx |= tri0x40[sq];
+#else
+	idx = pos[pidx_list[l][2]];
+	for (m = 3; m < n; m++)
+	  idx = (idx << 6) | pos[pidx_list[l][m]];
+	sq = pos[pidx_list[l][0]];
+	idx ^= sq_mask[sq];
+	sq2 = pos[pidx_list[l][1]];
+	if (KK_map[sq][sq2] < 0)
+	  idx = diagonal;
+	else {
+	  if (mirror[sq][sq2] < 0)
+	    idx = MIRROR_A1H8(idx);
+	  idx |= ((long64)KK_map[sq][sq2]) << shift[1];
+	}
+#endif
 	__builtin_prefetch(&table[idx], 0, 3);
 	idx_cache[r] = idx;
       }
@@ -459,6 +520,7 @@ void convert_est_data_piece(struct thread_data *thread)
 	decode_piece(&entry_piece, norm, pos, factor, order, segs[i] + j);
 	for (r = p; r < q; r++) {
 	  l = trylist[r];
+#ifndef SMALL
 	  idx = pos[pidx_list[l][1]];
 	  for (m = 2; m < n; m++)
 	    idx = (idx << 6) | pos[pidx_list[l][m]];
@@ -467,6 +529,21 @@ void convert_est_data_piece(struct thread_data *thread)
 	  if (mirror[sq] < 0)
 	    idx = MIRROR_A1H8(idx);
 	  idx |= tri0x40[sq];
+#else
+	  idx = pos[pidx_list[l][2]];
+	  for (m = 3; m < n; m++)
+	    idx = (idx << 6) | pos[pidx_list[l][m]];
+	  sq = pos[pidx_list[l][0]];
+	  idx ^= sq_mask[sq];
+	  sq2 = pos[pidx_list[l][1]];
+	  if (KK_map[sq][sq2] < 0)
+	    idx = diagonal;
+	  else {
+	    if (mirror[sq][sq2] < 0)
+	      idx = MIRROR_A1H8(idx);
+	    idx |= ((long64)KK_map[sq][sq2]) << shift[1];
+	  }
+#endif
 	  __builtin_prefetch(&table[idx], 0, 3);
 	  dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
 	  idx_cache[r] = idx;

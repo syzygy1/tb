@@ -5,12 +5,18 @@
 */
 
 static long64 mask[MAX_PIECES];
-static int shift[MAX_PIECES];
+int shift[MAX_PIECES];
 
 int piv_sq[24];
 long64 piv_idx[64];
 ubyte piv_valid[64];
 long64 sq_mask[0];
+
+#ifdef SMALL
+long64 diagonal;
+short KK_map[64][0];
+char mirror[64][0];
+#endif
 
 static long64 pw_mask, pw_pawnmask;
 static long64 pw_capt_mask[8];
