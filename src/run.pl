@@ -7,24 +7,30 @@ use Getopt::Long;
 $threads = 1;
 $generate = '';
 $verify = '';
+$disk = '';
 $min = 3;
 $max = 4;
 GetOptions('threads=i' => \$threads,
 	   'generate' => \$generate,
 	   'verify' => \$verify,
 	   'min=i' => \$min,
-	   'max=i' => \$max);
+	   'max=i' => \$max,
+	   'disk' => \$disk);
 
 sub Process {
   my($tb) = @_;
   my $len = length($tb) - 1;
   if ($len < $min || $len > $max) { return; }
+  $dopt = "";
+  if ($disk && $len == 6) {
+    $dopt = "-d ";
+  }
   if ($generate && !-e $tb.".rtbz") {
     print "Generating $tb\n";
     if ($tb !~ /.*P.*/) {
-      system "rtbgen -t $threads --stats $tb";
+      system "rtbgen $dopt-t $threads --stats $tb";
     } else {
-      system "rtbgenp -t $threads --stats $tb";
+      system "rtbgenp $dopt-t $threads --stats $tb";
     }
   }
   if ($verify) {

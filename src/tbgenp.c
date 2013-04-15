@@ -102,7 +102,7 @@ struct dtz_map {
 };
 
 void init_permute_pawn(int *pcs, int *pt);
-ubyte *init_permute_file(int *pcs, int file);
+ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table);
 void *permute_pawn_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *best, int file, ubyte *v);
 long64 estimate_pawn_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, int file, ubyte *v);
 void permute_pawn_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, int file, ubyte *v);
@@ -628,6 +628,7 @@ static struct option options[] = {
   { "wdl", 0, NULL, 'w' },
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
+  { "disk", 0, NULL, 'd' },
   { 0, 0, NULL, 0 }
 };
 
@@ -639,10 +640,11 @@ int main(int argc, char **argv)
   int pcs[16];
   ubyte v[256];
   int save_stats = 0;
+  int save_to_disk = 0;
 
   numthreads = 1;
   do {
-    val = getopt_long(argc, argv, "t:gwzs", options, &longindex);
+    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -659,6 +661,10 @@ int main(int argc, char **argv)
       break;
     case 's':
       save_stats = 1;
+      break;
+    case 'd':
+      save_to_disk = 1;
+      break;
     }
   } while (val != EOF);
 
@@ -715,6 +721,28 @@ int main(int argc, char **argv)
   has_white_pawns = (pcs[WPAWN] != 0);
   has_black_pawns = (pcs[BPAWN] != 0);
 
+#ifndef SUICIDE
+  if (pcs[WKING] != 1 || pcs[BKING] != 1) {
+    printf("Need one white king and one black king.\n");
+    exit(1);
+  }
+
+  if (numpcs < 3) {
+    printf("Need at least 3 pawns or pieces.\n");
+    exit(1);
+  }
+#else
+  if (numpcs < 2) {
+    printf("Need at least 2 pawns or pieces.\n");
+    exit(1);
+  }
+#endif
+
+  if (numpawns == 0) {
+    printf("Expecting pawns.\n");
+    exit(1);
+  }
+
   // move pieces to back
   for (i = j = numpcs - 1; i >= numpawns; i--, j--) {
     while ((pt[j] & 0x07) == 1) j--;
@@ -730,11 +758,6 @@ int main(int argc, char **argv)
       pt[i] = BPAWN;
     for (; i < numpawns; i++)
       pt[i] = WPAWN;
-  }
-
-  if (numpawns == 0) {
-    printf("Expecting pawns.\n");
-    exit(1);
   }
 
   if (numthreads < 1) numthreads = 1;
@@ -981,6 +1004,8 @@ int main(int argc, char **argv)
     print_longest(F);
     fprintf(F, "\n");
 
+    tb_table = NULL;
+
     if (G || H) {
       reset_piece_captures();
       if (cursed_pawn_capt_w) {
@@ -992,7 +1017,13 @@ int main(int argc, char **argv)
 	run_threaded(reset_pawn_captures_b, work_g, 1);
       }
 
-      tb_table = init_permute_file(pcs, file);
+      if (save_to_disk || symmetric || !G)
+	tb_table = table_b;
+      tb_table = init_permute_file(pcs, file, tb_table);
+      if (save_to_disk && !symmetric && G) {
+	store_table(table_w, 'w');
+	store_table(table_b, 'b');
+      }
 
       ply_accurate_w = 0;
       if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
@@ -1013,6 +1044,10 @@ int main(int argc, char **argv)
       compress_tb(G, tb_table, best_w, minfreq, maxsymbols);
 
       if (!symmetric) {
+	if (save_to_disk) {
+	  load_table(table_b, 'b');
+	  tb_table = table_w;
+	}
 	test_closs(total_stats_b, table_b, to_fix_b);
 	prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
 	printf("find optimal permutation for file btm / wdl, file %c\n", 'a' + file);
@@ -1022,8 +1057,14 @@ int main(int argc, char **argv)
       }
     }
 
+    if (tb_table && tb_table != table_w && tb_table != table_b)
+      free(tb_table);
+
     // dtz
     if (H) {
+      if (tb_table == table_w)
+	load_table(table_w, 'w');
+
 #if defined(REGULAR) || defined(ATOMIC)
       fix_closs();
 #endif
@@ -1051,12 +1092,14 @@ int main(int argc, char **argv)
 	estimate_b = UINT64_MAX;
 
       if (estimate_w <= estimate_b) {
+	tb_table = table_b;
 	prepare_dtz_map(v, &map_w[file]);
 	printf("permute table for wtm / dtz, file %c\n", 'a' + file);
 	permute_pawn_dtz(tb_table, pcs, table_w, bestp_w, file, v);
 	printf("compressing data for wtm/dtz, file %c\n", 'a' + file);
 	compress_tb(H, tb_table, best_w, minfreq, maxsymbols);
       } else {
+	tb_table = table_w;
 	prepare_dtz_map(v, &map_b[file]);
 	printf("permute table for btm / dtz, file %c\n", 'a' + file);
 	permute_pawn_dtz(tb_table, pcs, table_b, bestp_b, file, v);
@@ -1069,8 +1112,6 @@ int main(int argc, char **argv)
       global_stats_w[i] += total_stats_w[i];
       global_stats_b[i] += total_stats_b[i];
     }
-
-    free(tb_table);
   }
 
   if (G) merge_tb(G);

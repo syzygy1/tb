@@ -431,3 +431,67 @@ void reduce_tables(int local)
   }
 }
 
+void store_table(ubyte *table, char color)
+{
+  FILE *F;
+  char name[64];
+
+  if (!lz4_buf) {
+    lz4_buf = malloc(4 + LZ4_compressBound(COPYSIZE));
+    if (!lz4_buf) {
+      printf("Out of memory.\n");
+      exit(0);
+    }
+  }
+
+  sprintf(name, "%s.%c", tablename, color);
+
+  if (!(F = fopen(name, "wb"))) {
+    printf("Could not open %s for writing.\n", name);
+    exit(-1);
+  }
+
+  ubyte *ptr = table;
+  long64 total = size;
+  while (total > 0) {
+    int chunk = COPYSIZE;
+    if (total < chunk) chunk = total;
+    total -= chunk;
+    uint32 lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
+    ptr += chunk;
+    *(uint32 *)lz4_buf = lz4_size;
+    fwrite(lz4_buf, 1, lz4_size + 4, F);
+  }
+
+  fclose(F);
+}
+
+void load_table(ubyte *table, char color)
+{
+  FILE *F;
+  char name[64];
+
+  sprintf(name, "%s.%c", tablename, color);
+
+  if (!(F = fopen(name, "rb"))) {
+    printf("Could not open %s for writing.\n", name);
+    exit(-1);
+  }
+
+  ubyte *ptr = table;
+  long64 total = size;
+  while (total > 0) {
+    int chunk = COPYSIZE;
+    if (total < chunk) chunk = total;
+    total -= chunk;
+    uint32 lz4size;
+    fread(&lz4size, 1, 4, F);
+    fread(lz4_buf, 1, lz4size, F);
+    LZ4_uncompress(lz4_buf, (char *)ptr, chunk);
+    ptr += chunk;
+  }
+
+  fclose(F);
+  unlink(name);
+}
+

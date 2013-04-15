@@ -856,7 +856,7 @@ long64 estimate_compression(ubyte *table, int *bestp, int *pcs, int wdl, int fil
   return best;
 }
 
-ubyte *init_permute_piece(int *pcs, int *pt)
+ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
 {
   int i, j, k, m, l;
   int factor[TBPIECES];
@@ -988,7 +988,10 @@ ubyte *init_permute_piece(int *pcs, int *pt)
   printf("tb_size = %"PRIu64"\n", tb_size);
 
   generate_test_list(tb_size, entry_piece.num);
-  ubyte *tb_table = malloc(tb_size);
+  if (!tb_table && !(tb_table = malloc(tb_size))) {
+    printf("Out of memory.\n");
+    exit(1);
+  }
 
   init_0x40(entry_piece.num);
   work_convert = create_work(total_work, tb_size, 0);
@@ -1164,7 +1167,7 @@ void init_permute_pawn(int *pcs, int *pt)
   work_convert = alloc_work(total_work);
 }
 
-ubyte *init_permute_file(int *pcs, int file)
+ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
 {
   int factor[TBPIECES];
   ubyte norm[TBPIECES];
@@ -1176,7 +1179,10 @@ ubyte *init_permute_file(int *pcs, int file)
 
   generate_test_list(tb_size, entry_pawn.num);
 
-  ubyte *tb_table = malloc(tb_size);
+  if (!tb_table && !(tb_table = malloc(tb_size))) {
+    printf("Out of memory.\n");
+    exit(1);
+  }
 
   fill_work(total_work, tb_size, 0, work_convert);
 

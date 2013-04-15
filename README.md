@@ -5,10 +5,11 @@ probing to a chess engine. The tablebase generator is able to generate
 all tablebases for up to 6 pieces.
 
 Requirements for the generator:
-* 32GB of RAM for 6-piece tables (much less for 5-piece tables).
+* 16GB of RAM for 6-piece tables (much less for 5-piece tables).
 * x86-64 CPU with popcnt support.
 * 64-bit OS.
 * Sufficiently recent gcc (producing 64-bit executables).
+
 
 ### Tablebase files
 
@@ -64,6 +65,12 @@ Generate the table but do not compress and save.
 --stats  (or -s)  
 Save statistics. Statistics are written to $RTBSTATSDIR/KQRvKR.txt
 or to ./KQRvKR.txt if $RTBSTATSDIR is not set.
+
+--disk  (or -d)
+Reduce RAM usage during compression. This takes a bit more time because
+tables are temporarily saved to disk. **This option is necessary to
+generate 6-piece tables on systems with 16 GB RAM.** This option is
+not needed on system with 24 GB RAM or more.
 
 **Usage:** `rtbver KQRvKR`   (or `rtbverp KRPvKR`)  
 Verifies consistency of KQRvKR.rtbw and KQRvKR.rtbz. This should detect
@@ -125,6 +132,9 @@ Only treat tablebases with at least n pieces.
 
 --max n  
 Only treat tablebases with at most n pieces.
+
+--disk
+Use this option to generate 6-piece tables on a system with 16 GB of RAM.
 
 
 ### Probing code

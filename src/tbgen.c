@@ -106,7 +106,7 @@ struct dtz_map {
   ubyte high_freq_max;
 };
 
-ubyte *init_permute_piece(int *pcs, int *pt);
+ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table);
 void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *best, ubyte *v);
 long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, ubyte *v);
 void permute_piece_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, ubyte *v);
@@ -530,6 +530,7 @@ static struct option options[] = {
   { "wdl", 0, NULL, 'w' },
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
+  { "disk", 0, NULL, 'd' },
   { 0, 0, NULL, 0 }
 };
 
@@ -541,11 +542,12 @@ int main(int argc, char **argv)
   int pcs[16];
   ubyte v[256];
   int save_stats = 0;
+  int save_to_disk = 0;
   int switched = 0;
 
   numthreads = 1;
   do {
-    val = getopt_long(argc, argv, "t:gwzs", options, &longindex);
+    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -562,6 +564,9 @@ int main(int argc, char **argv)
       break;
     case 's':
       save_stats = 1;
+      break;
+    case 'd':
+      save_to_disk = 1;
       break;
     }
   } while (val != EOF);
@@ -614,6 +619,23 @@ int main(int argc, char **argv)
       exit(1);
     }
   if (!color) exit(1);
+
+#ifndef SUICIDE
+  if (pcs[WKING] != 1 || pcs[BKING] != 1) {
+    printf("Need one white king and one black king.\n");
+    exit(1);
+  }
+
+  if (numpcs < 3) {
+    printf("Need at least 3 pieces.\n");
+    exit(1);
+  }
+#else
+  if (numpcs < 2) {
+    printf("Need at least 2 pieces.\n");
+    exit(1);
+  }
+#endif
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
     printf("Can't handle pawns.\n");
@@ -708,13 +730,6 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     if (pt[i] == BKING)
       black_king = i;
-#endif
-
-#ifdef SMALL
-  if (white_king != 0 || black_king != 1) {
-    printf("ERROR: white_king = %d, black_king = %d\n", white_king, black_king);
-    exit(1);
-  }
 #endif
 
   for (i = 0; i < 8; i++)
@@ -812,7 +827,14 @@ int main(int argc, char **argv)
 
   reset_captures();
 
-  tb_table = init_permute_piece(pcs, pt);
+  tb_table = NULL;
+  if (save_to_disk || symmetric || !generate_wdl)
+    tb_table = table_b;
+  tb_table = init_permute_piece(pcs, pt, tb_table);
+  if (save_to_disk && !symmetric && generate_wdl) {
+    store_table(table_w, 'w');
+    store_table(table_b, 'b');
+  }
 
   if (generate_wdl) {
     test_closs(total_stats_w, table_w, to_fix_w);
@@ -824,6 +846,10 @@ int main(int argc, char **argv)
     compress_tb(G, (unsigned char *)tb_table, best_w, minfreq, maxsymbols);
 
     if (!symmetric) {
+      if (save_to_disk) {
+	load_table(table_b, 'b');
+	tb_table = table_w;
+      }
       test_closs(total_stats_b, table_b, to_fix_b);
       prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
       printf("find optimal permutation for btm / wdl\n");
@@ -836,6 +862,9 @@ int main(int argc, char **argv)
   }
 
   if (generate_dtz) {
+    if (tb_table == table_w)
+      load_table(table_w, 'w');
+
 #if defined(REGULAR) || defined(ATOMIC)
     fix_closs();
 #endif
@@ -866,12 +895,14 @@ int main(int argc, char **argv)
       estimate_b = UINT64_MAX;
 
     if (estimate_w <= estimate_b) {
+      tb_table = table_b;
       prepare_dtz_map(v, &map_w);
       printf("permute table for wtm / dtz\n");
       permute_piece_dtz(tb_table, pcs, table_w, bestp_w, v);
       printf("compressing data for wtm / dtz\n");
       compress_tb(G, (unsigned char *)tb_table, best_w, minfreq, maxsymbols);
     } else {
+      tb_table = table_w;
       prepare_dtz_map(v, &map_b);
       printf("permute table for btm / dtz\n");
       permute_piece_dtz(tb_table, pcs, table_b, bestp_b, v);
