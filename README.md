@@ -66,7 +66,7 @@ Generate the table but do not compress and save.
 Save statistics. Statistics are written to $RTBSTATSDIR/KQRvKR.txt
 or to ./KQRvKR.txt if $RTBSTATSDIR is not set.
 
---disk  (or -d)
+--disk  (or -d)  
 Reduce RAM usage during compression. This takes a bit more time because
 tables are temporarily saved to disk. **This option is necessary to
 generate 6-piece tables on systems with 16 GB RAM.** This option is
@@ -133,7 +133,7 @@ Only treat tablebases with at least n pieces.
 --max n  
 Only treat tablebases with at most n pieces.
 
---disk
+--disk  
 Use this option to generate 6-piece tables on a system with 16 GB of RAM.
 
 
