@@ -9,7 +9,6 @@
 
 #ifdef MAGIC
 
-extern bitboard bishop_mask[64], rook_mask[64];
 extern bitboard attack_table[97264];
 
 struct Magic {

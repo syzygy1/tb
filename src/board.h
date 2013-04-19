@@ -7,17 +7,33 @@
 #ifndef BOARD_BB_H
 #define BOARD_BB_H
 
-#define BITBOARD
-
 #define MAGIC
 //#define HYPER
+//#define BMI2
 
 #include "defs.h"
 
 extern bitboard bit[64];
 
+static __inline__ int FirstOne(bitboard x)
+{
+  bitboard res;
+  __asm__("bsfq %1, %0" : "=r" (res) : "g" (x));
+  return (int)res;
+}
+
+static __inline__ int PopCount(bitboard x)
+{
+  bitboard res;
+  __asm__("popcnt %1, %0" : "=r" (res) : "g" (x));
+  return (int)res;
+}
+
+#define ClearFirst(x) ((x)&=(x)-1)
+
 #include "magic.h"
 #include "hyper.h"
+#include "bmi2.h"
 
 extern bitboard knight_range[64], king_range[64];
 #ifdef HAS_PAWNS
@@ -80,22 +96,6 @@ static __inline__ bitboard PieceMoves(int sq, int type, bitboard occ)
 {
   return PieceRange(sq, type, occ) & ~occ;
 }
-
-static __inline__ int FirstOne(bitboard x)
-{
-  bitboard res;
-  __asm__("bsfq %1, %0" : "=r" (res) : "g" (x));
-  return (int)res;
-}
-
-static __inline__ int PopCount(bitboard x)
-{
-  bitboard res;
-  __asm__("popcnt %1, %0" : "=r" (res) : "g" (x));
-  return (int)res;
-}
-
-#define ClearFirst(x) ((x)&=(x)-1)
 
 #endif
 

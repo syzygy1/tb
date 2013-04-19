@@ -9,6 +9,8 @@ vpath %.o $(OBJDIR)
 vpath %.P
 vpath %.P $(DEPDIR)
 
+# for Haswell add -mbmi2 and define BMI2 in board.h
+
 #CFLAGS = -g3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing
 CFLAGS = -g -O6 -fomit-frame-pointer -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -fno-tree-vectorize
 

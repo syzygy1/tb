@@ -7,6 +7,7 @@
 #include "board.h"
 #include "magic.c"
 #include "hyper.c"
+#include "bmi2.c"
 
 #define MAX_PIECES 8
 
