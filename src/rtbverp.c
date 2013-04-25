@@ -774,10 +774,11 @@ void calc_broken_pp(struct thread_data *thread)
 //  int p[MAX_PIECES];
 
   for (idx = thread->begin; idx < end; idx += 64) {
+#ifdef USE_POPCOUNT
     bb = 0;
     for (i = pp_num, idx2 = (idx ^ pw_mask) >> pp_shift; i > 0; i--, idx2 >>= 6)
-      bb |= bit[idx2 & 0x3f];
-    bb |= bit[piv_sq[idx2]];
+      bit_set(bb, idx2 & 0x3f);
+    bit_set(bb, piv_sq[idx2]);
     if (bb & pp_mask) {
       for (i = 0; i < 64; i++)
 	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
@@ -785,11 +786,30 @@ void calc_broken_pp(struct thread_data *thread)
     }
     occ = 0;
     for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6)
-      occ |= bit[idx2 & 0x3f];
+      bit_set(occ, idx2 & 0x3f);
     for (; i > pp_num; i--, idx2 >>= 6)
-      bb |= bit[idx2 & 0x3f];
+      bit_set(bb, idx2 & 0x3f);
     occ |= bb;
     if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK)) {
+#else
+    int c = 0;
+    bb = 0;
+    for (i = pp_num, idx2 = (idx ^ pw_mask) >> pp_shift; i > 0; i--, idx2 >>= 6)
+      bit_set_test(bb, idx2 & 0x3f, c);
+    bit_set_test(bb, piv_sq[idx2], c);
+    if ((bb & pp_mask) || c) {
+      for (i = 0; i < 64; i++)
+	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+      continue;
+    }
+    occ = 0;
+    for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6)
+      bit_set_test(occ, idx2 & 0x3f, c);
+    for (; i > pp_num; i--, idx2 >>= 6)
+      bit_set_test(bb, idx2 & 0x3f, c);
+    if (!c && !(bb & (occ | PAWN_MASK))) {
+      occ |= bb;
+#endif
       if (n == numpawns) { // FIXME: only possible in suicide?
 	for (i = 0; i < 8; i++) {
 	  table_w[idx + i] = WDL_BROKEN;

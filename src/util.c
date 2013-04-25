@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #ifndef __WIN32__
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>

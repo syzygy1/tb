@@ -39,6 +39,10 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 
 #define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
+#define bit_set_test(x,y,v) \
+  asm("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+
+#ifdef USE_POPCNT
 #define FILL_OCC64_cheap \
   occ = bb = 0; \
   for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6) \
@@ -85,18 +89,76 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
     bit_set(bb, p[k] = idx2 & 0x3f); \
   occ |= bb; \
   if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
+#else
+#define FILL_OCC64_cheap \
+  int c = 0; \
+  occ = bb = 0; \
+  for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6) \
+    bit_set_test(occ, idx2 & 0x3f, c); \
+  for (; i > 0; i--, idx2 >>= 6) \
+    bit_set_test(bb, idx2 & 0x3f, c); \
+  bit_set_test(bb, piv_sq[idx2], c); \
+  if (!c && !(bb & (occ | PAWN_MASK)) && (occ |= bb, 1))
+
+#define FILL_OCC64 \
+  int c = 0; \
+  occ = bb = 0; \
+  for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6) \
+    bit_set_test(occ, p[i] = idx2 & 0x3f, c); \
+  for (; i > 0; i--, idx2 >>= 6) \
+    bit_set_test(bb, p[i] = idx2 & 0x3f, c); \
+  bit_set_test(bb, p[0] = piv_sq[idx2], c); \
+  if (!c && !(bb & (occ | PAWN_MASK)) && (occ |= bb, 1))
+
+#define FILL_OCC_CAPTS \
+  int c = 0; \
+  long64 idx2 = idx ^ pw_capt_mask[i]; \
+  occ = bb = 0; \
+  for (k = n - 1; k >= numpawns; k--) \
+    if (k != i) { \
+      bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
+      idx2 >>= 6; \
+    } \
+  for (; k > 0; k--) \
+    if (k != i) { \
+      bit_set_test(bb, p[k] = idx2 & 0x3f, c); \
+      idx2 >>= 6; \
+    } \
+  bit_set_test(bb, p[0] = piv_sq[idx2], c); \
+  if (!c && !(bb & (occ | PAWN_MASK)) && (occ |= bb, 1))
+
+#define FILL_OCC_CAPTS_PIVOT \
+  int c = 0; \
+  long64 idx2 = idx ^ pw_mask; \
+  occ = bb = 0; \
+  for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
+    bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
+  for (; k > 0; k--, idx2 >>= 6) \
+    bit_set_test(bb, p[k] = idx2 & 0x3f, c); \
+  if (!c && !(bb & (occ | PAWN_MASK)) && (occ |= bb, 1))
+#endif
 
 #define FILL_OCC_PIECES \
   occ = bb; \
   for (i = n - 1, idx2 = idx; i >= numpawns; i--, idx2 >>= 6) \
     bit_set(occ, p[i] = idx2 & 0x3f)
 
+#ifdef USE_POPCNT
 #define FILL_OCC_PAWNS \
   occ = 0; \
   for (idx2 = idx ^ pw_pawnmask, i = numpawns - 1; i > 0; i--, idx2 >>= 6) \
     bit_set(occ, p[i] = idx2 & 0x3f); \
   bit_set(occ, p[0] = piv_sq[idx2]); \
   if (PopCount(occ) == numpawns && !(occ & PAWN_MASK))
+#else
+#define FILL_OCC_PAWNS \
+  int c = 0; \
+  occ = 0; \
+  for (idx2 = idx ^ pw_pawnmask, i = numpawns - 1; i > 0; i--, idx2 >>= 6) \
+    bit_set_test(occ, p[i] = idx2 & 0x3f, c); \
+  bit_set_test(occ, p[0] = piv_sq[idx2], c); \
+  if (!c && !(occ & PAWN_MASK))
+#endif
 
 #define FILL_OCC_PAWNS_PIECES \
   occ = 0; \

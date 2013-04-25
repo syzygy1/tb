@@ -7,10 +7,6 @@
 #ifndef BOARD_BB_H
 #define BOARD_BB_H
 
-#define MAGIC
-//#define HYPER
-//#define BMI2
-
 #include "defs.h"
 
 extern bitboard bit[64];
@@ -22,12 +18,14 @@ static __inline__ int FirstOne(bitboard x)
   return (int)res;
 }
 
+#ifdef USE_POPCNT
 static __inline__ int PopCount(bitboard x)
 {
   bitboard res;
   __asm__("popcnt %1, %0" : "=r" (res) : "g" (x));
   return (int)res;
 }
+#endif
 
 #define ClearFirst(x) ((x)&=(x)-1)
 

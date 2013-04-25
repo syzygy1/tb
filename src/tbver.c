@@ -44,7 +44,11 @@ extern int numthreads;
 extern struct timeval start_time, cur_time;
 
 static long64 *work_g;
+#ifndef SMALL
 static long64 *work_piv;
+#else
+static long64 *work_piv0, *work_piv1;
+#endif
 
 ubyte *table_w, *table_b;
 int numpcs;
@@ -71,7 +75,11 @@ static int pt[MAX_PIECES];
 static int pcs2[MAX_PIECES];
 #endif
 
+#ifndef SMALL
 #include "generic.c"
+#else
+#include "generics.c"
+#endif
 
 #if defined(REGULAR)
 #include "rtbver.c"
@@ -217,15 +225,26 @@ int main(int argc, char **argv)
   else
     total_work = 100 + 10 * numthreads;
 
-  size = 10ULL << (6 * (numpcs-1));
-
   for (i = 0; i < numpcs; i++) {
     shift[i] = (numpcs - i - 1) * 6;
     mask[i] = 0x3fULL << shift[i];
   }
 
+#ifndef SMALL
+  size = 10ULL << (6 * (numpcs-1));
+#else
+  size = 462ULL << (6 * (numpcs-2));
+
+  mask[0] = 0x1ffULL << shift[1];
+#endif
+
   work_g = create_work(total_work, size, 0x3f);
+#ifndef SMALL
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
+#else
+  work_piv0 = create_work(total_work, 1ULL << shift[0], 0);
+  work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+#endif
 
   static int piece_order[16] = {
     0, 0, 3, 5, 7, 9, 1, 0,

@@ -220,9 +220,12 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
 #define jump_bit_clear(x,y,lab) \
   asm goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
 
-#define bit_set_jump_set(x,y,lab) \
-  asm goto ("bts %1, %0; jc %l[lab]" : "+r" (x) : "r" ((long64)(y)) : : lab);
+#ifndef USE_POPCNT
+#define bit_set_test(x,y,v) \
+  asm("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+#endif
 
+#ifdef USE_POPCNT
 #define FILL_OCC64_cheap \
   occ = 0; \
   for (i = n - 2, idx2 = idx >> 6; i > 1; i--, idx2 >>= 6) \
@@ -238,18 +241,24 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   bit_set(occ, p[0] = KK_inv[idx2][0]); \
   bit_set(occ, p[1] = KK_inv[idx2][1]); \
   if (PopCount(occ) == n - 1)
-
-#if 0
-#define FILL_OCC64_asmgoto \
+#else
+#define FILL_OCC64_cheap \
+  int c = 0; \
   occ = 0; \
-  i = n - 2; \
-  idx2 = idx >> 6; \
-  do { \
-    bit_set_jump_set(occ, p[i] = idx2 & 0x3f, lab); \
-    idx2 >>= 6; \
-    i--; \
-  } while (i > 0); \
-  bit_set_jump_set(occ, p[0] = inv_tri0x40[idx2], lab)
+  for (i = n - 2, idx2 = idx >> 6; i > 1; i--, idx2 >>= 6) \
+    bit_set_test(occ, idx2 & 0x3f, c); \
+  bit_set_test(occ, KK_inv[idx2][0], c); \
+  bit_set_test(occ, KK_inv[idx2][1], c); \
+  if (!c)
+
+#define FILL_OCC64 \
+  int c = 0; \
+  occ = 0; \
+  for (i = n - 2, idx2 = idx >> 6; i > 1; i--, idx2 >>= 6) \
+    bit_set_test(occ, p[i] = idx2 & 0x3f, c); \
+  bit_set_test(occ, p[0] = KK_inv[idx2][0], c); \
+  bit_set_test(occ, p[1] = KK_inv[idx2][1], c); \
+  if (!c)
 #endif
 
 #define FILL_OCC \
@@ -259,6 +268,7 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   bit_set(occ, p[0] = KK_inv[idx2][0]); \
   bit_set(occ, p[1] = KK_inv[idx2][1]);
 
+#ifdef USE_POPCNT
 #define FILL_OCC_CAPTS \
   long64 idx2 = idx; \
   occ = 0; \
@@ -270,6 +280,20 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   bit_set(occ, p[0] = KK_inv[idx2][0]); \
   bit_set(occ, p[1] = KK_inv[idx2][1]); \
   if (PopCount(occ) == n - 1)
+#else
+#define FILL_OCC_CAPTS \
+  int c = 0; \
+  long64 idx2 = idx; \
+  occ = 0; \
+  for (k = n - 1; k > 1; k--) \
+    if (k != i) { \
+      bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
+      idx2 >>= 6; \
+    } \
+  bit_set_test(occ, p[0] = KK_inv[idx2][0], c); \
+  bit_set_test(occ, p[1] = KK_inv[idx2][1], c); \
+  if (!c)
+#endif
 
 #define MAKE_IDX2 \
   idx2 = ((idx << 6) & idx_mask1[i]) | (idx & idx_mask2[i])
@@ -377,6 +401,7 @@ static void func##_pivot1(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA
 #define LOOP_CAPTS_PIVOT1 \
   for (idx = thread->begin; idx < end; idx++)
 
+#ifdef USE_POPCNT
 #define FILL_OCC_CAPTS_PIVOT1 \
   long64 idx2 = idx; \
   occ = 0; \
@@ -384,6 +409,16 @@ static void func##_pivot1(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA
     bit_set(occ, p[k] = idx2 & 0x3f); \
   bit_set(occ, p[0] = inv_tri0x40[idx2]); \
   if (PopCount(occ) == n - 1)
+#else
+#define FILL_OCC_CAPTS_PIVOT1 \
+  int c = 0; \
+  long64 idx2 = idx; \
+  occ = 0; \
+  for (k = n - 1; k > 1; k--, idx2 >>= 6) \
+    bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
+  bit_set_test(occ, p[0] = inv_tri0x40[idx2], c); \
+  if (!c)
+#endif
 
 #define MAKE_IDX2_PIVOT1 \
   idx2 = idx & ~mask[0]
@@ -399,12 +434,22 @@ static void func##_pivot1(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA
 #define LOOP_CAPTS_PIVOT0 \
   for (idx = thread->begin; idx < end; idx++)
 
+#ifdef USE_POPCNT
 #define FILL_OCC_CAPTS_PIVOT0 \
   long64 idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
   if (PopCount(occ) == n - 1)
+#else
+#define FILL_OCC_CAPTS_PIVOT0 \
+  int c = 0; \
+  long64 idx2 = idx; \
+  occ = 0; \
+  for (k = n - 1; k > 0; k--, idx2 >>= 6) \
+    bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
+  if (!c)
+#endif
 
 #define MAKE_IDX2_PIVOT0 \
   idx2 = idx & ~mask[0]

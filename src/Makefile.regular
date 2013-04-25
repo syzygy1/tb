@@ -6,16 +6,8 @@ CLEAN = clean
 
 DEPDIR = .depsr
 OBJDIR = objsr
-FLAGS = -DREGULAR
 
-# Specify the name of the gcc executable.
-# When compiling for On non-Windows systems, add -pthread.
-
-# regular Linux
-CC = gcc -pthread
-
-# cross compiling from Linux to Windows
-#CC = x86_64-w64-mingw32-gcc
+FLAGS += -DREGULAR
 
 include Makefile.general
 

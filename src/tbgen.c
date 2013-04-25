@@ -84,11 +84,7 @@ ubyte *copybuf = NULL;
 #elif defined(ATOMIC)
 #include "atbgen.c"
 #elif defined(LOSER)
-#ifndef SMALL
 #include "ltbgen.c"
-#else
-#include "ltbgens.c"
-#endif
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -673,7 +669,6 @@ int main(int argc, char **argv)
   work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
 #endif
 
-#if 1
   static int piece_order[16] = {
     0, 0, 3, 5, 7, 9, 1, 0,
     0, 0, 4, 6, 8, 10, 2, 0
@@ -703,7 +698,6 @@ int main(int argc, char **argv)
 	pt[i] = pt[j];
 	pt[j] = tmp;
       }
-#endif
 
   for (i = 0, j = 0; i < numpcs; i++)
     if (!(pt[i] & 0x08))
