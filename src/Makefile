@@ -17,7 +17,13 @@ CC = gcc -pthread
 # cross compiling from Linux to Windows
 #CC = x86_64-w64-mingw32-gcc
 
-export FLAGS CC
+# Compilation flags
+# Remove or replace -march=corei7 and -msse4.2 if necessary.
+# For Haswell add -mbmi2 and select -DBMI2 above.
+#CFLAGS = -g3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing
+CFLAGS = -g -O6 -fomit-frame-pointer -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -fstrict-aliasing -fno-tree-vectorize
+
+export FLAGS CC CFLAGS
 
 rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 	@$(MAKE) -f Makefile.regular $@
