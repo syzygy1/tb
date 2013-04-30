@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-//#include <pthread.h>
 #include <getopt.h>
+#include <string.h>
 
 #include "defs.h"
 #include "threads.h"
@@ -10,9 +10,42 @@
 extern int total_work;
 extern int numthreads;
 
+static void compare_checksums(char *file)
+{
+  char name[128];
+  char sum[40];
+  char sum2[40];
+
+  FILE *F = fopen(file, "r");
+  if (!F) {
+    printf("Could not open %s.\n", file);
+    return;
+  }
+  while (!feof(F)) {
+    int num = fscanf(F, "%100[KQRBNP|v|rtbwz|.]: %32[0-9|a-f]\n", name, sum);
+    if (num != 2 || strlen(sum) != 32) {
+      printf("Could not completely parse %s.\n", file);
+      break;
+    }
+    FILE *G = fopen(name, "rb");
+    if (!G) {
+      printf("Tablebase file %s not found.\n", name);
+    } else {
+      fclose(G);
+      print_checksum(name, sum2);
+      if (strcmp(sum, sum2) == 0)
+	printf("%s: OK!\n", name);
+      else
+	printf("%s: FAIL!\n", name);
+    }
+  }
+  fclose(F);
+}
+
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
   { "print", 0, NULL, 'p' },
+  { "compare", 0, NULL, 'c' },
   { 0, 0, NULL, 0 }
 };
 
@@ -21,17 +54,22 @@ int main(int argc, char **argv)
   int i;
   int val, longindex;
   int only_print = 0;
+  int compare = 0;
 
   numthreads = 1;
 
   do {
-    val = getopt_long(argc, argv, "t:p", options, &longindex);
+    val = getopt_long(argc, argv, "t:pc", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
       break;
     case 'p':
       only_print = 1;
+      break;
+    case 'c':
+      compare = 1;
+      break;
     }
   } while (val != EOF);
 
@@ -47,12 +85,21 @@ int main(int argc, char **argv)
 
   init_threads(0);
 
-  if (!only_print)
+  if (!compare) {
+    if (!only_print)
+      for (i = optind; i < argc; i++)
+	verify_checksum(argv[i]);
+    else
+      for (i = optind; i < argc; i++) {
+	char sum[40];
+	printf("%s: ", argv[i]);
+	print_checksum(argv[i], sum);
+	puts(sum);
+      }
+  } else {
     for (i = optind; i < argc; i++)
-      verify_checksum(argv[i]);
-  else
-    for (i = optind; i < argc; i++)
-      print_checksum(argv[i]);
+      compare_checksums(argv[i]);
+  }
 
   return 0;
 }

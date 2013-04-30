@@ -78,9 +78,8 @@ static void calc_checksum(char *name)
 			&& checksum1[1] == checksum2[1]);
 }
 
-void print_checksum(char *name)
+void print_checksum(char *name, char *sum)
 {
-  printf("%s: ", name);
   data = map_file(name, 1, &size);
   if ((size & 0x3f) == 0x10) {
     memcpy(checksum1, data + (size & ~0x3fULL), 16);
@@ -96,10 +95,10 @@ void print_checksum(char *name)
 
   for (i = 0; i < 16; i++) {
     ubyte b = c[i];
-    putc(nibble[b >> 4], stdout);
-    putc(nibble[b & 0x0f], stdout);
+    sum[2 * i] = nibble[b >> 4];
+    sum[2 * i + 1] = nibble[b & 0x0f];
   }
-  putc('\n', stdout);
+  sum[32] = 0;
 }
 
 void add_checksum(char *name)

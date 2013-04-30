@@ -9,7 +9,7 @@
 
 void add_checksum(char *name);
 void verify_checksum(char *name);
-void print_checksum(char *name);
+void print_checksum(char *name, char *sum);
 
 #endif
 
