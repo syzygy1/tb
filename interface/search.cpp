@@ -603,7 +603,7 @@ namespace {
     }
 
     // TB
-    if (popcount<Full>(pos.pieces()) <= 6) {
+    if (!RootNode && popcount<Full>(pos.pieces()) <= 6) {
       int success;
       int v = probe_wdl(pos, &success);
       if (success) {
