@@ -7,7 +7,6 @@
   this code to other chess engines.
 */
 
-
 #include "position.h"
 #include "movegen.h"
 #include "rkiss.h"
@@ -457,7 +456,7 @@ static int probe_dtz_no_ep(Position& pos, int *success)
       // Generate at least all legal non-capturing pawn moves
       // including non-capturing promotions.
       if (!pos.checkers())
-	end = generate<QUIETS>(pos, stack);
+	end = generate<NON_EVASIONS>(pos, stack);
       else
 	end = generate<EVASIONS>(pos, stack);
 
