@@ -7,9 +7,19 @@
   this code to other chess engines.
 */
 
+// The probing code currently expects a little-endian architecture (e.g. x86).
+
+// Define DECOMP64 when compiling for a 64-bit platform.
+// 32-bit is only supported for 5-piece tables, because tables are mmap()ed
+// into memory.
+#ifdef IS_64BIT
+#define DECOMP64
+#endif
+
 #include "position.h"
 #include "movegen.h"
 #include "rkiss.h"
+#include "bitboard.h"
 #include "tbprobe.h"
 #include "tbcore.h"
 
@@ -18,7 +28,7 @@
 static RKISS rk;
 
 // Given a position with 6 or fewer pieces, produce a text string
-// of the form KQPvKRP, where "KQP" represent the white pieces if
+// of the form KQPvKRP, where "KQP" represents the white pieces if
 // mirror == 0 and the black pieces if mirror == 1.
 static void prt_str(Position& pos, char *str, int mirror)
 {
@@ -147,11 +157,10 @@ static int probe_wdl_table(Position& pos, int *success)
     struct TBEntry_piece *entry = (struct TBEntry_piece *)ptr;
     ubyte *pc = entry->pieces[bside];
     for (i = 0; i < entry->num;) {
-      bitboard bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
+      Bitboard bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
 				      (PieceType)(pc[i] & 0x07));
       do {
-	p[i++] = FirstOne(bb);
-	ClearFirst(bb);
+	p[i++] = pop_lsb(&bb);
       } while (bb);
     }
     idx = encode_piece(entry, entry->norm[bside], p, entry->factor[bside]);
@@ -159,11 +168,10 @@ static int probe_wdl_table(Position& pos, int *success)
   } else {
     struct TBEntry_pawn *entry = (struct TBEntry_pawn *)ptr;
     int k = entry->file[0].pieces[0][0] ^ cmirror;
-    bitboard bb = pos.pieces((Color)(k >> 3), (PieceType)(k & 0x07));
+    Bitboard bb = pos.pieces((Color)(k >> 3), (PieceType)(k & 0x07));
     i = 0;
     do {
-      p[i++] = FirstOne(bb) ^ mirror;
-      ClearFirst(bb);
+      p[i++] = pop_lsb(&bb) ^ mirror;
     } while (bb);
     int f = pawn_file(entry, p);
     ubyte *pc = entry->file[f].pieces[bside];
@@ -171,8 +179,7 @@ static int probe_wdl_table(Position& pos, int *success)
       bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
 				    (PieceType)(pc[i] & 0x07));
       do {
-	p[i++] = FirstOne(bb) ^ mirror;
-	ClearFirst(bb);
+	p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }
     idx = encode_pawn(entry, entry->file[f].norm[bside], p, entry->file[f].factor[bside]);
@@ -250,11 +257,10 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
     }
     ubyte *pc = entry->pieces;
     for (i = 0; i < entry->num;) {
-      bitboard bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
+      Bitboard bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
 				    (PieceType)(pc[i] & 0x07));
       do {
-	p[i++] = FirstOne(bb);
-	ClearFirst(bb);
+	p[i++] = pop_lsb(&bb);
       } while (bb);
     }
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm, p, entry->factor);
@@ -268,11 +274,10 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
   } else {
     struct DTZEntry_pawn *entry = (struct DTZEntry_pawn *)ptr;
     int k = entry->file[0].pieces[0] ^ cmirror;
-    bitboard bb = pos.pieces((Color)(k >> 3), (PieceType)(k & 0x07));
+    Bitboard bb = pos.pieces((Color)(k >> 3), (PieceType)(k & 0x07));
     i = 0;
     do {
-      p[i++] = FirstOne(bb) ^ mirror;
-      ClearFirst(bb);
+      p[i++] = pop_lsb(&bb) ^ mirror;
     } while (bb);
     int f = pawn_file((struct TBEntry_pawn *)entry, p);
     if ((entry->flags[f] & 1) != bside) {
@@ -284,8 +289,7 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
       bb = pos.pieces((Color)((pc[i] ^ cmirror) >> 3),
 			    (PieceType)(pc[i] & 0x07));
       do {
-	p[i++] = FirstOne(bb) ^ mirror;
-	ClearFirst(bb);
+	p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }
     idx = encode_pawn((struct TBEntry_pawn *)entry, entry->file[f].norm, p, entry->file[f].factor);

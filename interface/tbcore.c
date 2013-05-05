@@ -1163,11 +1163,11 @@ static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64
   int min_len = data[9];
   int h = max_len - min_len + 1;
   int num_syms = *(ushort *)(&data[10 + 2 * h]);
-  d = (struct PairsData *)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint64) + num_syms);
+  d = (struct PairsData *)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->offset = (ushort *)(&data[10]);
-  d->symlen = ((ubyte *)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint64);
+  d->symlen = ((ubyte *)d) + sizeof(struct PairsData) + (h - 1) * sizeof(base_t);
   d->sympat = &data[12 + 2 * h];
   d->min_len = min_len;
   *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -1188,8 +1188,13 @@ static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64
   d->base[h - 1] = 0;
   for (i = h - 2; i >= 0; i--)
     d->base[i] = (d->base[i + 1] + d->offset[i] - d->offset[i + 1]) / 2;
+#ifdef DECOMP64
   for (i = 0; i < h; i++)
     d->base[i] <<= 64 - (min_len + i);
+#else
+  for (i = 0; i < h; i++)
+    d->base[i] <<= 32 - (min_len + i);
+#endif
 
   d->offset -= d->min_len;
 
@@ -1404,8 +1409,6 @@ static int init_table_dtz(struct TBEntry *entry)
 
 static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
 {
-  int l;
-
   if (!d->idxbits)
     return d->min_len;
 
@@ -1426,15 +1429,16 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
 
   int m = d->min_len;
   ushort *offset = d->offset;
-  uint64 *base = d->base - m;
+  base_t *base = d->base - m;
   ubyte *symlen = d->symlen;
   int sym, bitcnt;
 
+#ifdef DECOMP64
   uint64 code = __builtin_bswap64(*((uint64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
-    l = m;
+    int l = m;
     while (code < base[l]) l++;
     sym = offset[l] + ((code - base[l]) >> (64 - l));
     if (litidx < (int)symlen[sym] + 1) break;
@@ -1446,6 +1450,30 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
       code |= ((uint64)(__builtin_bswap32(*ptr++))) << bitcnt;
     }
   }
+#else
+  uint32 next = 0;
+  uint32 code = __builtin_bswap32(*ptr++);
+  bitcnt = 0; // number of bits in next
+  for (;;) {
+    int l = m;
+    while (code < base[l]) l++;
+    sym = offset[l] + ((code - base[l]) >> (32 - l));
+    if (litidx < (int)symlen[sym] + 1) break;
+    litidx -= (int)symlen[sym] + 1;
+    code <<= l;
+    if (bitcnt < l) {
+      if (bitcnt) {
+	code |= (next >> (32 - l));
+	l -= bitcnt;
+      }
+      next = __builtin_bswap32(*ptr++);
+      bitcnt = 32;
+    }
+    code |= (next >> (32 - l));
+    next <<= l;
+    bitcnt -= l;
+  }
+#endif
 
   ubyte *sympat = d->sympat;
   while (symlen[sym] != 0) {

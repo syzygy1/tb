@@ -34,22 +34,18 @@
 
 #define TBHASHBITS 10
 
-typedef unsigned long long bitboard;
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
 typedef unsigned char ubyte;
 typedef unsigned short ushort;
 
-static __inline__ int FirstOne(bitboard x)
-{
-  bitboard res;
-  __asm__("bsfq %1, %0" : "=r" (res) : "g" (x));
-  return (int)res;
-}
-
-#define ClearFirst(x) ((x)&=(x)-1)
-
 struct TBHashEntry;
+
+#ifdef DECOMP64
+typedef uint64 base_t;
+#else
+typedef uint32 base_t;
+#endif
 
 struct PairsData {
   char *indextable;
@@ -61,7 +57,7 @@ struct PairsData {
   int blocksize;
   int idxbits;
   int min_len;
-  uint64 base[1]; // C++ complains about base[]...
+  base_t base[1]; // C++ complains about base[]...
 };
 
 struct TBEntry {
