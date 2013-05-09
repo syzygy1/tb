@@ -10,7 +10,7 @@ int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 
 #define SET_CAPT_VALUE(x,v) \
 { ubyte dummy = v; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -22,7 +22,7 @@ asm( \
 
 #define SET_CAPT_LOSS(x) \
 { ubyte dummy = CAPT_LOSS; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "testb %%al, %%al\n" \

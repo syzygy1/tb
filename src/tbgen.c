@@ -31,7 +31,7 @@ static long64 *work_piv0, *work_piv1;
 #endif
 
 struct tb_handle;
-ubyte *table_w, *table_b;
+ubyte *restrict table_w, *restrict table_b;
 int numpcs;
 int numpawns = 0;
 int symmetric, split;
@@ -157,8 +157,8 @@ static void tc_loop(struct thread_data *thread)
   int i;
   long64 idx = thread->begin;
   long64 end = thread->end;
-  ubyte *table = tc_table;
-  ubyte *v = tc_v;
+  ubyte *restrict table = tc_table;
+  ubyte *restrict v = tc_v;
 
   for (; idx < end; idx++)
     if (v[table[idx]]) {

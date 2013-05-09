@@ -4,9 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-static int reduce_val[];
-static int stats_val[];
-
 static char pc[] = { 0, 'P', 'N', 'B', 'R', 'Q', 'K', 0, 0, 'p', 'n', 'b', 'r', 'q', 'k', 0};
 
 static char fen_buf[128];
@@ -91,8 +88,6 @@ long64 find_val(ubyte *table, ubyte v, long64 *work)
   return found_idx;
 }
 
-ubyte *count_stats_table;
-
 void count_stats(struct thread_data *thread)
 {
   long64 idx;
@@ -104,7 +99,6 @@ void count_stats(struct thread_data *thread)
     stats[table[idx]]++;
 }
 
-long64 *thread_stats = NULL;
 int lw_ply = -1;
 int lb_ply = -1;
 int lcw_ply = -1;

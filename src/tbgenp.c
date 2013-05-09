@@ -27,9 +27,10 @@ extern struct thread_data thread_data[];
 extern int numthreads;
 extern struct timeval start_time, cur_time;
 
-static long64 *work_g, *work_piv, *work_p, *work_part;
+static long64 *restrict work_g, *restrict work_piv;
+static long64 *restrict work_p, *restrict work_part;
 
-ubyte *table_w, *table_b;
+ubyte *restrict table_w, *restrict table_b;
 
 static long64 size, pawnsize;
 static long64 begin;
@@ -72,7 +73,7 @@ static long64 global_stats_w[MAX_STATS];
 static long64 global_stats_b[MAX_STATS];
 
 #define COPYSIZE 10*1024*1024
-ubyte *copybuf = NULL;
+ubyte *restrict copybuf = NULL;
 
 #include "genericp.c"
 
@@ -127,7 +128,7 @@ void transform(struct thread_data *thread)
 {
   long64 idx;
   long64 end = begin + thread->end;
-  ubyte *v = transform_v;
+  ubyte *restrict v = transform_v;
 
   for (idx = begin + thread->begin; idx < end; idx++) {
     table_w[idx] = v[table_w[idx]];
@@ -139,16 +140,18 @@ void transform_table(struct thread_data *thread)
 {
   long64 idx;
   long64 end = thread->end;
-  ubyte *v = transform_v;
-  ubyte *table = transform_tbl;
+  ubyte *restrict v = transform_v;
+  ubyte *restrict table = transform_tbl;
 
   for (idx = thread->begin; idx < end; idx++)
     table[idx] = v[table[idx]];
 }
 
-#include "statsp.c"
+long64 *restrict thread_stats = NULL;
+ubyte *restrict count_stats_table;
 
 #include "reducep.c"
+#include "statsp.c"
 
 void calc_pawn_table_unthreaded(void)
 {
@@ -274,8 +277,8 @@ static void tc_loop(struct thread_data *thread)
   int i;
   long64 idx = thread->begin;
   long64 end = thread->end;
-  ubyte *table = tc_table;
-  ubyte *v = tc_v;
+  ubyte *restrict table = tc_table;
+  ubyte *restrict v = tc_v;
 
   for (; idx < end; idx++)
     if (v[table[idx]]) {
@@ -301,7 +304,7 @@ static void tc_loop(struct thread_data *thread)
     }
 }
 
-void test_closs(long64 *stats, ubyte *table, int to_fix)
+void test_closs(long64 *restrict stats, ubyte *restrict table, int to_fix)
 {
   int i;
   ubyte v[256];

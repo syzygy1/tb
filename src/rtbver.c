@@ -10,7 +10,7 @@ int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 
 #define SET_CAPT_VALUE(x,v) \
 { ubyte dummy = v; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -22,7 +22,7 @@ asm( \
 
 #define SET_CAPT_LOSS(x) \
 { ubyte dummy = CAPT_LOSS; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "testb %%al, %%al\n" \
@@ -131,8 +131,8 @@ static void init_wdl_dtz(void)
   int i, j;
   int win_num, loss_num;
 
-  win_num = ply_accurate_win ? 100 : 50;
-  loss_num = ply_accurate_loss ? 100 : 50;
+  win_num = ply_accurate_win ? DRAW_RULE : (DRAW_RULE / 2);
+  loss_num = ply_accurate_loss ? DRAW_RULE : (DRAW_RULE / 2);
   dtz_capt_cwin = DTZ_BASE_WIN + 1 + win_num;
   dtz_capt_closs = DTZ_BASE_LOSS - 1 - loss_num;
   opp_capt_cwin = DTZ_BASE_WIN + 1 + loss_num;

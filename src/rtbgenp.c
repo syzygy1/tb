@@ -42,13 +42,13 @@ void reduce_tables(int local);
 
 #define SET_CHANGED(x) \
 { ubyte dummy = CHANGED; \
-asm( \
+__asm__( \
 "movb %2, %%al\n\t" \
 "lock cmpxchgb %1, %0" \
 : "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); }
 
 #define SET_CAPT_VALUE(x,v) \
-{ ubyte dummy = v; asm( \
+{ ubyte dummy = v; __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -60,7 +60,7 @@ asm( \
 
 #define SET_WIN_VALUE(x,v) \
 { ubyte dummy = v; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -109,7 +109,8 @@ static void set_tbl_to_wdl(int saves)
 
 // check whether all moves end up in wins for the opponent
 // we already know there are no legal captures
-int check_loss(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
+		bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;
@@ -133,7 +134,7 @@ int check_loss(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
   return best;
 }
 
-int is_attacked(int sq, int *pcs, bitboard occ, int *p)
+int is_attacked(int sq, int *restrict pcs, bitboard occ, int *restrict p)
 {
   int k;
 
@@ -146,7 +147,8 @@ int is_attacked(int sq, int *pcs, bitboard occ, int *p)
 }
 
 // pawn moves and captures should be taken care of already
-int check_mate(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
+		bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;
@@ -556,10 +558,10 @@ void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
-  ubyte *table = iter_table;
-  ubyte *table_opp = iter_table_opp;
-  int *pcs = iter_pcs;
-  int *pcs_opp = iter_pcs_opp;
+  ubyte *restrict table = iter_table;
+  ubyte *restrict table_opp = iter_table_opp;
+  int *restrict pcs = iter_pcs;
+  int *restrict pcs_opp = iter_pcs_opp;
 
   LOOP_ITER {
     int v = table[idx];
@@ -756,7 +758,8 @@ void iterate()
 }
 
 // returns -4, -2, -1, 0, 1, 2
-int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitboard occ, int *p)
+int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
+		    bitboard occ, int *restrict p)
 {
   int i, m;
   int v;
@@ -869,7 +872,8 @@ void calc_pawn_captures_b(struct thread_data *thread)
 }
 
 // now returns -2, -1, 0, 1, 2
-static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bitboard occ, int *p)
+static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
+		    bitboard occ, int *restrict p)
 {
   int i, m, v;
   int pcs[MAX_PIECES];
@@ -893,7 +897,8 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bit
   return v;
 }
 
-static int has_moves(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+static int has_moves(int *restrict pcs, long64 idx0, ubyte *table,
+		      bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;
@@ -922,7 +927,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
-  int *p = thread->p;
+  int *restrict p = thread->p;
   long64 end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
@@ -1002,7 +1007,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
-  int *p = thread->p;
+  int *restrict p = thread->p;
   long64 end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
@@ -1078,7 +1083,7 @@ static ubyte reset_v[256];
 
 MARK(reset_capt_closs)
 {
-  ubyte *v = reset_v;
+  ubyte *restrict v = reset_v;
 
   MARK_BEGIN;
   if (v[table[idx2]]) table[idx2] = CAPT_CLOSS;
@@ -1138,7 +1143,7 @@ void reset_piece_captures(void)
 {
   int i, j, k;
   int n = numpcs;
-  ubyte *v = reset_v;
+  ubyte *restrict v = reset_v;
 
   for (i = 0;i < 256; i++)
     v[i] = 0;
@@ -1190,7 +1195,8 @@ void reset_piece_captures(void)
 }
 
 // return 1 if a non-losing capture exists, otherwise 0
-int test_pawn_capt(int k, int sq, long64 idx, ubyte *table, int king, int clr, int wtm, bitboard occ, int *p)
+int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
+		    int clr, int wtm, bitboard occ, int *restrict p)
 {
   int i, m;
   int pt2[MAX_PIECES];
@@ -1282,7 +1288,8 @@ void reset_pawn_captures_b(struct thread_data *thread)
   }
 }
 
-int compute_capt_closs(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
+			bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;

@@ -30,13 +30,13 @@ void reduce_tables(void);
 
 #define SET_CHANGED(x) \
 do { ubyte dummy = CHANGED; \
-asm( \
+__asm__( \
 "movb %2, %%al\n\t" \
 "lock cmpxchgb %1, %0" \
 : "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); } while (0)
 
 #define SET_CAPT_VALUE(x,v) \
-do { ubyte dummy = v; asm( \
+do { ubyte dummy = v; __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -48,7 +48,7 @@ do { ubyte dummy = v; asm( \
 
 #define SET_WIN_VALUE(x,v) \
 do { ubyte dummy = v; \
-asm( \
+__asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -63,7 +63,8 @@ ubyte loss_win[256];
 
 // check whether all moves end up in wins for the opponent
 // if we are here, all captures are losing
-static int check_loss(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
+	bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;
@@ -109,7 +110,8 @@ static int check_loss(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
 }
 
 #define ASM_GOTO
-static int is_attacked(int sq, int *pcs, bitboard occ, int *p)
+static int is_attacked(int sq, const int *restrict pcs, bitboard occ,
+			const int *restrict p)
 {
   int k;
 
@@ -129,7 +131,8 @@ lab:
 #endif
 }
 
-static int check_mate(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
+	bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;
@@ -218,30 +221,6 @@ static void calc_mates(struct thread_data *thread)
     }
   }
 }
-
-#if 0
-MARK_PIVOT0(mark_illegal)
-{
-  MARK_BEGIN_PIVOT0;
-  table[idx2] = ILLEGAL;
-  if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
-    table[idx3] = ILLEGAL;
-  }
-  MARK_END;
-}
-
-MARK_PIVOT1(mark_illegal)
-{
-  MARK_BEGIN_PIVOT1;
-  table[idx2] = ILLEGAL;
-  if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
-    table[idx3] = ILLEGAL;
-  }
-  MARK_END;
-}
-#endif
 
 MARK(mark_illegal)
 {
@@ -554,10 +533,10 @@ void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
-  ubyte *table = iter_table;
-  ubyte *table_opp = iter_table_opp;
-  int *pcs = iter_pcs;
-  int *pcs_opp = iter_pcs_opp;
+  ubyte *restrict table = iter_table;
+  ubyte *restrict table_opp = iter_table_opp;
+  int *restrict pcs = iter_pcs;
+  int *restrict pcs_opp = iter_pcs_opp;
 
   LOOP_ITER {
     int v = table[idx];
@@ -867,7 +846,8 @@ void reset_captures(void)
 
 // CAPT_CLOSS means there is a capture into a cursed win, preventing a loss
 // we need to determine if there are regular moves into a slower cursed loss
-int compute_capt_closs(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
+	bitboard occ, int *restrict p)
 {
   int sq;
   long64 idx, idx2;

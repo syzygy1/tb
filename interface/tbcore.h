@@ -67,7 +67,7 @@ struct TBEntry {
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
-};
+} __attribute__((__may_alias__));
 
 struct TBEntry_piece {
   char *data;

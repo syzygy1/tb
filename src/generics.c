@@ -211,18 +211,18 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
 #define PIVOT_ON_DIAG(idx2) (flag && idx2 >= diagonal)
 #define PIVOT_MIRROR(idx) (MIRROR_A1H8(idx) | (idx & mask[0]))
 
-#define bit_set(x,y) { long64 dummy = y; asm("bts %1,%0" : "+r" (x) : "r" (dummy));}
-#define bit_set(x,y) { long64 dummy = y; asm("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define jump_bit_set(x,y,lab) \
-  asm goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
 
 #define jump_bit_clear(x,y,lab) \
-  asm goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
 
 #ifndef USE_POPCNT
 #define bit_set_test(x,y,v) \
-  asm("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
 #endif
 
 #ifdef USE_POPCNT
@@ -299,13 +299,13 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   idx2 = ((idx << 6) & idx_mask1[i]) | (idx & idx_mask2[i])
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT0(func, ...) \
-static void func##_pivot0(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func##_pivot0(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT1(func, ...) \
-static void func##_pivot1(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define WhiteKingMoves (KingRange(p[0]) & ~(KingRange(p[1]) | occ))
 #define BlackKingMoves (KingRange(p[1]) & ~(KingRange(p[0]) | occ))

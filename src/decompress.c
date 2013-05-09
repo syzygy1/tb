@@ -138,16 +138,16 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64
     return d;
   }
   fread(data + 2, 1, 10, F);
-
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = *(uint32 *)(&data[4]);
+  int real_num_blocks = data[4] | (data[5] << 8)
+			  | (data[6] << 16) | (data[7] << 24);
   int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
   fread(data + 12, 1, 2 * h, F);
-  int num_syms = *(ushort *)(&data[10 + 2 * h]);
+  int num_syms = data[10 + 2 * h] | (data[11 + 2 * h] << 8);
   d = malloc(sizeof(struct PairsData) + h * sizeof(long64) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;

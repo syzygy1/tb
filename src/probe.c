@@ -760,7 +760,8 @@ void init_indices(void)
 }
 
 #ifndef CONNECTED_KINGS
-long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor)
+long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
+	int *restrict pos, int *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -838,7 +839,8 @@ long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *facto
   return idx;
 }
 #else
-long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor)
+long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
+	int *restrict pos, int *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -1214,7 +1216,9 @@ void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm)
     order[k - i - 1] = tmp[i];
 }
 
-void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx)
+void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
+	int *restrict pos, int *restrict factor, int *restrict order,
+	long64 idx)
 {
   int i, j, k;
   int p, q;
@@ -1473,7 +1477,7 @@ int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor)
+long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1532,7 +1536,7 @@ long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor)
 }
 
 #ifdef VERIFICATION
-long64 encode_pawn_ver(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor)
+long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1595,7 +1599,9 @@ long64 encode_pawn_ver(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *fac
 }
 #endif
 
-void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx, int file)
+void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
+      int *restrict pos, int *restrict factor, int *restrict order,
+      long64 idx, int file)
 {
   int i, j, k;
   int p, q, t;
@@ -2323,7 +2329,7 @@ extern int numpawns;
 
 static __attribute__ ((noinline)) void probe_failed(int *pieces);
 
-int probe_table(int *pieces, int *gpos, int wtm)
+int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
@@ -2417,7 +2423,7 @@ int probe_table(int *pieces, int *gpos, int wtm)
 #if defined(REGULAR)
 static int white_king, black_king;
 
-int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
+int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ, int alpha, int beta)
 {
   int i, j, k, s, t;
   int sq, sq2;

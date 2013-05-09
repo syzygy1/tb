@@ -11,6 +11,8 @@ static char *lz4_buf = NULL;
 #define MAX_SAVES 16
 
 void reduce_tables(int local);
+void count_stats(struct thread_data *thread);
+void collect_stats(long64 *work, int phase, int local);
 
 static FILE *tmp_table[MAX_SAVES][2];
 static int reduce_cnt[MAX_SAVES];

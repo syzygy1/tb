@@ -10,12 +10,12 @@ int shift[MAX_PIECES];
 int piv_sq[24];
 long64 piv_idx[64];
 ubyte piv_valid[64];
-long64 sq_mask[0];
+long64 sq_mask[64];
 
 #ifdef SMALL
 long64 diagonal;
-short KK_map[64][0];
-char mirror[64][0];
+short KK_map[64][64];
+char mirror[64][64];
 #endif
 
 static long64 pw_mask, pw_pawnmask;
@@ -40,7 +40,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define bit_set_test(x,y,v) \
-  asm("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
 
 #ifdef USE_POPCNT
 #define FILL_OCC64_cheap \
@@ -246,7 +246,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #endif
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_BEGIN \
   int sq; \
@@ -292,8 +292,8 @@ static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_A
   bitboard occ, bb; \
   int n = numpcs; \
   int king, wtm; \
-  ubyte *table; \
-  int *pcs; \
+  ubyte *restrict table; \
+  int *restrict pcs; \
   long64 end = thread->end; \
   for (k = 1; k < n; k++) \
     pt2[k] = pt[k]; \
@@ -318,8 +318,8 @@ static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_A
   bitboard occ, bb; \
   int n = numpcs; \
   int king, opp_king, wtm; \
-  ubyte *table; \
-  int *pcs; \
+  ubyte *restrict table; \
+  int *restrict pcs; \
   long64 end = thread->end; \
   if (pt[0] == WPAWN) { \
     king = black_king; \
@@ -343,8 +343,8 @@ static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_A
   bitboard occ, bb; \
   int n = numpcs; \
   int king; \
-  ubyte *table; \
-  int *pcs; \
+  ubyte *restrict table; \
+  int *restrict pcs; \
   long64 end = thread->end; \
   if (pt[0] == WPAWN) { \
     king = black_king; \
@@ -364,8 +364,8 @@ static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_A
   bitboard occ, bb; \
   int n = numpcs; \
   int wtm; \
-  ubyte *table; \
-  int *pcs; \
+  ubyte *restrict table; \
+  int *restrict pcs; \
   long64 end = thread->end; \
   for (k = 1; k < n; k++) \
     pt2[k] = pt[k]; \
@@ -386,8 +386,8 @@ static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_A
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  ubyte *table; \
-  int *pcs; \
+  ubyte *restrict table; \
+  int *restrict pcs; \
   long64 end = thread->end; \
   if (pt[0] == WPAWN) { \
     table = table_b; \

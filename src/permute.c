@@ -22,8 +22,8 @@ long64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *nor
 void calc_order_piece(int num, int ord, int *order, ubyte *norm);
 void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm);
 
-static long64 *work_convert = NULL;
-static long64 *work_est = NULL;
+static long64 *restrict work_convert = NULL;
+static long64 *restrict work_est = NULL;
 
 extern int total_work;
 extern int numthreads;
@@ -102,7 +102,7 @@ void generate_type_perms(int n)
 }
 
 int num_segs, seg_size;
-long64 *segs = NULL;
+long64 *restrict segs = NULL;
 
 #define NUM_SEGS 1000
 #define SEG_SIZE (64*256)
@@ -218,12 +218,12 @@ static long64 flip0x40[] = {
   0, 0, 1, 2, 3, 4, 5, 0
 };
 
-long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor);
-void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx);
-long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor);
-void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx, int file);
+long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor);
+void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor, int *restrict order, long64 idx);
+long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor);
+void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor, int *restrict order, long64 idx, int file);
 
-ubyte *permute_v;
+ubyte *restrict permute_v;
 
 static void set_norm_piece(int *pcs, ubyte *type_perm, ubyte *norm, int order)
 {
@@ -299,11 +299,11 @@ void convert_data_piece(struct thread_data *thread)
   int order[TBPIECES];
   int factor[TBPIECES];
   ubyte norm[TBPIECES];
-  ubyte *src = convert_data.src;
-  ubyte *dst = convert_data.dst;
-  ubyte *pidx = pidx_list[convert_data.p];
+  ubyte *restrict src = convert_data.src;
+  ubyte *restrict dst = convert_data.dst;
+  ubyte *restrict pidx = pidx_list[convert_data.p];
   long64 end = thread->end;
-  ubyte *v = permute_v;
+  ubyte *restrict v = permute_v;
 
   set_norm_piece(convert_data.pcs, type_perm_list[convert_data.p], norm, order_list[convert_data.p]);
   calc_order_piece(n, order_list[convert_data.p], order, norm);
@@ -381,9 +381,9 @@ void convert_data_pawn(struct thread_data *thread)
   int order[TBPIECES];
   int factor[TBPIECES];
   ubyte norm[TBPIECES];
-  ubyte *src = convert_data.src;
-  ubyte *dst = convert_data.dst;
-  ubyte *pidx = pidx_list[convert_data.p];
+  ubyte *restrict src = convert_data.src;
+  ubyte *restrict dst = convert_data.dst;
+  ubyte *restrict pidx = pidx_list[convert_data.p];
   int file = convert_data.file;
   long64 end = thread->end;
   ubyte *v = permute_v;
@@ -414,8 +414,8 @@ void convert_data_pawn(struct thread_data *thread)
   dst[idx1 - 1] = v[src[idx3]];
 }
 
-struct HuffCode *construct_pairs(unsigned char *data, long64 size, int minfreq, int maxsymbols, int wdl);
-long64 calc_size(struct HuffCode *c);
+struct HuffCode *construct_pairs(unsigned char *restrict data, long64 size, int minfreq, int maxsymbols, int wdl);
+long64 calc_size(struct HuffCode *restrict c);
 
 void init_0x40(int numpcs)
 {
@@ -454,12 +454,12 @@ static struct {
 void convert_est_data_piece(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *table = est_data.table;
+  ubyte *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
-  int *pcs = est_data.pcs;
+  int *restrict pcs = est_data.pcs;
   uint32 dsize = est_data.dsize;
-  ubyte *dst = est_data.dst;
-  ubyte *v = permute_v;
+  ubyte *restrict dst = est_data.dst;
+  ubyte *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
   int sq;
@@ -559,12 +559,12 @@ void convert_est_data_piece(struct thread_data *thread)
 void convert_est_data_piece(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *table = est_data.table;
+  ubyte *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
-  int *pcs = est_data.pcs;
+  int *restrict pcs = est_data.pcs;
   uint32 dsize = est_data.dsize;
-  char *dst = est_data.dst;
-  char *v = permute_v;
+  char *restrict dst = est_data.dst;
+  char *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
   int sq;
@@ -609,12 +609,12 @@ void convert_est_data_piece(struct thread_data *thread)
 void convert_est_data_pawn(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *table = est_data.table;
+  ubyte *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
-  int *pcs = est_data.pcs;
+  int *restrict pcs = est_data.pcs;
   uint32 dsize = est_data.dsize;
-  ubyte *dst = est_data.dst;
-  ubyte *v = permute_v;
+  ubyte *restrict dst = est_data.dst;
+  ubyte *restrict v = permute_v;
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
@@ -670,12 +670,12 @@ void convert_est_data_pawn(struct thread_data *thread)
 void convert_est_data_pawn(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *table = est_data.table;
+  ubyte *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
-  int *pcs = est_data.pcs;
+  int *restrict pcs = est_data.pcs;
   uint32 dsize = est_data.dsize;
-  ubyte *dst = est_data.dst;
-  ubyte *v = permute_v;
+  ubyte *restrict dst = est_data.dst;
+  ubyte *restrict v = permute_v;
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
@@ -712,12 +712,13 @@ void convert_est_data_pawn(struct thread_data *thread)
 }
 #endif
 
-void estimate_compression_piece(ubyte *table, int *pcs, int wdl, int num_cands)
+void estimate_compression_piece(ubyte *restrict table, int *restrict pcs,
+				  int wdl, int num_cands)
 {
   int i, p;
 
   uint32 dsize = num_segs * seg_size;
-  ubyte *dst = malloc(num_cands * dsize);
+  ubyte *restrict dst = malloc(num_cands * dsize);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
@@ -733,7 +734,7 @@ void estimate_compression_piece(ubyte *table, int *pcs, int wdl, int num_cands)
   long64 csize;
 
   for (p = 0; p < num_cands; p++, dst += dsize) {
-    struct HuffCode *c = construct_pairs(dst, dsize, 20, 100, wdl);
+    struct HuffCode *restrict c = construct_pairs(dst, dsize, 20, 100, wdl);
     csize = calc_size(c);
     free(c);
     printf("[%2d] order: %d", p, order_list[trylist[p]]);
@@ -747,12 +748,13 @@ void estimate_compression_piece(ubyte *table, int *pcs, int wdl, int num_cands)
   free(dst0);
 }
 
-void estimate_compression_pawn(ubyte *table, int *pcs, int file, int wdl, int num_cands)
+void estimate_compression_pawn(ubyte *restrict table, int *restrict pcs,
+				int file, int wdl, int num_cands)
 {
   int i, p;
 
   uint32 dsize = num_segs * seg_size;
-  ubyte *dst = malloc(num_cands * dsize);
+  ubyte *restrict dst = malloc(num_cands * dsize);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
@@ -769,7 +771,7 @@ void estimate_compression_pawn(ubyte *table, int *pcs, int file, int wdl, int nu
   long64 csize;
 
   for (p = 0; p < num_cands; p++, dst += dsize) {
-    struct HuffCode *c = construct_pairs((unsigned char *)dst, dsize, 20, 100, wdl);
+    struct HuffCode *restrict c = construct_pairs((ubyte *)dst, dsize, 20, 100, wdl);
     csize = calc_size(c);
     free(c);
     printf("[%2d] order: %d", p, order_list[trylist[p]]);
@@ -783,7 +785,8 @@ void estimate_compression_pawn(ubyte *table, int *pcs, int file, int wdl, int nu
   free(dst0);
 }
 
-long64 estimate_compression(ubyte *table, int *bestp, int *pcs, int wdl, int file)
+long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
+			    int *restrict pcs, int wdl, int file)
 {
   int i, j, k, p, q;
   int num_cands, bp = 0;
@@ -999,7 +1002,8 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
   return tb_table;
 }
 
-void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *best, ubyte *v)
+void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table,
+			ubyte *best, ubyte *v)
 {
   int i;
 
@@ -1027,7 +1031,8 @@ void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *
   run_threaded(convert_data_piece, work_convert, 1);
 }
 
-long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, ubyte *v)
+long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best,
+			  int *bestp, ubyte *v)
 {
   int i;
 

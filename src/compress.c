@@ -201,7 +201,7 @@ uint32 countfirst[MAX_THREADS][MAX_NEW][MAXSYMB];
 uint32 countsecond[MAX_THREADS][MAX_NEW][MAXSYMB];
 
 extern int total_work;
-static long64 *work = NULL, *work_adj = NULL;
+static long64 *restrict work = NULL, *restrict work_adj = NULL;
 
 static struct {
   unsigned char *data;
@@ -263,11 +263,11 @@ void compress_init_dtz(struct dtz_map *map)
 }
 
 // only used for dtz
-void adjust_work_dontcares(long64 *work1, long64 *work2)
+void adjust_work_dontcares(long64 *restrict work1, long64 *restrict work2)
 {
   long64 idx;
   long64 end = work1[total_work];
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   int i;
   int num = num_vals;
 
@@ -290,7 +290,7 @@ void fill_dontcares(struct thread_data *thread)
 {
   long64 idx, idx2;
   long64 end = thread->end;
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   long64 size = compress_state.size;
   int s1;
   int k;
@@ -365,7 +365,7 @@ static void count_pairs_wdl(struct thread_data *thread)
   int s1, s2;
   long64 idx = thread->begin;
   long64 end = thread->end;
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   int t = thread->thread;
 
   if (idx == 0) idx = 1;
@@ -384,7 +384,7 @@ static void count_pairs_dtz(struct thread_data *thread)
   int s1, s2;
   long64 idx = thread->begin;
   long64 end = thread->end;
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   int t = thread->thread;
 
   if (idx == 0) idx = 1;
@@ -396,11 +396,11 @@ static void count_pairs_dtz(struct thread_data *thread)
   }
 }
 
-void adjust_work_replace(long64 *work)
+void adjust_work_replace(long64 *restrict work)
 {
   long64 idx, idx2;
   long64 end = compress_state.size;
-  unsigned char *data = compress_state.data;
+  unsigned char *restrict data = compress_state.data;
   int i, s1, s2, j;
 
   for (i = 1; i < total_work; i++) {
@@ -434,7 +434,7 @@ void replace_pairs(struct thread_data *thread)
 {
   long64 idx = thread->begin;
   long64 end = thread->end;
-  unsigned char *data = compress_state.data;
+  unsigned char *restrict data = compress_state.data;
   int s1, s2, a;
   int t = thread->thread;
 
@@ -468,7 +468,7 @@ static void remove_wdl_worker(struct thread_data *thread)
 {
   long64 idx, idx2;
   long64 end = thread->end;
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   long64 size = compress_state.size;
   int s, t;
 
@@ -516,11 +516,11 @@ static void remove_wdl_worker(struct thread_data *thread)
   }
 }
 
-void adjust_work_dontcares_wdl(long64 *work1, long64 *work2)
+void adjust_work_dontcares_wdl(long64 *restrict work1, long64 *restrict work2)
 {
   long64 idx;
   long64 end = work1[total_work];
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   int i;
 
   work2[0] = work1[0];
@@ -539,7 +539,8 @@ void adjust_work_dontcares_wdl(long64 *work1, long64 *work2)
 
 static int d[5] = { 5, 5, 6, 7, 8 };
 
-struct HuffCode *construct_pairs_wdl(unsigned char *data, long64 size, int minfreq, int maxsymbols)
+struct HuffCode *construct_pairs_wdl(unsigned char *restrict data, long64 size,
+				      int minfreq, int maxsymbols)
 {
   int i, j, k, l;
   int s1, s2;
@@ -844,7 +845,7 @@ lab:
 
   }
 
-  struct HuffCode *c = setup_code(data, size);
+  struct HuffCode *restrict c = setup_code(data, size);
 
   // map remaining don't cares to a value
   for (k = 5; k < 9; k++)
@@ -899,7 +900,7 @@ static void remove_dtz_worker(struct thread_data *thread)
 {
   long64 idx, idx2;
   long64 end = thread->end;
-  ubyte *data = compress_state.data;
+  ubyte *restrict data = compress_state.data;
   long64 size = compress_state.size;
   int s;
   int num = num_vals;
@@ -931,7 +932,7 @@ static void remove_dtz_worker(struct thread_data *thread)
   }
 }
 
-void adjust_work_dontcares_dtz(long64 *work1, long64 *work2)
+void adjust_work_dontcares_dtz(long64 *restrict work1, long64 *restrict work2)
 {
   long64 idx;
   long64 end = work1[total_work];
@@ -955,7 +956,8 @@ void adjust_work_dontcares_dtz(long64 *work1, long64 *work2)
   work2[total_work] = work1[total_work];
 }
 
-struct HuffCode *construct_pairs_dtz(unsigned char *data, long64 size, int minfreq, int maxsymbols)
+struct HuffCode *construct_pairs_dtz(unsigned char *restrict data, long64 size,
+				      int minfreq, int maxsymbols)
 {
   int i, j, k, l;
   int num, t;
@@ -1149,14 +1151,15 @@ struct HuffCode *construct_pairs_dtz(unsigned char *data, long64 size, int minfr
       newtest[newpairs[i].s1][newpairs[i].s2] = 0;
   }
 
-  struct HuffCode *c = setup_code(data, size);
+  struct HuffCode *restrict c = setup_code(data, size);
   create_code(c);
   sort_code(c, num_syms);
 
   return c;
 }
 
-struct HuffCode *construct_pairs(unsigned char *data, long64 size, int minfreq, int maxsymbols, int wdl)
+struct HuffCode *construct_pairs(unsigned char *restrict data, long64 size,
+				  int minfreq, int maxsymbols, int wdl)
 {
   if (wdl)
     return construct_pairs_wdl(data, size, minfreq, maxsymbols);
@@ -1164,7 +1167,7 @@ struct HuffCode *construct_pairs(unsigned char *data, long64 size, int minfreq, 
     return construct_pairs_dtz(data, size, minfreq, maxsymbols);
 }
 
-void calc_symbol_tweaks(struct HuffCode *c)
+void calc_symbol_tweaks(struct HuffCode *restrict c)
 {
   int i, l, s;
 
@@ -1186,12 +1189,12 @@ void calc_symbol_tweaks(struct HuffCode *c)
   }
 }
 
-static struct HuffCode *setup_code(unsigned char *data, long64 size)
+static struct HuffCode *setup_code(unsigned char *restrict data, long64 size)
 {
   long64 idx;
   int i, s;
 
-  struct HuffCode *c = malloc(sizeof(struct HuffCode));
+  struct HuffCode *restrict c = malloc(sizeof(struct HuffCode));
   for (i = 0; i < MAXSYMB; i++)
     c->freq[i] = 0;
 
@@ -1203,7 +1206,7 @@ static struct HuffCode *setup_code(unsigned char *data, long64 size)
   return c;
 }
 
-long64 calc_size(struct HuffCode *c)
+long64 calc_size(struct HuffCode *restrict c)
 {
   int i;
   long64 bits = 0;
@@ -1214,7 +1217,8 @@ long64 calc_size(struct HuffCode *c)
   return (bits + 7) >> 3;
 }
 
-void calc_block_sizes(ubyte *data, long64 size, struct HuffCode *c, int maxsize)
+void calc_block_sizes(ubyte *restrict data, long64 size,
+		      struct HuffCode *restrict c, int maxsize)
 {
   long64 idx;
   int i, s, t;
@@ -1375,7 +1379,7 @@ void calc_block_sizes(ubyte *data, long64 size, struct HuffCode *c, int maxsize)
 
 // FIXME: should put COPYSIZE in some header
 #define COPYSIZE 10*1024*1024
-extern ubyte *copybuf;
+extern ubyte *restrict copybuf;
 
 void copy_bytes(FILE *F, FILE *G, long64 n)
 {
@@ -1543,7 +1547,8 @@ void write_final(struct tb_handle *F, FILE *G)
   }
 }
 
-void write_ctb_data(FILE *F, unsigned char *data, struct HuffCode *c, long64 size, int blocksize)
+void write_ctb_data(FILE *F, unsigned char *restrict data,
+		    struct HuffCode *restrict c, long64 size, int blocksize)
 {
   long64 idx;
   int s, t, l;
@@ -1614,9 +1619,10 @@ void write_ctb_data(FILE *F, unsigned char *data, struct HuffCode *c, long64 siz
     write_bits(F, 0, -(1 << blocksize));
 }
 
-static void compress_data(struct tb_handle *F, int num, FILE *G, ubyte *data, long64 size, int minfreq)
+static void compress_data(struct tb_handle *F, int num, FILE *G,
+			  ubyte *restrict data, long64 size, int minfreq)
 {
-  struct HuffCode *c;
+  struct HuffCode *restrict c;
   int i;
 
   if (F->wdl)
@@ -1712,9 +1718,8 @@ static void compress_data_single_valued(struct tb_handle *F, int num)
   }
 }
 
-//#include "rle.c"
-
-void compress_tb(struct tb_handle *F, unsigned char *data, ubyte *perm, int minfreq)
+void compress_tb(struct tb_handle *F, ubyte *restrict data,
+		  ubyte *restrict perm, int minfreq)
 {
   int i;
   int num;
@@ -1794,7 +1799,7 @@ void merge_tb(struct tb_handle *F)
   add_checksum(name);
 }
 
-static void create_code(struct HuffCode *c)
+static void create_code(struct HuffCode *restrict c)
 {
   int i, num;
   int idx1, idx2;
@@ -1850,7 +1855,7 @@ static void create_code(struct HuffCode *c)
   }
 }
 
-static void sort_code(struct HuffCode *c, int num)
+static void sort_code(struct HuffCode *restrict c, int num)
 {
   int i, j, max_len;
 
