@@ -45,14 +45,14 @@
 
 #include <stdlib.h>  // for size_t.
 #include <stdint.h>
-//#include <utility>
+#include "citycrc.h"
 
 /* Define to 1 if the compiler supports __builtin_expect. */
 #define HAVE_BUILTIN_EXPECT 1
 
 typedef uint8_t uint8;
 typedef uint32_t uint32;
-typedef uint64_t uint64;
+
 struct Pair {
   uint64 first;
   uint64 second;

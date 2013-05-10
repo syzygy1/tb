@@ -342,7 +342,12 @@ uint128 CityHash128(const char *s, size_t len) {
 }
 
 #include "citycrc.h"
+
+#ifdef __SSE_4_2__
 #include <nmmintrin.h>
+#else
+#include "crc32c.c"
+#endif
 
 // Requires len >= 240.
 static void CityHashCrc256Long(const char *s, size_t len,
