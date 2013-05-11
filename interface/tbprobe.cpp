@@ -312,7 +312,7 @@ static MoveStack *add_underprom_caps(Position& pos, MoveStack *stack, MoveStack 
 
   for (moves = stack; moves < end; moves++) {
     Move move = moves->move;
-    if (type_of(move) == PROMOTION && pos.is_empty(to_sq(move))) {
+    if (type_of(move) == PROMOTION && !pos.is_empty(to_sq(move))) {
       (*extra++).move = (Move)(move - (1 << 12));
       (*extra++).move = (Move)(move - (2 << 12));
       (*extra++).move = (Move)(move - (3 << 12));
