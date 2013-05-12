@@ -735,9 +735,16 @@ int main(int argc, char **argv)
     cursed_capt[i] = 0;
   has_cursed_capts = 0;
 
-  table_w = alloc_huge(size);
-  table_b = alloc_huge(size);
-//  table_b = table_w + size;
+  long64 alloc_size;
+  if (numpcs == 3)
+    alloc_size = 31332;
+  else if (numpcs == 4)
+    alloc_size = 31332 * 61;
+  else
+    alloc_size = size;
+
+  table_w = alloc_huge(alloc_size);
+  table_b = alloc_huge(alloc_size);
 
   init_threads(0);
   init_tables();
