@@ -20,6 +20,8 @@
 #include "movegen.h"
 #include "rkiss.h"
 #include "bitboard.h"
+#include "search.h"
+
 #include "tbprobe.h"
 #include "tbcore.h"
 
@@ -449,105 +451,126 @@ static int probe_dtz_no_ep(Position& pos, int *success)
   if (*success == 0) return 0;
 
   if (wdl == 0) return 0;
-  if (*success == 2) dtz = 1;
-  else {
-    MoveStack stack[192];
-    MoveStack *moves, *end = stack;
-    StateInfo st;
-    CheckInfo ci(pos);
 
-    if (wdl > 0) {
-      // Generate at least all legal non-capturing pawn moves
-      // including non-capturing promotions.
-      if (!pos.checkers())
-	end = generate<NON_EVASIONS>(pos, stack);
-      else
-	end = generate<EVASIONS>(pos, stack);
+  if (*success == 2)
+    return wdl == 2 ? 1 : 101;
 
-      for (moves = stack; moves < end; moves++) {
-	Move move = moves->move;
-	if (type_of(pos.piece_moved(move)) != PAWN) continue;
-	if (pos.is_capture(move)) continue;
-	if (!pos.pl_move_is_legal(move, ci.pinned)) continue;
-	pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
-	int v = -probe_ab(pos, -2, 2, success);
-	pos.undo_move(move);
-	if (*success == 0) return 0;
-	if (v == wdl)
-	  return wdl == 1 ? 299 : VALUE_MATE - 101;
-      }
-    }
-    dtz = 1 + probe_dtz_table(pos, wdl, success);
-    if (*success == 0) return 0;
-    if (*success == -1) {
-      int v, best;
-      best = -VALUE_MATE;
-      // Generate at least all legal non-ep moves.
-      // If wdl > 0, we can skip captures (and we already generated the rest).
-      if (wdl < 0) {
-	if (!pos.checkers())
-	  end = generate<NON_EVASIONS>(pos, stack);
-	else
-	  end = generate<EVASIONS>(pos, stack);
-      }
-      for (moves = stack; moves < end; moves++) {
-	Move move = moves->move;
-	if (type_of(move) == ENPASSANT) continue;
-	if (!pos.pl_move_is_legal(move, ci.pinned)) continue;
-	pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
-	if (st.rule50 == 0) { // Did the last move reset the 50-move counter?
-	  static int wdl_to_score[] = {
-	    -VALUE_MATE + 100, -300, 0, 300, VALUE_MATE - 100
-	  };
-	  v = -probe_ab(pos, -2, 2, success);
-	  v = wdl_to_score[v + 2];
-	} else {
-	  v = -probe_dtz(pos, success);
-	}
-	pos.undo_move(move);
-	if (*success == 0) return 0;
-	if (v > best) best = v;
-      }
-      if (best == -VALUE_MATE) {
-	if (!pos.checkers())
-	  best = 0; // Stalemate
-      }
-      if (best > 0) best--;
-      else if (best < 0) best++;
-      return best;
+  MoveStack stack[192];
+  MoveStack *moves, *end = NULL;
+  StateInfo st;
+  CheckInfo ci(pos);
+
+  if (wdl > 0) {
+    // Generate at least all legal non-capturing pawn moves
+    // including non-capturing promotions.
+    if (!pos.checkers())
+      end = generate<NON_EVASIONS>(pos, stack);
+    else
+      end = generate<EVASIONS>(pos, stack);
+
+    for (moves = stack; moves < end; moves++) {
+      Move move = moves->move;
+      if (type_of(pos.piece_moved(move)) != PAWN || pos.is_capture(move)
+		|| !pos.pl_move_is_legal(move, ci.pinned))
+	continue;
+      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      int v = -probe_ab(pos, -2, -wdl + 1, success);
+      pos.undo_move(move);
+      if (*success == 0) return 0;
+      if (v == wdl)
+	return v == 2 ? 1 : 101;
     }
   }
 
-  int v;
-  if (wdl & 1) {
-    if (wdl > 0) v = 300 - dtz;
-    else v = -300 + dtz;
-  } else if (wdl > 0) v = VALUE_MATE - 100 - dtz;
-  else if (wdl < 0) v = -VALUE_MATE + 100 + dtz;
-  else v = 0;
+  dtz = 1 + probe_dtz_table(pos, wdl, success);
+  if (*success >= 0) {
+    if (wdl & 1) dtz += 100;
+    return wdl >= 0 ? dtz : -dtz;
+  }
 
-  return v;
+  if (wdl > 0) {
+    int best = 0xffff;
+    for (moves = stack; moves < end; moves++) {
+      Move move = moves->move;
+      if (pos.is_capture(move) || type_of(pos.piece_moved(move)) == PAWN
+		|| !pos.pl_move_is_legal(move, ci.pinned))
+	continue;
+      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      int v = -probe_dtz(pos, success) + 1;
+      pos.undo_move(move);
+      if (*success == 0) return 0;
+      if (v < best)
+	best = v;
+    }
+    return best;
+  } else {
+    int best = -1;
+    if (!pos.checkers())
+      end = generate<NON_EVASIONS>(pos, stack);
+    else
+      end = generate<EVASIONS>(pos, stack);
+    for (moves = stack; moves < end; moves++) {
+      int v;
+      Move move = moves->move;
+      if (!pos.pl_move_is_legal(move, ci.pinned))
+	continue;
+      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      if (st.rule50 == 0) {
+	if (wdl == -2) v = -1;
+	else {
+	  v = probe_ab(pos, 1, 2, success);
+	  v = (v == 2) ? 0 : -101;
+	}
+      } else {
+	v = -probe_dtz(pos, success) - 1;
+      }
+      pos.undo_move(move);
+      if (*success == 0) return 0;
+      if (v < best)
+	best = v;
+    }
+    return best;
+  }
 }
+
+static int wdl_to_dtz[] = {
+  -1, -101, 0, 101, 1
+};
 
 // Probe the DTZ table for a particular position.
 // If *success != 0, the probe was successful.
 // The return value is from the point of view of the side to move:
-// -VALUE_MATE + n : loss in n ply.
-//        -300 + n : loss, but draw under 50-move rule
-//           0     : draw
-//	   300 - n : win, but draw under 50-move rule
-//  VALUE_MATE - n : win in n ply
-// Note that the value of n can be off by 1.
+//         n < -100 : 
+// -100 <= n < -1   : loss in n ply (assuming 50-move counter == 0)
+//         0	    : draw
+//     1 < n <= 100 : win in n ply (assuming 50-move counter == 0)
+//   100 < n        : win, but draw under 50-move rule
+//
+// The return value n can be off by 1: a return value -n can mean a loss
+// in n+1 ply and a return value +n can mean a win in n+1 ply. This
+// cannot happen for tables with positions exactly on the "edge" of
+// the 50-move rule.
+//
+// This implies that if dtz > 0 is returned, the position is certainly
+// a win if dtz + 50-move-counter <= 99. Care must be taken that the engine
+// picks moves that preserve dtz + 50-move-counter <= 99.
+//
+// If n = 100 immediately after a capture or pawn move, then the position
+// is also certainly a win, and during the whole phase until the next
+// capture or pawn move, the inequality to be preserved is
+// dtz + 50-movecounter <= 100.
+//
+// In short, if a move is available resulting in dtz + 50-move-counter <= 99,
+// then do not accept moves leading to dtz + 50-move-counter == 100.
+//
 int probe_dtz(Position& pos, int *success)
 {
-  int v;
-
   *success = 1;
-  v = probe_dtz_no_ep(pos, success);
+  int v = probe_dtz_no_ep(pos, success);
 
   if (pos.ep_square() == SQ_NONE)
     return v;
-  if (!(*success)) return 0;
+  if (*success == 0) return 0;
 
   // Now handle en passant.
   int v1 = -3;
@@ -565,7 +588,7 @@ int probe_dtz(Position& pos, int *success)
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
     if (type_of(capture) != ENPASSANT
-	  || !pos.pl_move_is_legal(capture, ci.pinned))
+		|| !pos.pl_move_is_legal(capture, ci.pinned))
       continue;
     pos.do_move(capture, st, ci, pos.move_gives_check(capture, ci));
     int v0 = -probe_ab(pos, -2, 2, success);
@@ -574,16 +597,26 @@ int probe_dtz(Position& pos, int *success)
     if (v0 > v1) v1 = v0;
   }
   if (v1 > -3) {
-    static int wdl_to_score[] = {
-      -VALUE_MATE + 100 + 1, -300 + 1, 0, 300 - 1, VALUE_MATE - 100 - 1
-    };
-    v1 = wdl_to_score[v1 + 2];
-    if (v1 >= v) v = v1;
-    else if (v == 0) {
+    v1 = wdl_to_dtz[v1 + 2];
+    if (v < -100) {
+      if (v1 >= 0)
+	v = v1;
+    } else if (v < 0) {
+      if (v1 >= 0 || v1 < 100)
+	v = v1;
+    } else if (v > 100) {
+      if (v1 > 0)
+	v = v1;
+    } else if (v > 0) {
+      if (v1 == 1)
+	v = v1;
+    } else if (v1 >= 0) {
+      v = v1;
+    } else {
       for (moves = stack; moves < end; moves++) {
-	Move capture = moves->move;
-	if (type_of(capture) == ENPASSANT) continue;
-	if (pos.pl_move_is_legal(capture, ci.pinned)) break;
+	Move move = moves->move;
+	if (type_of(move) == ENPASSANT) continue;
+	if (pos.pl_move_is_legal(move, ci.pinned)) break;
       }
       if (moves == end && !pos.checkers()) {
 	end = generate<QUIETS>(pos, end);
@@ -601,71 +634,106 @@ int probe_dtz(Position& pos, int *success)
   return v;
 }
 
-// Select a move that minimaxes DTZ.
-// If *success != 0, the probe was successful.
-// Returns the probe_dtz() score for the position.
-// Best move is stored in *return_move.
-int root_probe(Position& pos, Move *return_move, int *success)
+static int has_repeated(StateInfo *st)
 {
-  int value;
+  while (1) {
+    int i = 4, e = std::min(st->rule50, st->pliesFromNull);
+    if (e < i)
+      return 0;
+    StateInfo *stp = st->previous->previous;
+    do {
+      stp = stp->previous->previous;
+      if (stp->key == st->key)
+	return 1;
+      i += 2;
+    } while (i <= e);
+    st = st->previous;
+  }
+}
 
-  *success = 1;
-  value = probe_dtz(pos, success);
-  if (!(*success)) return MOVE_NONE;
+// Use the DTZ tables to filter out moves that don't preserve the win or draw.
+// If the position is lost, but DTZ is fairly high, only keep moves that
+// maximise DTZ.
+//
+// A return value of 0 indicates that not all probes were successful and that
+// no moves were filtered out.
+int root_probe(Position& pos)
+{
+  int success;
 
-  MoveStack stack[192];
-  MoveStack *moves, *end;
+  int wdl = probe_wdl(pos, &success);
+  if (!success) return 0;
+
   StateInfo st;
-
-  // Generate at least all legal moves.
-  if (!pos.checkers())
-    end = generate<NON_EVASIONS>(pos, stack);
-  else
-    end = generate<EVASIONS>(pos, stack);
   CheckInfo ci(pos);
 
-  int num_best = 0;
-  int best = -VALUE_INFINITE;
-  int best2 = 0;
-  int v, w;
-  for (moves = stack; moves < end; moves++) {
-    Move move = moves->move;
-    if (!pos.pl_move_is_legal(move, ci.pinned))
-      continue;
+  // Probe each move.
+  for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+    Move move = Search::RootMoves[i].pv[0];
     pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
-    v = w = 0;
-    if (pos.checkers()) {
+    int v = 0;
+    if (pos.checkers() && wdl == 2) {
       MoveStack s[192];
       if (generate<LEGAL>(pos, s) == s)
-	v = VALUE_MATE;
+	v = 1;
     }
     if (!v) {
-      v = -probe_dtz(pos, success);
-      if (!st.rule50 && v) {
-	w = v;
-	if (v > 300)
-	  v = VALUE_MATE - 100;
-	else if (v > 0)
-	  v = 300;
-	else if (v < -300)
-	  v = -VALUE_MATE + 100;
-	else
-	  v = -300;
+      if (st.rule50 != 0) {
+	v = -probe_dtz(pos, &success);
+	if (v > 0) v++;
+	else if (v < 0) v--;
+      } else {
+	v = -probe_wdl(pos, &success);
+	v = wdl_to_dtz[v + 2];
       }
     }
     pos.undo_move(move);
-    if (!(*success)) return MOVE_NONE;
-    if (v > best || (v == best && w > best2)) {
-      stack[0].move = move;
-      best = v;
-      best2 = w;
-      num_best = 1;
-    } else if (v == best && w == best2) {
-      stack[num_best++].move = move;
-    }
+    if (!success) return 0;
+    Search::RootMoves[i].score = (Value)v;
   }
 
-  *return_move = stack[rk.rand<unsigned>() % num_best].move;
-  return value;
+  int cnt50 = st.previous->rule50;
+  size_t j = 0;
+  if (wdl > 0) {
+    int best = 0xffff;
+    for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+      int v = Search::RootMoves[i].score;
+      if (v > 0 && v < best)
+	best = v;
+    }
+    int max = best;
+    // If the current phase has not seen repetitions, then try all moves
+    // that stay safely within the 50-move budget.
+    if (!has_repeated(st.previous) && best + cnt50 <= 99)
+      max = 99 - cnt50;
+    for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+      int v = Search::RootMoves[i].score;
+      if (v > 0 && v <= max)
+	Search::RootMoves[j++] = Search::RootMoves[i];
+    }
+  } else if (wdl < 0) {
+    int best = 0;
+    for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+      int v = Search::RootMoves[i].score;
+      if (v < best)
+	best = v;
+    }
+    // Try all moves, unless we approach or have a 50-move rule draw.
+    if (-best * 2 + cnt50 < 100)
+      return 1;
+    for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+      if (Search::RootMoves[i].score == best)
+	Search::RootMoves[j++] = Search::RootMoves[i];
+    }
+  } else {
+    // Try all moves that preserve the draw.
+    for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+      if (Search::RootMoves[i].score == 0)
+	Search::RootMoves[j++] = Search::RootMoves[i];
+    }
+  }
+  Search::RootMoves.resize(j, Search::RootMove(MOVE_NONE));
+
+  return 1;
 }
 
