@@ -5,7 +5,7 @@ probing to a chess engine. The tablebase generator is able to generate
 all tablebases for up to 6 pieces.
 
 Requirements for the generator:
-* 16GB of RAM for 6-piece tables (much less for 5-piece tables).
+* 16 GB of RAM for 6-piece tables (much less for 5-piece tables).
 * x86-64 CPU.
 * 64-bit OS.
 * Sufficiently recent gcc (producing 64-bit executables).
@@ -26,7 +26,7 @@ The .rtbz files store the distance-to-zero: the number of moves to the next
 capture or pawn move. These files only need to be accessed when the root
 position has 6 pieces or less. They are "single-sided".
 
-The 6-piece WDL tables are 68.3 GB in total. The DTZ tables take up 81.9 GB.
+The 6-piece WDL tables are 68.2 GB in total. The DTZ tables take up 81.9 GB.
 For up to 5 pieces, the numbers are 378 MB and 561 MB. Ideally, the WDL
 tables are stored on an SSD.
 
