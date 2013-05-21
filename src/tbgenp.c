@@ -1020,11 +1020,14 @@ int main(int argc, char **argv)
 	run_threaded(reset_pawn_captures_b, work_g, 1);
       }
 
-      if (save_to_disk || symmetric || !G)
+      if (save_to_disk || !G
+		|| (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
 	tb_table = table_b;
       tb_table = init_permute_file(pcs, file, tb_table);
-      if (save_to_disk && !symmetric && G) {
+      if (save_to_disk && G && !symmetric) {
 	store_table(table_w, 'w');
+	store_table(table_b, 'b');
+      } else if (save_to_disk && G && H && (to_fix_w || cursed_pawn_capt_w)) {
 	store_table(table_b, 'b');
       }
 
@@ -1067,6 +1070,10 @@ int main(int argc, char **argv)
     if (H) {
       if (tb_table == table_w)
 	load_table(table_w, 'w');
+      else if (tb_table == table_b && G && (to_fix_w || cursed_pawn_capt_w))
+	load_table(table_b, 'b');
+      if (symmetric)
+	to_fix_b = cursed_pawn_capt_b = 0;
 
 #if defined(REGULAR) || defined(ATOMIC)
       fix_closs();

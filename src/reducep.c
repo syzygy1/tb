@@ -439,7 +439,7 @@ void store_table(ubyte *table, char color)
   char name[64];
 
   if (!lz4_buf) {
-    lz4_buf = malloc(4 + LZ4_compressBound(COPYSIZE));
+    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
     if (!lz4_buf) {
       printf("Out of memory.\n");
       exit(0);
