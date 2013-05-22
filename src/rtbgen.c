@@ -94,7 +94,7 @@ static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
     }
   }
   while ((k = *pcs++) >= 0) {
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves2(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -157,7 +157,7 @@ static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
     }
   }
   while ((k = *pcs++) >= 0) {
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves2(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -175,6 +175,7 @@ static void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -199,6 +200,7 @@ static void calc_mates(struct thread_data *thread)
   bitboard occ, bb;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int p[MAX_PIECES];
   long64 end = thread->end;
 
@@ -412,6 +414,9 @@ static void probe_captures_w(struct thread_data *thread)
       case 2:
 	LOOP_WHITE_PIECES(mark_changed);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -446,6 +451,9 @@ static void probe_captures_b(struct thread_data *thread)
 	break;
       case 2:
 	LOOP_BLACK_PIECES(mark_changed);
+	break;
+      default:
+	assume(0);
 	break;
       }
     }
@@ -570,6 +578,9 @@ void iter(struct thread_data *thread)
       } else {
 	table[idx] = UNKNOWN;
       }
+    default:
+      assume(0);
+      break;
     }
   }
 
@@ -875,7 +886,7 @@ int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
     }
   }
   while ((k = *pcs++) >= 0) {
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves2(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);

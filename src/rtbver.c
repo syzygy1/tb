@@ -489,7 +489,7 @@ static int check_mate(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
     }
   }
   while ((k = *pcs++) >= 0) {
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves2(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -507,6 +507,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -527,6 +528,7 @@ void calc_mates(struct thread_data *thread)
   bitboard occ, bb;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int p[MAX_PIECES];
   long64 end = thread->end;
 
@@ -700,6 +702,9 @@ void probe_captures_w(struct thread_data *thread)
       case 2:
 	LOOP_WHITE_PIECES(mark_capt_losses);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -729,6 +734,9 @@ void probe_captures_b(struct thread_data *thread)
 	break;
       case 2:
 	LOOP_BLACK_PIECES(mark_capt_losses);
+	break;
+      default:
+	assume(0);
 	break;
       }
     }
@@ -779,6 +787,7 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -811,9 +820,9 @@ void load_wdl(struct thread_data *thread)
     idx2 = encode_piece(entry, norm, pos, factor);
     __builtin_prefetch(&src[idx2], 0, 3);
     v2 = src[idx2_p];
-    if (v2 > 4) table[idx_p] = WDL_ERROR;
+    if (unlikely(v2 > 4)) table[idx_p] = WDL_ERROR;
     else table[idx_p] = wdl_matrix[v2][v1_p];
-if(table[idx_p]==WDL_ERROR)
+if(unlikely(table[idx_p]==WDL_ERROR))
 printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
     v1_p = v1;
     idx_p = idx;
@@ -821,9 +830,9 @@ printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
   }
 
   v2 = src[idx2_p];
-  if (v2 > 4) table[idx_p] = WDL_ERROR;
+  if (unlikely(v2 > 4)) table[idx_p] = WDL_ERROR;
   else table[idx_p] = wdl_matrix[v2][v1_p];
-if(table[idx_p]==WDL_ERROR)
+if(unlikely(table[idx_p]==WDL_ERROR))
 printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
 }
 #else
@@ -832,6 +841,7 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -850,9 +860,9 @@ void load_wdl(struct thread_data *thread)
     pos[perm[1]] = KK_inv[idx2][1];
     idx2 = encode_piece(entry, norm, pos, factor);
     v2 = src[idx2];
-    if (v2 > 4) table[idx] = WDL_ERROR;
+    if (unlikely(v2 > 4)) table[idx] = WDL_ERROR;
     else table[idx] = wdl_matrix[v2][v1];
-if(table[idx]==WDL_ERROR)
+if(unlikely(table[idx]==WDL_ERROR))
 printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }
@@ -863,6 +873,7 @@ void load_dtz(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -901,7 +912,7 @@ void load_dtz(struct thread_data *thread)
     __builtin_prefetch(&src[idx2], 0, 3);
     v2 = src[idx2_p];
     table[idx_p] = wdl_to_dtz[v1_p][v2];
-if(table[idx_p]==DTZ_ERROR)
+if(unlikely(table[idx_p]==DTZ_ERROR))
 error("DTZ_ERROR: idx = %"PRIu64", v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx_p, v1_p, v2, idx2_p);
     v1_p = v1;
     idx_p = idx;
@@ -919,6 +930,7 @@ void load_dtz_mapped(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -943,7 +955,7 @@ void load_dtz_mapped(struct thread_data *thread)
     idx2 = encode_piece(entry, norm, pos, factor);
     v2 = map[wdl][src[idx2]];
     table[idx] = wdl_to_dtz[v1][v2];
-if(table[idx]==DTZ_ERROR)
+if(unlikely(table[idx]==DTZ_ERROR))
 error("DTZ_ERROR: idx = %"PRIu64", wdl = %d, v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx, wdl, v1, v2, idx2);
   }
 }
@@ -976,7 +988,7 @@ static int compute(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
     }
   }
   while ((k = *pcs++) >= 0) {
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves2(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -985,7 +997,7 @@ static int compute(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
       if (v > best) best = v;
       ClearFirst(bb);
     }
-  } while (*(++pcs) >= 0);
+  }
 
   return best;
 }
@@ -1001,7 +1013,7 @@ void verify_opp(struct thread_data *thread)
     int v = opp_table[idx];
     if (v >= WDL_ILLEGAL) {
       opp_table[idx] = wdl_to_dtz_c[v - WDL_ERROR];
-      if (v == WDL_ERROR)
+      if (unlikely(v == WDL_ERROR))
 	error("ERROR: opp table, idx = %"PRIu64", v = WDL_ERROR\n", idx);
       continue;
     }
@@ -1009,7 +1021,7 @@ void verify_opp(struct thread_data *thread)
     int w = compute(opp_pieces, idx, dtz_table, occ, p);
     int z = dtz_to_opp[v][w];
     opp_table[idx] = z;
-    if (z == DTZ_ERROR)
+    if (unlikely(z == DTZ_ERROR))
       error("ERROR: opp table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1024,13 +1036,13 @@ void verify_dtz(struct thread_data *thread)
   LOOP_ITER {
     int v = dtz_table[idx];
     if (v == DTZ_ILLEGAL || v >= DTZ_ERROR) {
-      if (v == DTZ_ERROR)
+      if (unlikely(v == DTZ_ERROR))
 	error("ERROR: dtz table, idx = %"PRIu64", v = DTZ_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
     int w = compute(dtz_pieces, idx, opp_table, occ, p);
-    if (!dtz_matrix[v][w])
+    if (unlikely(!dtz_matrix[v][w]))
       error("ERROR: dtz table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1047,7 +1059,7 @@ void verify_wdl(struct thread_data *thread)
     if (w_skip[v]) continue;
     FILL_OCC;
     int w = compute(pieces, idx, opp_table, occ, p);
-    if (!w_matrix[v][w])
+    if (unlikely(!w_matrix[v][w]))
       error("ERROR: wdl table, idx = %"PRIu64", v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1057,6 +1069,7 @@ void wdl_load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = (ubyte *)tb_table;
   int *perm = tb_perm;
@@ -1078,9 +1091,10 @@ void wdl_load_wdl(struct thread_data *thread)
     pos[perm[1]] = KK_inv[idx2][1];
     idx2 = encode_piece(entry, norm, pos, factor);
     v2 = src[idx2];
-    if (v2 > 4) table[idx] = W_ERROR;
+    if (unlikely(v2 > 4)) table[idx] = W_ERROR;
     else table[idx] = w_wdl_matrix[v2][v1];
-if(table[idx]==W_ERROR)
+if(unlikely(table[idx]==W_ERROR))
 printf("W_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }
+

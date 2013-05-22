@@ -295,6 +295,7 @@ void convert_data_piece(struct thread_data *thread)
   int sq2;
 #endif
   int n = entry_piece.num;
+  assume(n >= 3 && n <= 6);
   int pos[TBPIECES];
   int order[TBPIECES];
   int factor[TBPIECES];
@@ -328,7 +329,7 @@ void convert_data_piece(struct thread_data *thread)
   sq = pos[pidx[0]];
   idx3 ^= sq_mask[sq];
   sq2 = pos[pidx[1]];
-  if (KK_map[sq][sq2] < 0)
+  if (unlikely(KK_map[sq][sq2] < 0))
     idx3 = diagonal;
   else {
     if (mirror[sq][sq2] < 0)
@@ -356,7 +357,7 @@ void convert_data_piece(struct thread_data *thread)
     sq = pos[pidx[0]];
     idx2 ^= sq_mask[sq];
     sq2 = pos[pidx[1]];
-    if (KK_map[sq][sq2] < 0)
+    if (unlikely(KK_map[sq][sq2] < 0))
       idx2 = diagonal;
     else {
       if (mirror[sq][sq2] < 0)
@@ -377,6 +378,7 @@ void convert_data_pawn(struct thread_data *thread)
   long64 idx1, idx2, idx3;
   int i;
   int n = entry_pawn.num;
+  assume(n >= 3 && n <= 6);
   int pos[TBPIECES];
   int order[TBPIECES];
   int factor[TBPIECES];
@@ -462,6 +464,7 @@ void convert_est_data_piece(struct thread_data *thread)
   ubyte *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
+  assume(n >= 3 && n <= 6);
   int sq;
 #ifdef SMALL
   int sq2;
@@ -504,7 +507,7 @@ void convert_est_data_piece(struct thread_data *thread)
 	sq = pos[pidx_list[l][0]];
 	idx ^= sq_mask[sq];
 	sq2 = pos[pidx_list[l][1]];
-	if (KK_map[sq][sq2] < 0)
+	if (unlikely(KK_map[sq][sq2] < 0))
 	  idx = diagonal;
 	else {
 	  if (mirror[sq][sq2] < 0)
@@ -536,7 +539,7 @@ void convert_est_data_piece(struct thread_data *thread)
 	  sq = pos[pidx_list[l][0]];
 	  idx ^= sq_mask[sq];
 	  sq2 = pos[pidx_list[l][1]];
-	  if (KK_map[sq][sq2] < 0)
+	  if (unlikely(KK_map[sq][sq2] < 0))
 	    idx = diagonal;
 	  else {
 	    if (mirror[sq][sq2] < 0)
@@ -567,6 +570,7 @@ void convert_est_data_piece(struct thread_data *thread)
   char *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
+  assume(n >= 3 && n <= 6);
   int sq;
   int pos[TBPIECES];
   int factor[TBPIECES];
@@ -618,6 +622,7 @@ void convert_est_data_pawn(struct thread_data *thread)
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
+  assume(n >= 3 && n <= 6);
   int pos[TBPIECES];
   int factor[TBPIECES];
   int order[TBPIECES];
@@ -679,6 +684,7 @@ void convert_est_data_pawn(struct thread_data *thread)
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
+  assume(n >= 3 && n <= 6);
   int pos[TBPIECES];
   int factor[TBPIECES];
   int order[TBPIECES];

@@ -47,5 +47,15 @@ typedef ushort Move;
 #define BQUEEN 13
 #define BKING 14
 
+#define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
+
+#if 0
+#define likely(x) (x)
+#define unlikely(x) (x)
+#else
+#define likely(x) __builtin_expect(!!(x),1)
+#define unlikely(x) __builtin_expect(!!(x),0)
+#endif
+
 #endif
 

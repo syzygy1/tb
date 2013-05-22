@@ -448,9 +448,9 @@ void replace_pairs(struct thread_data *thread)
       struct Symbol *sym = &symtable[newpairs[newtest[s1][s2] - 1].sym];
       data[idx - sym->len] = sym->first;
       data[idx - sym->len + 1] = sym->second;
-      if (a >= 0) countfirst[t][newtest[s1][s2] - 1][a]++;
+      if (likely(a >= 0)) countfirst[t][newtest[s1][s2] - 1][a]++;
       a = newtest[s1][s2] - 1;
-      if (idx == compress_state.size) break;
+      if (unlikely(idx == compress_state.size)) break;
       s1 = symcode[data[idx]][data[idx + 1]];
       idx += symtable[s1].len;
       countsecond[t][a][s1]++;
