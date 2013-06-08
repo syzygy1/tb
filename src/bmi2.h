@@ -12,18 +12,11 @@ static long64 _pext_u64(long64 val, long64 mask)
   long64 res = 0;
   int i = 0;
 
-  val &= mask;
-  while (val) {
-    long64 p = val & (-val);
-    long64 q = mask & (-mask);
-    while (q != p) {
-      i++;
-      ClearFirst(mask);
-      q = mask & (-mask);
-    }
-    ClearFirst(mask);
-    res |= bit[i++];
-    ClearFirst(val);
+  while (mask) {
+    if (val & mask & -mask)
+      res |= bit[i];
+    mask &= mask - 1;
+    i++;
   }
 
   return res;
@@ -36,8 +29,8 @@ static long64 _pdep_u64(long64 val, long64 mask)
 
   while (mask) {
     if (val & bit[i++])
-      res |= mask & (-mask);
-    ClearFirst(mask);
+      res |= mask & -mask;
+    mask &= mask - 1;
   }
 
   return res;
