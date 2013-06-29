@@ -25,8 +25,12 @@ char *map_file(char *name, int shared, long64 *size)
   }
   fstat(fd, &statbuf);
   *size = statbuf.st_size;
+#ifdef __linux__
   char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ,
 	    shared ? MAP_SHARED : MAP_PRIVATE | MAP_POPULATE, fd, 0);
+#else
+  char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+#endif
   if (data == (char *)(-1)) {
     printf("Could not mmap() %s.\n", name);
     exit(1);
@@ -104,7 +108,9 @@ ubyte *alloc_huge(long64 size)
     printf("Could not allocate sufficient memory.\n");
     exit(1);
   }
+#ifdef __linux__
   madvise((void *)ptr, size, MADV_HUGEPAGE);
+#endif
 
   return ptr;
 #else
