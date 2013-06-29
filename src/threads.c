@@ -17,16 +17,66 @@
 
 struct thread_data thread_data[MAX_THREADS];
 
-#ifndef __WIN32__
+#ifndef __WIN32__ /* pthread */
+
+// implementation of pthread_barrier in case it is missing
+#if !defined(_POSIX_BARRIERS) || !((_POSIX_BARRIERS - 20012L) >= 0)
+#define pthread_barrier_t barrier_t
+#define pthread_barrier_attr_t barrier_attr_t
+#define pthread_barrier_init(b,a,n) barrier_init(b,n)
+#define pthread_barrier_destroy(b) barrier_destroy(b)
+#define pthread_barrier_wait(b) barrier_wait(b)
+
+typedef struct {
+  int needed;
+  int called;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+} barrier_t;
+
+int barrier_init(barrier_t *barrier, int needed)
+{
+  barrier->needed = needed;
+  barrier->called = 0;
+  pthread_mutex_init(&barrier->mutex,NULL);
+  pthread_cond_init(&barrier->cond,NULL);
+  return 0;
+}
+
+int barrier_destroy(barrier_t *barrier)
+{
+  pthread_mutex_destroy(&barrier->mutex);
+  pthread_cond_destroy(&barrier->cond);
+  return 0;
+}
+
+int barrier_wait(barrier_t *barrier)
+{
+  pthread_mutex_lock(&barrier->mutex);
+  barrier->called++;
+  if (barrier->called == barrier->needed) {
+    barrier->called = 0;
+    pthread_cond_broadcast(&barrier->cond);
+  } else {
+    pthread_cond_wait(&barrier->cond,&barrier->mutex);
+  }
+  pthread_mutex_unlock(&barrier->mutex);
+  return 0;
+}
+#endif
+
 pthread_t threads[MAX_THREADS - 1];
 static pthread_attr_t thread_attr;
 static pthread_barrier_t barrier_start, barrier_end;
 #define THREAD_FUNC void*
-#else
+
+#else /* WIN32 */
+
 HANDLE threads[MAX_THREADS - 1];
 HANDLE start_event[MAX_THREADS - 1];
 HANDLE stop_event[MAX_THREADS - 1];
 #define THREAD_FUNC DWORD
+
 #endif
 
 static struct {

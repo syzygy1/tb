@@ -47,7 +47,11 @@ typedef ushort Move;
 #define BQUEEN 13
 #define BKING 14
 
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
+#else
+#define assume(x) do { } while (0)
+#endif
 
 #if 0
 #define likely(x) (x)
