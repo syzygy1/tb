@@ -737,9 +737,9 @@ int main(int argc, char **argv)
 
   long64 alloc_size;
   if (numpcs == 3)
-    alloc_size = 31332;
+    alloc_size = 31332 + 1;
   else if (numpcs == 4)
-    alloc_size = 31332 * 61;
+    alloc_size = 31332 * 61 + 1;
   else
     alloc_size = size;
 

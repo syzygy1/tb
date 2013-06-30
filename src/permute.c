@@ -724,7 +724,7 @@ void estimate_compression_piece(ubyte *restrict table, int *restrict pcs,
   int i, p;
 
   uint32 dsize = num_segs * seg_size;
-  ubyte *restrict dst = malloc(num_cands * dsize);
+  ubyte *restrict dst = malloc(num_cands * dsize + 1);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
@@ -760,7 +760,7 @@ void estimate_compression_pawn(ubyte *restrict table, int *restrict pcs,
   int i, p;
 
   uint32 dsize = num_segs * seg_size;
-  ubyte *restrict dst = malloc(num_cands * dsize);
+  ubyte *restrict dst = malloc(num_cands * dsize + 1);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
@@ -811,6 +811,7 @@ long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
   for (i = 0; i < num_type_perms; i++)
     compest[i] = 0;
 
+  assume(num_types >= 2);
   for (k = 0; k < num_types - 1; k++) {
     best = UINT64_MAX;
     num_cands = 0;
@@ -997,7 +998,7 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
   printf("tb_size = %"PRIu64"\n", tb_size);
 
   generate_test_list(tb_size, entry_piece.num);
-  if (!tb_table && !(tb_table = malloc(tb_size))) {
+  if (!tb_table && !(tb_table = malloc(tb_size + 1))) {
     printf("Out of memory.\n");
     exit(1);
   }
@@ -1190,7 +1191,7 @@ ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
 
   generate_test_list(tb_size, entry_pawn.num);
 
-  if (!tb_table && !(tb_table = malloc(tb_size))) {
+  if (!tb_table && !(tb_table = malloc(tb_size + 1))) {
     printf("Out of memory.\n");
     exit(1);
   }
