@@ -595,6 +595,7 @@ void iter(struct thread_data *thread)
       } else {
 	table[idx] = UNKNOWN;
       }
+      break;
     }
   }
 
