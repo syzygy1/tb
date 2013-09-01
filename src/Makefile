@@ -21,7 +21,7 @@ CC = gcc -pthread
 # Remove or replace -march=corei7 and -msse4.2 if necessary.
 # For Haswell add -mbmi2 and select -DBMI2 above.
 #CFLAGS = -g -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2
-CFLAGS = -g -O3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2 -flto
+CFLAGS = -g -O3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2 -flto -Wno-array-bounds -Wno-maybe-uninitialized
 
 export FLAGS CC CFLAGS
 
