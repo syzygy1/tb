@@ -157,6 +157,7 @@ void generate_test_list(long64 size, int n)
 
   if (n <= 3 || size <= 100000) {
     // 1 entry covering whole table
+    num_segs = 1;
     segs = malloc(sizeof(long64));
     seg_size = size;
     segs[0] = 0;
