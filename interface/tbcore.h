@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2015 Ronald de Man
 */
 
 #ifndef TBCORE_H
@@ -7,8 +7,14 @@
 
 #ifndef __WIN32__
 #include <pthread.h>
+#define SEP_CHAR ':'
+#define FD int
+#define FD_ERR -1
 #else
 #include <windows.h>
+#define SEP_CHAR ';'
+#define FD HANDLE
+#define FD_ERR INVALID_HANDLE_VALUE
 #endif
 
 #ifndef __WIN32__
@@ -63,6 +69,7 @@ struct PairsData {
 struct TBEntry {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -72,6 +79,7 @@ struct TBEntry {
 struct TBEntry_piece {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -86,6 +94,7 @@ struct TBEntry_piece {
 struct TBEntry_pawn {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -102,6 +111,7 @@ struct TBEntry_pawn {
 struct DTZEntry_piece {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -111,7 +121,6 @@ struct DTZEntry_piece {
   int factor[TBPIECES];
   ubyte pieces[TBPIECES];
   ubyte norm[TBPIECES];
-  uint64 mapped_size;
   ubyte flags; // accurate, mapped, side
   ushort map_idx[4];
   ubyte *map;
@@ -120,6 +129,7 @@ struct DTZEntry_piece {
 struct DTZEntry_pawn {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -131,7 +141,6 @@ struct DTZEntry_pawn {
     ubyte pieces[TBPIECES];
     ubyte norm[TBPIECES];
   } file[4];
-  uint64 mapped_size;
   ubyte flags[4];
   ushort map_idx[4][4];
   ubyte *map;

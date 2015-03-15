@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013 Ronald de Man
+  Copyright (c) 2013-2015 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbprobe.cpp contains the Stockfish-specific routines of the
@@ -18,20 +18,25 @@
 
 #include "position.h"
 #include "movegen.h"
-#include "rkiss.h"
 #include "bitboard.h"
 #include "search.h"
+#include "bitcount.h"
 
 #include "tbprobe.h"
 #include "tbcore.h"
 
-#include "tbcore.c"
+namespace Zobrist {
+  extern Key psq[COLOR_NB][PIECE_TYPE_NB][SQUARE_NB];
+}
 
-static RKISS rk;
+int TBlargest = 0;
+
+#include "tbcore.c"
 
 // Given a position with 6 or fewer pieces, produce a text string
 // of the form KQPvKRP, where "KQP" represents the white pieces if
 // mirror == 0 and the black pieces if mirror == 1.
+// No need to make this very efficient.
 static void prt_str(Position& pos, char *str, int mirror)
 {
   Color color;
@@ -40,18 +45,19 @@ static void prt_str(Position& pos, char *str, int mirror)
   
   color = !mirror ? WHITE : BLACK;
   for (pt = KING; pt >= PAWN; pt--)
-    for (i = 0; i < pos.piece_count(color, pt); i++)
+    for (i = popcount<Max15>(pos.pieces(color, pt)); i > 0; i--)
       *str++ = pchr[6 - pt];
   *str++ = 'v';
   color = ~color;
   for (pt = KING; pt >= PAWN; pt--)
-    for (i = 0; i < pos.piece_count(color, pt); i++)
+    for (i = popcount<Max15>(pos.pieces(color, pt)); i > 0; i--)
       *str++ = pchr[6 - pt];
   *str++ = 0;
 }
 
 // Given a position, produce a 64-bit material signature key.
 // If the engine supports such a key, it should equal the engine's key.
+// Again no need to make this very efficient.
 static uint64 calc_key(Position& pos, int mirror)
 {
   Color color;
@@ -60,13 +66,13 @@ static uint64 calc_key(Position& pos, int mirror)
   uint64 key = 0;
 
   color = !mirror ? WHITE : BLACK;
-  for (pt = PAWN; pt <= QUEEN; pt++)
-    for (i = 0; i < pos.piece_count(color, pt); i++)
-      key ^= Zobrist::psq[WHITE][pt][i];
+  for (pt = PAWN; pt <= KING; pt++)
+    for (i = popcount<Max15>(pos.pieces(color, pt)); i > 0; i--)
+      key ^= Zobrist::psq[WHITE][pt][i - 1];
   color = ~color;
-  for (pt = PAWN; pt <= QUEEN; pt++)
-    for (i = 0; i < pos.piece_count(color, pt); i++)
-      key ^= Zobrist::psq[BLACK][pt][i];
+  for (pt = PAWN; pt <= KING; pt++)
+    for (i = popcount<Max15>(pos.pieces(color, pt)); i > 0; i--)
+      key ^= Zobrist::psq[BLACK][pt][i - 1];
 
   return key;
 }
@@ -75,6 +81,7 @@ static uint64 calc_key(Position& pos, int mirror)
 // defined by pcs[16], where pcs[1], ..., pcs[6] is the number of white
 // pawns, ..., kings and pcs[9], ..., pcs[14] is the number of black
 // pawns, ..., kings.
+// Again no need to be efficient here.
 static uint64 calc_key_from_pcs(int *pcs, int mirror)
 {
   int color;
@@ -83,11 +90,11 @@ static uint64 calc_key_from_pcs(int *pcs, int mirror)
   uint64 key = 0;
 
   color = !mirror ? 0 : 8;
-  for (pt = PAWN; pt <= QUEEN; pt++)
+  for (pt = PAWN; pt <= KING; pt++)
     for (i = 0; i < pcs[color + pt]; i++)
       key ^= Zobrist::psq[WHITE][pt][i];
   color ^= 8;
-  for (pt = PAWN; pt <= QUEEN; pt++)
+  for (pt = PAWN; pt <= KING; pt++)
     for (i = 0; i < pcs[color + pt]; i++)
       key ^= Zobrist::psq[BLACK][pt][i];
 
@@ -109,7 +116,8 @@ static int probe_wdl_table(Position& pos, int *success)
   key = pos.material_key();
 
   // Test for KvK.
-  if (!key) return 0;
+  if (key == (Zobrist::psq[WHITE][KING][0] ^ Zobrist::psq[BLACK][KING][0]))
+    return 0;
 
   ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
   for (i = 0; i < HSHMAX; i++)
@@ -126,11 +134,13 @@ static int probe_wdl_table(Position& pos, int *success)
       char str[16];
       prt_str(pos, str, ptr->key != key);
       if (!init_table_wdl(ptr, str)) {
-	ptr->data = NULL;
 	ptr2[i].key = 0ULL;
 	*success = 0;
+	UNLOCK(TB_mutex);
 	return 0;
       }
+      // Memory barrier to ensure ptr->ready = 1 is not reordered.
+      __asm__ __volatile__ ("" ::: "memory");
       ptr->ready = 1;
     }
     UNLOCK(TB_mutex);
@@ -271,7 +281,7 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
     if (entry->flags & 2)
       res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
 
-    if (!(entry->flags & pa_flags[wdl + 2]) && !(wdl & 1))
+    if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
   } else {
     struct DTZEntry_pawn *entry = (struct DTZEntry_pawn *)ptr;
@@ -300,7 +310,7 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
     if (entry->flags[f] & 2)
       res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
 
-    if (!(entry->flags[f] & pa_flags[wdl + 2]) && !(wdl & 1))
+    if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
   }
 
@@ -308,13 +318,13 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
 }
 
 // Add underpromotion captures to list of captures.
-static MoveStack *add_underprom_caps(Position& pos, MoveStack *stack, MoveStack *end)
+static ExtMove *add_underprom_caps(Position& pos, MoveStack *stack, MoveStack *end)
 {
-  MoveStack *moves, *extra = end;
+  ExtMove *moves, *extra = end;
 
   for (moves = stack; moves < end; moves++) {
     Move move = moves->move;
-    if (type_of(move) == PROMOTION && !pos.is_empty(to_sq(move))) {
+    if (type_of(move) == PROMOTION && !pos.empty(to_sq(move))) {
       (*extra++).move = (Move)(move - (1 << 12));
       (*extra++).move = (Move)(move - (2 << 12));
       (*extra++).move = (Move)(move - (3 << 12));
@@ -327,8 +337,8 @@ static MoveStack *add_underprom_caps(Position& pos, MoveStack *stack, MoveStack 
 static int probe_ab(Position& pos, int alpha, int beta, int *success)
 {
   int v;
-  MoveStack stack[64];
-  MoveStack *moves, *end;
+  ExtMove stack[64];
+  ExtMove *moves, *end;
   StateInfo st;
 
   // Generate (at least) all legal non-ep captures including (under)promotions.
@@ -344,10 +354,10 @@ static int probe_ab(Position& pos, int alpha, int beta, int *success)
 
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
-    if (!pos.is_capture(capture) || type_of(capture) == ENPASSANT
+    if (!pos.capture(capture) || type_of(capture) == ENPASSANT
 			|| !pos.pl_move_is_legal(capture, ci.pinned))
       continue;
-    pos.do_move(capture, st, ci, pos.move_gives_check(capture, ci));
+    pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
     v = -probe_ab(pos, -beta, -alpha, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
@@ -394,8 +404,8 @@ int probe_wdl(Position& pos, int *success)
   // Now handle en passant.
   int v1 = -3;
   // Generate (at least) all legal en passant captures.
-  MoveStack stack[192];
-  MoveStack *moves, *end;
+  ExtMove stack[192];
+  ExtMove *moves, *end;
   StateInfo st;
 
   if (!pos.checkers())
@@ -408,9 +418,9 @@ int probe_wdl(Position& pos, int *success)
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
     if (type_of(capture) != ENPASSANT
-	  || !pos.pl_move_is_legal(capture, ci.pinned))
+	  || !pos.legal(capture, ci.pinned))
       continue;
-    pos.do_move(capture, st, ci, pos.move_gives_check(capture, ci));
+    pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
     int v0 = -probe_ab(pos, -2, 2, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
@@ -423,13 +433,13 @@ int probe_wdl(Position& pos, int *success)
       for (moves = stack; moves < end; moves++) {
 	Move capture = moves->move;
 	if (type_of(capture) == ENPASSANT) continue;
-	if (pos.pl_move_is_legal(capture, ci.pinned)) break;
+	if (pos.legal(capture, ci.pinned)) break;
       }
       if (moves == end && !pos.checkers()) {
 	end = generate<QUIETS>(pos, end);
 	for (; moves < end; moves++) {
 	  Move move = moves->move;
-	  if (pos.pl_move_is_legal(move, ci.pinned))
+	  if (pos.legal(move, ci.pinned))
 	    break;
 	}
       }
@@ -455,8 +465,8 @@ static int probe_dtz_no_ep(Position& pos, int *success)
   if (*success == 2)
     return wdl == 2 ? 1 : 101;
 
-  MoveStack stack[192];
-  MoveStack *moves, *end = NULL;
+  ExtMove stack[192];
+  ExtMove *moves, *end = NULL;
   StateInfo st;
   CheckInfo ci(pos);
 
@@ -470,10 +480,10 @@ static int probe_dtz_no_ep(Position& pos, int *success)
 
     for (moves = stack; moves < end; moves++) {
       Move move = moves->move;
-      if (type_of(pos.piece_moved(move)) != PAWN || pos.is_capture(move)
-		|| !pos.pl_move_is_legal(move, ci.pinned))
+      if (type_of(pos.moved_piece(move)) != PAWN || pos.capture(move)
+		|| !pos.legal(move, ci.pinned))
 	continue;
-      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      pos.do_move(move, st, ci, pos.gives_check(move, ci));
       int v = -probe_ab(pos, -2, -wdl + 1, success);
       pos.undo_move(move);
       if (*success == 0) return 0;
@@ -492,10 +502,10 @@ static int probe_dtz_no_ep(Position& pos, int *success)
     int best = 0xffff;
     for (moves = stack; moves < end; moves++) {
       Move move = moves->move;
-      if (pos.is_capture(move) || type_of(pos.piece_moved(move)) == PAWN
-		|| !pos.pl_move_is_legal(move, ci.pinned))
+      if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
+		|| !pos.legal(move, ci.pinned))
 	continue;
-      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      pos.do_move(move, st, ci, pos.gives_check(move, ci));
       int v = -probe_dtz(pos, success);
       pos.undo_move(move);
       if (*success == 0) return 0;
@@ -512,9 +522,9 @@ static int probe_dtz_no_ep(Position& pos, int *success)
     for (moves = stack; moves < end; moves++) {
       int v;
       Move move = moves->move;
-      if (!pos.pl_move_is_legal(move, ci.pinned))
+      if (!pos.legal(move, ci.pinned))
 	continue;
-      pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+      pos.do_move(move, st, ci, pos.gives_check(move, ci));
       if (st.rule50 == 0) {
 	if (wdl == -2) v = -1;
 	else {
@@ -540,7 +550,7 @@ static int wdl_to_dtz[] = {
 // Probe the DTZ table for a particular position.
 // If *success != 0, the probe was successful.
 // The return value is from the point of view of the side to move:
-//         n < -100 : 
+//         n < -100 : loss, but draw under 50-move rule
 // -100 <= n < -1   : loss in n ply (assuming 50-move counter == 0)
 //         0	    : draw
 //     1 < n <= 100 : win in n ply (assuming 50-move counter == 0)
@@ -575,8 +585,8 @@ int probe_dtz(Position& pos, int *success)
   // Now handle en passant.
   int v1 = -3;
 
-  MoveStack stack[192];
-  MoveStack *moves, *end;
+  ExtMove stack[192];
+  ExtMove *moves, *end;
   StateInfo st;
 
   if (!pos.checkers())
@@ -588,9 +598,9 @@ int probe_dtz(Position& pos, int *success)
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
     if (type_of(capture) != ENPASSANT
-		|| !pos.pl_move_is_legal(capture, ci.pinned))
+		|| !pos.legal(capture, ci.pinned))
       continue;
-    pos.do_move(capture, st, ci, pos.move_gives_check(capture, ci));
+    pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
     int v0 = -probe_ab(pos, -2, 2, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
@@ -616,13 +626,13 @@ int probe_dtz(Position& pos, int *success)
       for (moves = stack; moves < end; moves++) {
 	Move move = moves->move;
 	if (type_of(move) == ENPASSANT) continue;
-	if (pos.pl_move_is_legal(move, ci.pinned)) break;
+	if (pos.legal(move, ci.pinned)) break;
       }
       if (moves == end && !pos.checkers()) {
 	end = generate<QUIETS>(pos, end);
 	for (; moves < end; moves++) {
 	  Move move = moves->move;
-	  if (pos.pl_move_is_legal(move, ci.pinned))
+	  if (pos.legal(move, ci.pinned))
 	    break;
 	}
       }
@@ -634,6 +644,8 @@ int probe_dtz(Position& pos, int *success)
   return v;
 }
 
+// Check whether there has been at least one repetition of positions
+// since the last capture or pawn move.
 static int has_repeated(StateInfo *st)
 {
   while (1) {
@@ -651,13 +663,21 @@ static int has_repeated(StateInfo *st)
   }
 }
 
+static Value wdl_to_value[5] = {
+  -VALUE_MATE + MAX_PLY + 1,
+  VALUE_DRAW - 2,
+  VALUE_DRAW,
+  VALUE_DRAW + 2,
+  VALUE_MATE - MAX_PLY - 1
+};
+
 // Use the DTZ tables to filter out moves that don't preserve the win or draw.
 // If the position is lost, but DTZ is fairly high, only keep moves that
 // maximise DTZ.
 //
 // A return value of 0 indicates that not all probes were successful and that
 // no moves were filtered out.
-int root_probe(Position& pos)
+int root_probe(Position& pos, Value &TBScore)
 {
   int success;
 
@@ -670,10 +690,10 @@ int root_probe(Position& pos)
   // Probe each move.
   for (size_t i = 0; i < Search::RootMoves.size(); i++) {
     Move move = Search::RootMoves[i].pv[0];
-    pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+    pos.do_move(move, st, ci, pos.gives_check(move, ci));
     int v = 0;
     if (pos.checkers() && wdl == 2) {
-      MoveStack s[192];
+      ExtMove s[192];
       if (generate<LEGAL>(pos, s) == s)
 	v = 1;
     }
@@ -692,9 +712,31 @@ int root_probe(Position& pos)
     Search::RootMoves[i].score = (Value)v;
   }
 
+  // Obtain 50-move counter for the root position.
+  // In Stockfish there seems to be no clean way, so we do it like this:
   int cnt50 = st.previous->rule50;
+
+  // Use 50-move counter to determine whether the root position is
+  // won, lost or drawn.
+  int wdl = 0;
+  if (dtz > 0)
+    wdl = (dtz + cnt50 <= 100) ? 2 : 1;
+  else if (dtz < 0)
+    wdl = (-dtz + cnt50 <= 100) ? -2 : -1;
+
+  // Determine the score to report to the user.
+  TBScore = wdl_to_Value[wdl + 2];
+  // If the position is winning or losing, but too few moves left, adjust the
+  // score to show how close it is to winning or losing.
+  // NOTE: int(PawnValueEg) is used as scaling factor in score_to_uci().
+  if (wdl == 1 && dtz <= 100)
+    TBScore = (Value)(((200 - dtz - cnt50) * int(PawnValueEg)) / 200);
+  else if (wdl == -1 && dtz >= -100)
+    TBScore = -(Value)(((200 + dtz - cnt50) * int(PawnValueEg)) / 200);
+
+  // Now be a bit smart about filtering out moves.
   size_t j = 0;
-  if (wdl > 0) {
+  if (dtz > 0) { // winning (or 50-move rule draw)
     int best = 0xffff;
     for (size_t i = 0; i < Search::RootMoves.size(); i++) {
       int v = Search::RootMoves[i].score;
@@ -703,7 +745,7 @@ int root_probe(Position& pos)
     }
     int max = best;
     // If the current phase has not seen repetitions, then try all moves
-    // that stay safely within the 50-move budget.
+    // that stay safely within the 50-move budget, if there are any.
     if (!has_repeated(st.previous) && best + cnt50 <= 99)
       max = 99 - cnt50;
     for (size_t i = 0; i < Search::RootMoves.size(); i++) {
@@ -711,7 +753,7 @@ int root_probe(Position& pos)
       if (v > 0 && v <= max)
 	Search::RootMoves[j++] = Search::RootMoves[i];
     }
-  } else if (wdl < 0) {
+  } else if (dtz < 0) {
     int best = 0;
     for (size_t i = 0; i < Search::RootMoves.size(); i++) {
       int v = Search::RootMoves[i].score;
@@ -725,12 +767,52 @@ int root_probe(Position& pos)
       if (Search::RootMoves[i].score == best)
 	Search::RootMoves[j++] = Search::RootMoves[i];
     }
-  } else {
+  } else { // drawing
     // Try all moves that preserve the draw.
     for (size_t i = 0; i < Search::RootMoves.size(); i++) {
       if (Search::RootMoves[i].score == 0)
 	Search::RootMoves[j++] = Search::RootMoves[i];
     }
+  }
+  Search::RootMoves.resize(j, Search::RootMove(MOVE_NONE));
+
+  return 1;
+}
+
+// Use the WDL tables to filter out moves that don't preserve the win or draw.
+// This is a fallback for the case that some or all DTZ tables are missing.
+//
+// A return value of 0 indicates that not all probes were successful and that
+// no moves were filtered out.
+int root_probe_wdl(Position& pos, Value& TBScore)
+{
+  int success;
+
+  int wdl = probe_wdl(pos, &success);
+  if (!success) return false;
+  TBScore = wdl_to_Value[wdl + 2];
+
+  StateInfo st;
+  CheckInfo ci(pos);
+
+  int best = -2;
+
+  // Probe each move.
+  for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+    Move move = Search::RootMoves[i].pv[0];
+    pos.do_move(move, st, ci, pos._check(move, ci));
+    int v = -probe_wdl(pos, &success);
+    pos.undo_move(move);
+    if (!success) return false;
+    Search::RootMoves[i].score = (Value)v;
+    if (v > best)
+      best = v;
+  }
+
+  size_t j = 0;
+  for (size_t i = 0; i < Search::RootMoves.size(); i++) {
+    if (Search::RootMoves[i].score == best)
+      Search::RootMoves[j++] = Search::RootMoves[i];
   }
   Search::RootMoves.resize(j, Search::RootMove(MOVE_NONE));
 

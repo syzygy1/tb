@@ -49,6 +49,7 @@ namespace Search {
   Time::point SearchTime;
   StateStackPtr SetupStates;
   int use_tb;
+  Value TBScore;
 }
 
 using std::string;
@@ -235,11 +236,11 @@ void Search::think() {
   }
 
   // TB
-  use_tb = 6;
+  use_tb = TBlargest;
   tb_position = 0;
-  if (popcount<Full>(RootPos.pieces()) <= 6)
+  if (popcount<Full>(RootPos.pieces()) <= TBlargest)
   {
-      if ((tb_position = root_probe(RootPos))) {
+      if ((tb_position = root_probe(RootPos, TBScore))) {
           // The current root position is in the tablebases.
           // RootMoves now contains only moves that preserve the draw or win.
 
@@ -252,6 +253,15 @@ void Search::think() {
           // be done from within the Position class, so we skip it for now.
 
           // Optional: decrease target time.
+      }
+      else // If DTZ tables are missing, use WDL tables as a fallback
+      {
+          // Filter out moves that do not preserve a draw or win
+          tb_position = root_probe_wdl(RootPos, TBScore);
+
+          // Only probe during search if winning
+          if (TBScore <= VALUE_DRAW)
+              use_tb = 0;
       }
   }
 
@@ -622,7 +632,12 @@ namespace {
     }
 
     // TB
-    if (!RootNode && popcount<Full>(pos.pieces()) <= use_tb) {
+    // The test for rule50_count() == 0 is required to prevent probing in case
+    // the root position is a TB position but only WDL tables are available.
+    // In that case the search should not probe before a pawn move or capture
+    // is made.
+    if (!RootNode && popcount<Full>(pos.pieces()) <= use_tb
+                  && pos.rule50_count() == 0) {
       int success;
       int v = probe_wdl(pos, &success);
       if (success) {

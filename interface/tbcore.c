@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2015 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbcore.c contains engine-independent routines of the tablebase probing code.
@@ -40,8 +40,10 @@
 
 static LOCK_T TB_mutex;
 
-static char TBdir[128];
-static char WDLdir[128];
+static int initialized = 0;
+static int num_paths = 0;
+static char *path_string = NULL;
+static char **paths = NULL;
 
 static int TBnum_piece, TBnum_pawn;
 static struct TBEntry_piece TB_piece[TBMAX_PIECE];
@@ -55,60 +57,90 @@ static struct DTZTableEntry DTZ_table[DTZ_ENTRIES];
 
 static void init_indices(void);
 static uint64 calc_key_from_pcs(int *pcs, int mirror);
+static void free_wdl_entry(struct TBEntry *entry);
+static void free_dtz_entry(struct TBEntry *entry);
 
-static char *map_file(char *name, uint64 *size)
+static FD open_tb(const char *str, const char *suffix)
+{
+  int i;
+  FD fd;
+  char file[256];
+
+  for (i = 0; i < num_paths; i++) {
+    strcpy(file, paths[i]);
+    strcat(file, "/");
+    strcat(file, str);
+    strcat(file, suffix);
+#ifndef __WIN32__
+    fd = open(file, O_RDONLY);
+#else
+    fd = CreateFile(file, GENERIC_READ, FILE_SHARE_READ, NULL,
+			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+#endif
+    if (fd != FD_ERR) return fd;
+  }
+  return FD_ERR;
+}
+
+static void close_tb(FD fd)
 {
 #ifndef __WIN32__
+  close(fd);
+#else
+  CloseHandle(fd);
+#endif
+}
+
+static char *map_file(const char *name, const char *suffix, uint64 *mapping)
+{
+  FD fd = open_tb(name, suffix);
+  if (fd == FD_ERR)
+    return NULL;
+#ifndef __WIN32__
   struct stat statbuf;
-  int fd = open(name, O_RDONLY);
-  if (fd < 0) {
-    printf("Could not open %s for reading.\n", name);
-    exit(1);
-  }
   fstat(fd, &statbuf);
-  *size = statbuf.st_size;
+  *mapping = statbuf.st_size;
   char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ,
 			      MAP_SHARED, fd, 0);
   if (data == (char *)(-1)) {
     printf("Could not mmap() %s.\n", name);
     exit(1);
   }
-  close(fd);
-  return data;
 #else
-  HANDLE h = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
-			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (h == INVALID_HANDLE_VALUE) {
-    printf("Could not open %s for reading.\n", name);
-    exit(1);
-  }
   DWORD size_low, size_high;
-  size_low = GetFileSize(h, &size_high);
-  *size = ((uint64)size_high) << 32 | ((uint64)size_low);
-  HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
+  size_low = GetFileSize(fd, &size_high);
+//  *size = ((uint64)size_high) << 32 | ((uint64)size_low);
+  HANDLE map = CreateFileMapping(fd, NULL, PAGE_READONLY, size_high, size_low,
 				  NULL);
   if (map == NULL) {
     printf("CreateFileMapping() failed.\n");
     exit(1);
   }
+  *mapping = (uint64)map;
   char *data = (char *)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
-    printf("MapViewOfFile() failed.\n");
+    printf("MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
     exit(1);
   }
-  CloseHandle(h);
-  return data;
 #endif
+  close_tb(fd);
+  return data;
 }
 
+#ifndef __WIN32__
 static void unmap_file(char *data, uint64 size)
 {
-#ifndef __WIN32__
+  if (!data) return;
   munmap(data, size);
-#else
-  UnmapViewOfFile(data);
-#endif
 }
+#else
+static void unmap_file(char *data, uint64 mapping)
+{
+  if (!data) return;
+  UnmapViewOfFile(data);
+  CloseHandle((HANDLE)mapping);
+}
+#endif
 
 static void add_to_hash(struct TBEntry *ptr, uint64 key)
 {
@@ -131,21 +163,16 @@ static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
 static void init_tb(char *str)
 {
-  char file[256];
-  int fd;
+  FD fd;
   struct TBEntry *entry;
   int i, j, pcs[16];
   uint64 key, key2;
   int color;
   char *s;
 
-  strcpy(file, WDLdir);
-  strcat(file, "/");
-  strcat(file, str);
-  strcat(file, WDLSUFFIX);
-  fd = open(file, O_RDONLY);
-  if (fd < 0) return;
-  close(fd);
+  fd = open_tb(str, WDLSUFFIX);
+  if (fd == FD_ERR) return;
+  close_tb(fd);
 
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
@@ -174,9 +201,6 @@ static void init_tb(char *str)
       color = 0x08;
       break;
     }
-  for (i = 0; i < 8; i++)
-    if (pcs[i] != pcs[i+8])
-      break;
   key = calc_key_from_pcs(pcs, 0);
   key2 = calc_key_from_pcs(pcs, 1);
   if (pcs[TB_WPAWN] + pcs[TB_BPAWN] == 0) {
@@ -199,6 +223,8 @@ static void init_tb(char *str)
     entry->num += pcs[i];
   entry->symmetric = (key == key2);
   entry->has_pawns = (pcs[TB_WPAWN] + pcs[TB_BPAWN] > 0);
+  if (entry->num > TBlargest)
+    TBlargest = entry->num;
 
   if (entry->has_pawns) {
     struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
@@ -227,33 +253,64 @@ static void init_tb(char *str)
   if (key2 != key) add_to_hash(entry, key2);
 }
 
-void init_tablebases(void)
+void init_tablebases(char *path)
 {
-  char str[16], *dirptr;
+  char str[16];
   int i, j, k, l;
+
+  if (initialized) {
+    free(path_string);
+    free(paths);
+    struct TBEntry *entry;
+    for (i = 0; i < TBnum_piece; i++) {
+      entry = (struct TBEntry *)&TB_piece[i];
+      free_wdl_entry(entry);
+    }
+    for (i = 0; i < TBnum_pawn; i++) {
+      entry = (struct TBEntry *)&TB_pawn[i];
+      free_wdl_entry(entry);
+    }
+    for (i = 0; i < DTZ_ENTRIES; i++)
+      if (DTZ_table[i].entry)
+	free_dtz_entry(DTZ_table[i].entry);
+  } else {
+    init_indices();
+    initialized = 1;
+  }
+
+  char *p = path;
+  if (strlen(p) == 0 || !strcmp(p, "<empty>")) return;
+  path_string = (char *)malloc(strlen(p) + 1);
+  strcpy(path_string, p);
+  num_paths = 0;
+  for (i = 0;; i++) {
+    if (path_string[i] != SEP_CHAR)
+      num_paths++;
+    while (path_string[i] && path_string[i] != SEP_CHAR)
+      i++;
+    if (!path_string[i]) break;
+    path_string[i] = 0;
+  }
+  paths = (char **)malloc(num_paths * sizeof(char *));
+  for (i = j = 0; i < num_paths; i++) {
+    while (!path_string[j]) j++;
+    paths[i] = &path_string[j];
+    while (path_string[j]) j++;
+  }
 
   LOCK_INIT(TB_mutex);
 
   TBnum_piece = TBnum_pawn = 0;
+  TBlargest = 0;
 
   for (i = 0; i < (1 << TBHASHBITS); i++)
-    for (j = 0; j < HSHMAX; j++)
+    for (j = 0; j < HSHMAX; j++) {
+      TB_hash[i][j].key = 0ULL;
       TB_hash[i][j].ptr = NULL;
+    }
 
   for (i = 0; i < DTZ_ENTRIES; i++)
     DTZ_table[i].entry = NULL;
-
-  dirptr = getenv(DTZDIR);
-  if (dirptr && strlen(dirptr) < 100)
-    strcpy(TBdir, dirptr);
-  else
-    strcpy(TBdir, ".");
-
-  dirptr = getenv(WDLDIR);
-  if (dirptr && strlen(dirptr) < 100)
-    strcpy(WDLdir, dirptr);
-  else
-    strcpy(WDLdir, ".");
 
   for (i = 1; i < 6; i++) {
     sprintf(str, "K%cvK", pchr[i]);
@@ -297,7 +354,7 @@ void init_tablebases(void)
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
-	for (l = 0; l < 6; l++) {
+	for (l = 1; l < 6; l++) {
 	  sprintf(str, "K%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l]);
 	  init_tb(str);
 	}
@@ -311,8 +368,6 @@ void init_tablebases(void)
 	}
 
   printf("Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
-
-  init_indices();
 }
 
 static const char offdiag[] = {
@@ -725,7 +780,7 @@ static uint64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int
     i = 3;
     break;
 
-  case 2: /* K2 */
+  default: /* K2 */
     idx = KK_idx[triangle[pos[0]]][pos[1]];
     i = 2;
     break;
@@ -1210,17 +1265,17 @@ static int init_table_wdl(struct TBEntry *entry, char *str)
   ubyte flags;
 
   // first mmap the table into memory
-  char file[256];
-  strcpy(file, WDLdir);
-  strcat(file, "/");
-  strcat(file, str);
-  strcat(file, WDLSUFFIX);
-  uint64 dummy;
-  entry->data = map_file(file, &dummy);
+  entry->data = map_file(str, WDLSUFFIX, &entry->mapping);
+  if (!entry->data) {
+    printf("Could not find %s" WDLSUFFIX "\n", str);
+    return 0;
+  }
 
   ubyte *data = (ubyte *)entry->data;
   if (((uint32 *)data)[0] != WDL_MAGIC) {
     printf("Corrupted table.\n");
+    unmap_file(entry->data, entry->mapping);
+    entry->data = 0;
     return 0;
   }
 
@@ -1323,6 +1378,9 @@ static int init_table_dtz(struct TBEntry *entry)
   int f, s;
   uint64 tb_size[4];
   uint64 size[4 * 3];
+
+  if (!data)
+    return 0;
 
   if (((uint32 *)data)[0] != DTZ_MAGIC) {
     printf("Corrupted table.\n");
@@ -1492,7 +1550,6 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
 
 void load_dtz_table(char *str, uint64 key1, uint64 key2)
 {
-  char file[256];
   int i;
   struct TBEntry *ptr, *ptr3;
   struct TBHashEntry *ptr2;
@@ -1512,12 +1569,7 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
 				? sizeof(struct DTZEntry_pawn)
 				: sizeof(struct DTZEntry_piece));
 
-  strcpy(file, TBdir);
-  strcat(file, "/");
-  strcat(file, str);
-  strcat(file, DTZSUFFIX);
-  uint64 size;
-  ptr3->data = map_file(file, &size);
+  ptr3->data = map_file(str, DTZSUFFIX, &ptr3->mapping);
   ptr3->key = ptr->key;
   ptr3->num = ptr->num;
   ptr3->symmetric = ptr->symmetric;
@@ -1526,11 +1578,9 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
     struct DTZEntry_pawn *entry = (struct DTZEntry_pawn *)ptr3;
     entry->pawns[0] = ((struct TBEntry_pawn *)ptr)->pawns[0];
     entry->pawns[1] = ((struct TBEntry_pawn *)ptr)->pawns[1];
-    entry->mapped_size = size;
   } else {
     struct DTZEntry_piece *entry = (struct DTZEntry_piece *)ptr3;
     entry->enc_type = ((struct TBEntry_piece *)ptr)->enc_type;
-    entry->mapped_size = size;
   }
   if (!init_table_dtz(ptr3))
     free(ptr3);
@@ -1538,18 +1588,36 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
     DTZ_table[0].entry = ptr3;
 }
 
+static void free_wdl_entry(struct TBEntry *entry)
+{
+  unmap_file(entry->data, entry->mapping);
+  if (!entry->has_pawns) {
+    struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
+    free(ptr->precomp[0]);
+    if (ptr->precomp[1])
+      free(ptr->precomp[1]);
+  } else {
+    struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
+    int f;
+    for (f = 0; f < 4; f++) {
+      free(ptr->file[f].precomp[0]);
+      if (ptr->file[f].precomp[1])
+	free(ptr->file[f].precomp[1]);
+    }
+  }
+}
+
 static void free_dtz_entry(struct TBEntry *entry)
 {
+  unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
     struct DTZEntry_piece *ptr = (struct DTZEntry_piece *)entry;
     free(ptr->precomp);
-    unmap_file(ptr->data, ptr->mapped_size);
   } else {
     struct DTZEntry_pawn *ptr = (struct DTZEntry_pawn *)entry;
     int f;
     for (f = 0; f < 4; f++)
       free(ptr->file[f].precomp);
-    unmap_file(ptr->data, ptr->mapped_size);
   }
   free(entry);
 }
