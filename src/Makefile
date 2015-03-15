@@ -25,10 +25,10 @@ CFLAGS = -g -O3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstri
 
 export FLAGS CC CFLAGS
 
+all: rtbgen rtbgenp rtbver rtbverp tbcheck
+
 rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 	@$(MAKE) -f Makefile.regular $@
-
-all: rtbgen rtbgenp rtbver rtbverp tbcheck
 
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean
 

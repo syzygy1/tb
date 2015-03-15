@@ -993,7 +993,7 @@ struct HuffCode *construct_pairs_dtz(unsigned char *restrict data, long64 size,
       pairfreq[i][j] = 0;
 
   if (num_syms > 255) {
-    printf("error\n");
+    fprintf(stderr, "error\n");
     exit(1);
   }
   for (t = 0; t < numthreads; t++)
@@ -1107,7 +1107,7 @@ struct HuffCode *construct_pairs_dtz(unsigned char *restrict data, long64 size,
     }
 
     if (i != num) {
-      printf("Ran short of symbols.\n");
+      printf("Ran short of symbols.\n"); // not an error
       num = i;
       num_ctrl--;
     }
@@ -1738,7 +1738,7 @@ void compress_tb(struct tb_handle *F, ubyte *restrict data,
     strcat(name, F->wdl ? WDLSUFFIX : DTZSUFFIX);
     strcat(name, ext);
     if (!(G = fopen(name, "wb"))) {
-      printf("Could not open %s for writing.\n", name);
+      fprintf(stderr, "Could not open %s for writing.\n", name);
       exit(1);
     }
 
@@ -1760,7 +1760,7 @@ void merge_tb(struct tb_handle *F)
   strcpy(name, F->name);
   strcat(name, F->wdl ? WDLSUFFIX : DTZSUFFIX);
   if (!(G = fopen(name, "wb"))) {
-    printf("Could not open %s for writing.\n", name);
+    fprintf(stderr, "Could not open %s for writing.\n", name);
     exit(1);
   }
 
@@ -1771,7 +1771,7 @@ void merge_tb(struct tb_handle *F)
     strcat(name, F->wdl ? WDLSUFFIX : DTZSUFFIX);
     strcat(name, ext);
     if (!(F->H[i] = fopen(name, "rb"))) {
-      printf("Could not open %s for reading.\n", name);
+      fprintf(stderr, "Could not open %s for reading.\n", name);
       exit(1);
     }
   }

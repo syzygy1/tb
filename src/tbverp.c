@@ -240,8 +240,8 @@ int main(int argc, char **argv)
   } while (val != EOF);
 
   if (optind >= argc) {
-    printf("No tablebase specified.\n");
-    exit(0);
+    fprintf(stderr, "No tablebase specified.\n");
+    exit(1);
   }
   tablename = argv[optind];
 
@@ -310,7 +310,7 @@ int main(int argc, char **argv)
   }
 
   if (numpawns == 0) {
-    printf("Expecting pawns.\n");
+    fprintf(stderr, "Expecting pawns.\n");
     exit(1);
   }
 
@@ -325,7 +325,7 @@ int main(int argc, char **argv)
   symmetric = (i == 8);
 
   if (symmetric) {
-    printf("Can't handle symmetric tables.\n");
+    fprintf(stderr, "Can't handle symmetric tables.\n");
     exit(1);
   }
 

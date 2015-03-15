@@ -20,7 +20,7 @@ char *map_file(char *name, int shared, long64 *size)
   struct stat statbuf;
   int fd = open(name, O_RDONLY);
   if (fd < 0) {
-    printf("Could not open %s for reading.\n", name);
+    fprintf(stderr, "Could not open %s for reading.\n", name);
     exit(1);
   }
   fstat(fd, &statbuf);
@@ -32,7 +32,7 @@ char *map_file(char *name, int shared, long64 *size)
   char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 #endif
   if (data == (char *)(-1)) {
-    printf("Could not mmap() %s.\n", name);
+    fprintf(stderr, "Could not mmap() %s.\n", name);
     exit(1);
   }
   close(fd);
@@ -41,7 +41,7 @@ char *map_file(char *name, int shared, long64 *size)
   HANDLE h = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
 			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (h == INVALID_HANDLE_VALUE) {
-    printf("Could not open %s for reading.\n", name);
+    fprintf(stderr, "Could not open %s for reading.\n", name);
     exit(1);
   }
   DWORD size_low, size_high;
@@ -50,12 +50,12 @@ char *map_file(char *name, int shared, long64 *size)
   HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
 				  NULL);
   if (map == NULL) {
-    printf("CreateFileMapping() failed.\n");
+    fprintf(stderr, "CreateFileMapping() failed.\n");
     exit(1);
   }
   char *data = (char *)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
-    printf("MapViewOfFile() failed.\n");
+    fprintf(stderr, "MapViewOfFile() failed.\n");
     exit(1);
   }
   CloseHandle(h);
@@ -79,7 +79,7 @@ ubyte *alloc_aligned(long64 size, uintptr_t alignment)
 
   posix_memalign((void **)&ptr, alignment, size);
   if (ptr == NULL) {
-    printf("Could not allocate sufficient memory.\n");
+    fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
 
@@ -89,7 +89,7 @@ ubyte *alloc_aligned(long64 size, uintptr_t alignment)
 
   ptr = malloc(size + alignment - 1);
   if (ptr == NULL) {
-    printf("Could not allocate sufficient memory.\n");
+    fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
   ptr = (ubyte *)((uintptr_t)(ptr + alignment - 1) & ~(alignment - 1));
@@ -105,7 +105,7 @@ ubyte *alloc_huge(long64 size)
 
   posix_memalign((void **)&ptr, 2 * 1024 * 1024, size);
   if (ptr == NULL) {
-    printf("Could not allocate sufficient memory.\n");
+    fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
 #ifdef __linux__
@@ -118,7 +118,7 @@ ubyte *alloc_huge(long64 size)
 
   ptr = malloc(size);
   if (ptr == NULL) {
-    printf("Could not allocate sufficient memory.\n");
+    fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
 

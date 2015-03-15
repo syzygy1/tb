@@ -823,7 +823,7 @@ void load_wdl(struct thread_data *thread)
     if (unlikely(v2 > 4)) table[idx_p] = WDL_ERROR;
     else table[idx_p] = wdl_matrix[v2][v1_p];
 if(unlikely(table[idx_p]==WDL_ERROR))
-printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
+error("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
     v1_p = v1;
     idx_p = idx;
     idx2_p = idx2;
@@ -833,7 +833,7 @@ printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
   if (unlikely(v2 > 4)) table[idx_p] = WDL_ERROR;
   else table[idx_p] = wdl_matrix[v2][v1_p];
 if(unlikely(table[idx_p]==WDL_ERROR))
-printf("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
+error("WDL_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx_p, v2, v1_p);
 }
 #else
 void load_wdl(struct thread_data *thread)
@@ -1094,7 +1094,7 @@ void wdl_load_wdl(struct thread_data *thread)
     if (unlikely(v2 > 4)) table[idx] = W_ERROR;
     else table[idx] = w_wdl_matrix[v2][v1];
 if(unlikely(table[idx]==W_ERROR))
-printf("W_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
+error("W_ERROR: idx = %"PRIu64", v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }
 

@@ -1000,7 +1000,7 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
 
   generate_test_list(tb_size, entry_piece.num);
   if (!tb_table && !(tb_table = malloc(tb_size + 1))) {
-    printf("Out of memory.\n");
+    fprintf(stderr, "Out of memory.\n");
     exit(1);
   }
 
@@ -1193,7 +1193,7 @@ ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
   generate_test_list(tb_size, entry_pawn.num);
 
   if (!tb_table && !(tb_table = malloc(tb_size + 1))) {
-    printf("Out of memory.\n");
+    fprintf(stderr, "Out of memory.\n");
     exit(1);
   }
 
