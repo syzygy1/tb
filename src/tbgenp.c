@@ -118,6 +118,7 @@ static int maxsymbols = 4095;
 static int only_generate = 0;
 static int generate_dtz = 1;
 static int generate_wdl = 1;
+static int dtz_ply = 0;
 
 static char *tablename;
 
@@ -510,19 +511,19 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
   freq[0][0] = stats[0];
   if (dtzmap->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
-      freq[0][i] += stats[i + 1];
+      freq[0][i + 1 > dtz_ply ? i : 0] += stats[i + 1];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      freq[0][i / 2] += stats[i + 1];
+      freq[0][i + 1 > dtz_ply ? i / 2 : 0] += stats[i + 1];
   dtzmap->num[0] = sort_list(freq[0], map[0], inv_map[0]);
 
   freq[1][0] = stats[STAT_MATE];
   if (dtzmap->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      freq[1][i] += stats[STAT_MATE - i - 1];
+      freq[1][i + 1 > dtz_ply ? i : 0] += stats[STAT_MATE - i - 1];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      freq[1][i / 2] += stats[STAT_MATE - i - 1];
+      freq[1][i + 1 > dtz_ply ? i / 2 : 0] += stats[STAT_MATE - i - 1];
   dtzmap->num[1] = sort_list(freq[1], map[1], inv_map[1]);
 
   for (i = DRAW_RULE; i < MAX_PLY; i++)
@@ -575,16 +576,16 @@ void prepare_dtz_map(ubyte *v, struct dtz_map *map)
     v[MATE] = inv_map[1][0];
     if (map->ply_accurate_win)
       for (i = 0; i < DRAW_RULE; i++)
-	v[WIN_IN_ONE + i] = inv_map[0][i];
+	v[WIN_IN_ONE + i] = inv_map[0][i + 1 > dtz_ply ? i : 0];
     else
       for (i = 0; i < DRAW_RULE; i++)
-	v[WIN_IN_ONE + i] = inv_map[0][i / 2];
+	v[WIN_IN_ONE + i] = inv_map[0][i + 1 > dtz_ply ? i / 2 : 0];
     if (map->ply_accurate_loss)
       for (i = 0; i < DRAW_RULE; i++)
-	v[LOSS_IN_ONE - i] = inv_map[1][i];
+	v[LOSS_IN_ONE - i] = inv_map[1][i + 1 > dtz_ply ? i : 0];
     else
       for (i = 0; i < DRAW_RULE; i++)
-	v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
+	v[LOSS_IN_ONE - i] = inv_map[1][i + 1 > dtz_ply ? i / 2 : 0];
     for (; i < REDUCE_PLY; i++) {
       v[WIN_IN_ONE + i + 2] = inv_map[2][(i - DRAW_RULE) / 2];
       v[LOSS_IN_ONE - i] = inv_map[3][(i - DRAW_RULE) / 2];
@@ -647,7 +648,7 @@ int main(int argc, char **argv)
 
   numthreads = 1;
   do {
-    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "t:gwzsdp:", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -667,6 +668,9 @@ int main(int argc, char **argv)
       break;
     case 'd':
       save_to_disk = 1;
+      break;
+    case 'p':
+      dtz_ply = atoi(optarg);
       break;
     }
   } while (val != EOF);

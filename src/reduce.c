@@ -237,16 +237,16 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
       v[255] = inv_map[1][0];
       if (map->ply_accurate_win)
 	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 1] = inv_map[0][i];
+	  v[i + 1] = inv_map[0][i + 1 > dtz_ply ? i : 0];
       else
 	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 1] = inv_map[0][i / 2];
+	  v[i + 1] = inv_map[0][i + 1 > dtz_ply ? i / 2 : 0];
       if (map->ply_accurate_loss)
 	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i];
+	  v[254 - i] = inv_map[1][i + 1 > dtz_ply ? i : 0];
       else
 	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i / 2];
+	  v[254 - i] = inv_map[1][i + 1 > dtz_ply ? i / 2 : 0];
       for (; i <= REDUCE_PLY; i += 2) {
 	v[1 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
 	v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
