@@ -10,12 +10,17 @@ $verify = '';
 $disk = '';
 $min = 3;
 $max = 4;
+$ply = 0;
+$nowdl = '';
+
 GetOptions('threads=i' => \$threads,
 	   'generate' => \$generate,
 	   'verify' => \$verify,
 	   'min=i' => \$min,
 	   'max=i' => \$max,
-	   'disk' => \$disk);
+	   'disk' => \$disk,
+	   'ply=i' => \$ply,
+	   'nowdl' => \$nowdl);
 
 sub Process {
   my($tb) = @_;
@@ -25,12 +30,16 @@ sub Process {
   if ($disk && $len == 6) {
     $dopt = "-d ";
   }
+  $nowdlopt = "";
+  if ($nowdl) {
+    $nowdlopt = "-z ";
+  }
   if ($generate && !-e $tb.".rtbz") {
     print "Generating $tb\n";
     if ($tb !~ /.*P.*/) {
-      system "rtbgen $dopt-t $threads --stats $tb";
+      system "rtbgen $nowdlopt$dopt-t $threads -p $ply --stats $tb";
     } else {
-      system "rtbgenp $dopt-t $threads --stats $tb";
+      system "rtbgenp $nowdlopt$dopt-t $threads -p $ply --stats $tb";
     }
   }
   if ($verify) {
