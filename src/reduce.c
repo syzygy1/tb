@@ -145,16 +145,16 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
 #ifndef SUICIDE
   if (map->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i]] += tot_stats[i + 1];
+      stats2[inv_map[0][i + 1 > dtz_ply ? i : 0]] += tot_stats[i + 1];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
+      stats2[inv_map[0][i + 1 > dtz_ply ? i / 2 : 0]] += tot_stats[i + 1];
   if (map->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i + 1 > dtz_ply ? i : 0]] += tot_stats[1022 - i];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i + 1 > dtz_ply ? i / 2 : 0]] += tot_stats[1022 - i];
 #else
   if (map->ply_accurate_win)
     for (i = 2; i < DRAW_RULE; i++)

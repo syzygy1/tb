@@ -158,16 +158,16 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   stats2[inv_map[1][0]] = tot_stats[STAT_MATE];
   if (map->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i]] += tot_stats[i + 1];
+      stats2[inv_map[0][i + 1 > dtz_ply ? i : 0]] += tot_stats[i + 1];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
+      stats2[inv_map[0][i + 1 > dtz_ply ? i / 2 : 0]] += tot_stats[i + 1];
   if (map->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[STAT_MATE - 1 - i];
+      stats2[inv_map[1][i + 1 > dtz_ply ? i : 0]] += tot_stats[STAT_MATE - 1 - i];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[STAT_MATE - 1 - i];
+      stats2[inv_map[1][i + 1 > dtz_ply ? i / 2 : 0]] += tot_stats[STAT_MATE - 1 - i];
   for (i = DRAW_RULE + 1; i < MAX_PLY; i++) {
     stats2[inv_map[2][(i - DRAW_RULE - 1) / 2]] += tot_stats[i];
     stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[STAT_MATE - i];
