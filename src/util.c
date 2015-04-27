@@ -108,7 +108,7 @@ ubyte *alloc_huge(long64 size)
     fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
-#ifdef __linux__
+#ifdef MADV_HUGEPAGE
   madvise((void *)ptr, size, MADV_HUGEPAGE);
 #endif
 
