@@ -473,6 +473,7 @@ static int probe_dtz_no_ep(Position& pos, int *success)
   if (wdl > 0) {
     // Generate at least all legal non-capturing pawn moves
     // including non-capturing promotions.
+    // (The call to generate<>() in fact generates all moves.)
     if (!pos.checkers())
       end = generate<NON_EVASIONS>(pos, stack);
     else
@@ -500,6 +501,7 @@ static int probe_dtz_no_ep(Position& pos, int *success)
 
   if (wdl > 0) {
     int best = 0xffff;
+    // Captures should be generated now if that was not done before.
     for (moves = stack; moves < end; moves++) {
       Move move = moves->move;
       if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
@@ -515,6 +517,7 @@ static int probe_dtz_no_ep(Position& pos, int *success)
     return best;
   } else {
     int best = -1;
+    // Generate all legal moves.
     if (!pos.checkers())
       end = generate<NON_EVASIONS>(pos, stack);
     else
@@ -681,7 +684,7 @@ int root_probe(Position& pos, Value &TBScore)
 {
   int success;
 
-  int wdl = probe_wdl(pos, &success);
+  int dtz = probe_dtz(pos, &success);
   if (!success) return 0;
 
   StateInfo st;
@@ -692,7 +695,7 @@ int root_probe(Position& pos, Value &TBScore)
     Move move = Search::RootMoves[i].pv[0];
     pos.do_move(move, st, ci, pos.gives_check(move, ci));
     int v = 0;
-    if (pos.checkers() && wdl == 2) {
+    if (pos.checkers() && dtz > 0) {
       ExtMove s[192];
       if (generate<LEGAL>(pos, s) == s)
 	v = 1;
