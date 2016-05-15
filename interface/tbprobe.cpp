@@ -501,7 +501,8 @@ static int probe_dtz_no_ep(Position& pos, int *success)
 
   if (wdl > 0) {
     int best = 0xffff;
-    // Captures should be generated now if that was not done before.
+    // Non-capturing non-pawn moves should be generated now if that was not
+    // done before. (We have done it before by calling generate<>().)
     for (moves = stack; moves < end; moves++) {
       Move move = moves->move;
       if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
@@ -592,6 +593,8 @@ int probe_dtz(Position& pos, int *success)
   ExtMove *moves, *end;
   StateInfo st;
 
+  // Generate at least the legal en passant captures.
+  // (We generate many more, but filter out the unnecessary ones below.)
   if (!pos.checkers())
     end = generate<CAPTURES>(pos, stack);
   else
@@ -632,6 +635,7 @@ int probe_dtz(Position& pos, int *success)
 	if (pos.legal(move, ci.pinned)) break;
       }
       if (moves == end && !pos.checkers()) {
+        // Check for stalemate.
 	end = generate<QUIETS>(pos, end);
 	for (; moves < end; moves++) {
 	  Move move = moves->move;
