@@ -45,8 +45,13 @@ static uint32 UNALIGNED_LOAD32(const char *p) {
   return result;
 }
 
+#ifdef ARCH_BIG
+#define uint32_in_expected_order(x) __builtin_bswap32(x)
+#define uint64_in_expected_order(x) __builtin_bswap64(x)
+#else
 #define uint32_in_expected_order(x) (x)
 #define uint64_in_expected_order(x) (x)
+#endif
 
 #define LIKELY(x) (__builtin_expect(!!(x), 1))
 
@@ -416,6 +421,12 @@ static void CityHashCrc256Long(const char *s, size_t len,
   result[2] = a + result[1];
   a = ShiftMix((a + e) * k0) * k0;
   result[3] = a + result[2];
+
+  // Fix endianness.
+  result[0] = uint64_in_expected_order(result[0]);
+  result[1] = uint64_in_expected_order(result[1]);
+  result[2] = uint64_in_expected_order(result[2]);
+  result[3] = uint64_in_expected_order(result[3]);
 }
 
 // Requires len < 240.

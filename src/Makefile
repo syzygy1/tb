@@ -11,6 +11,13 @@ FLAGS = -DMAGIC
 # does not seem to matter.
 FLAGS += -DUSE_POPCNT
 
+# Endianness should be detected automatically, but if that does not work
+# then specify -DARCH_BIG to compile for a big endian platform.
+#FLAGS += -DARCH_BIG
+
+# Override maximum number of threads supported. Default is 12.
+#FLAGS += -DMAX_THREADS=32
+
 # Specify the compiler
 # regular linux
 CC = gcc -pthread
@@ -20,12 +27,12 @@ CC = gcc -pthread
 # Compilation flags
 # Remove or replace -march=corei7 and -msse4.2 if necessary.
 # For Haswell add -mbmi2 and select -DBMI2 above.
-#CFLAGS = -g -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2
-CFLAGS = -g -O3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2 -flto -Wno-array-bounds -Wno-maybe-uninitialized
+#CFLAGS = -g -pipe -D_GNU_SOURCE -Wall -std=c11 -Wstrict-aliasing=2
+CFLAGS = -g -O3 -pipe -D_GNU_SOURCE -Wall -std=c11 -Wstrict-aliasing=2 -flto
 
 export FLAGS CC CFLAGS
 
-all: rtbgen rtbgenp rtbver rtbverp tbcheck
+all: rtbgen rtbgenp tbcheck
 
 rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 	@$(MAKE) -f Makefile.regular $@

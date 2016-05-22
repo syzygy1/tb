@@ -83,8 +83,13 @@ uint64 _mm_crc32_u64(uint64 crc, uint64 v)
   uint32 crc32 = crc;
 
   in.v = v;
+#ifndef BIG_ARCH
   for (i = 0; i < 8; i++)
     CRC32C(crc32, in.buf[i]);
+#else
+  for (i = 7; i >= 0; i--)
+    CRC32C(crc32, in.buf[i]);
+#endif
 
   return (uint64)crc32;
 }

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -13,17 +13,25 @@ extern bitboard bit[64];
 
 static __inline__ int FirstOne(bitboard x)
 {
+#if 0
   bitboard res;
   __asm__("bsfq %1, %0" : "=r" (res) : "g" (x));
   return (int)res;
+#else
+  return __builtin_ctzll(x);
+#endif
 }
 
 #ifdef USE_POPCNT
 static __inline__ int PopCount(bitboard x)
 {
+#if 0
   bitboard res;
   __asm__("popcnt %1, %0" : "=r" (res) : "g" (x));
   return (int)res;
+#else
+  return __builtin_popcountll(x);
+#endif
 }
 #endif
 

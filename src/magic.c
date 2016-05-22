@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -169,6 +169,9 @@ static void init_magics(struct MagicInit *magic_init, struct Magic *magic,
   int i, j, d, num;
   bitboard bb, bb2;
   int squares[12];
+
+  for (i = 0; i < 12; i++)
+    squares[i] = 0;
 
   for (sq = 0; sq < 64; sq++) {
     magic[sq].magic = magic_init[sq].magic;

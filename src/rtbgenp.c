@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -40,35 +40,26 @@
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 void reduce_tables(int local);
 
-#define SET_CHANGED(x) \
-{ ubyte dummy = CHANGED; \
-__asm__( \
-"movb %2, %%al\n\t" \
-"lock cmpxchgb %1, %0" \
-: "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); }
+#define store_rlx(m,v) atomic_store_explicit(&(m),v,memory_order_relaxed)
+#define load_rlx(m) atomic_load_explicit(&(m),memory_order_relaxed)
+#define cmpxchg(m,a,b) atomic_compare_exchange_weak_explicit(&(m),a,b,memory_order_relaxed,memory_order_relaxed)
+#define cmpxchg_strong(m,a,b) atomic_compare_exchange_strong_explicit(&(m),a,b,memory_order_relaxed,memory_order_relaxed)
 
-#define SET_CAPT_VALUE(x,v) \
-{ ubyte dummy = v; __asm__( \
-"movb %0, %%al\n" \
-"0:\n\t" \
-"cmpb %1, %%al\n\t" \
-"jbe 1f\n\t" \
-"lock cmpxchgb %1, %0\n\t" \
-"jnz 0b\n" \
-"1:" \
-: "+m" (x), "+r" (dummy) : : "eax"); }
+#define SET_CHANGED(x) set_changed(&(x))
+static inline void set_changed(abyte *x)
+{
+  ubyte dummy = UNKNOWN;
+  cmpxchg_strong(*x, &dummy, CHANGED);
+}
 
-#define SET_WIN_VALUE(x,v) \
-{ ubyte dummy = v; \
-__asm__( \
-"movb %0, %%al\n" \
-"0:\n\t" \
-"cmpb %1, %%al\n\t" \
-"jbe 1f\n\t" \
-"lock cmpxchgb %1, %0\n\t" \
-"jnz 0b\n" \
-"1:" \
-: "+m" (x), "+r" (dummy) : : "eax"); }
+#define SET_CAPT_VALUE(x,v) set_capt_value(&(x),v)
+static inline void set_capt_value(abyte *x, ubyte v)
+{
+  ubyte w = load_rlx(*x);
+  while (w > v && !cmpxchg(*x,&w,v));
+}
+
+#define SET_WIN_VALUE(x,v) set_capt_value(&(x),v)
 
 ubyte win_loss[256];
 ubyte loss_win[256];
@@ -109,7 +100,7 @@ static void set_tbl_to_wdl(int saves)
 
 // check whether all moves end up in wins for the opponent
 // we already know there are no legal captures
-int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
+int check_loss(int *restrict pcs, long64 idx0, abyte *restrict table,
 		bitboard occ, int *restrict p)
 {
   int sq;
@@ -124,7 +115,7 @@ int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove(idx, k, sq);
-      int v = win_loss[table[idx2]];
+      int v = win_loss[load_rlx(table[idx2])];
       if (!v) return 0;
       if (v < best) best = v;
       ClearFirst(bb);
@@ -147,7 +138,7 @@ int is_attacked(int sq, int *restrict pcs, bitboard occ, int *restrict p)
 }
 
 // pawn moves and captures should be taken care of already
-int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
+int check_mate(int *restrict pcs, long64 idx0, abyte *restrict table,
 		bitboard occ, int *restrict p)
 {
   int sq;
@@ -161,7 +152,7 @@ int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove(idx, k, sq);
-      if (table[idx2] != ILLEGAL) return 0;
+      if (load_rlx(table[idx2]) != ILLEGAL) return 0;
       ClearFirst(bb);
     }
   } while (*(++pcs) >= 0);
@@ -258,10 +249,10 @@ void calc_mates(struct thread_data *thread)
     if (chk_w == chk_b) continue;
     FILL_OCC_PIECES;
     if (chk_w) {
-      if (table_w[idx] == UNKNOWN && check_mate(white_pcs, idx, table_b, occ, p))
+      if (table_w[idx] == UNKNOWN && check_mate(white_pcs, idx, (abyte *)table_b, occ, p))
 	table_w[idx] = MATE;
     } else {
-      if (table_b[idx] == UNKNOWN && check_mate(black_pcs, idx, table_w, occ, p))
+      if (table_b[idx] == UNKNOWN && check_mate(black_pcs, idx, (abyte *)table_w, occ, p))
 	table_b[idx] = MATE;
     }
   }
@@ -270,15 +261,15 @@ void calc_mates(struct thread_data *thread)
 MARK(mark_illegal)
 {
   MARK_BEGIN;
-  table[idx2] = ILLEGAL;
+  store_rlx(table[idx2], ILLEGAL);
   MARK_END;
 }
 
 MARK(mark_capt_wins)
 {
   MARK_BEGIN;
-  if (table[idx2] != ILLEGAL)
-    table[idx2] = CAPT_WIN;
+  if (load_rlx(table[idx2]) != ILLEGAL)
+    store_rlx(table[idx2], CAPT_WIN);
   MARK_END;
 }
 
@@ -306,7 +297,7 @@ MARK(mark_capt_cursed_losses)
 MARK(mark_changed)
 {
   MARK_BEGIN;
-  if (table[idx2] == UNKNOWN)
+  if (load_rlx(table[idx2]) == UNKNOWN)
     SET_CHANGED(table[idx2]);
   MARK_END;
 }
@@ -314,7 +305,7 @@ MARK(mark_changed)
 MARK(mark_wins, int v)
 {
   MARK_BEGIN;
-  if (table[idx2])
+  if (load_rlx(table[idx2]))
     SET_WIN_VALUE(table[idx2], v);
   MARK_END;
 }
@@ -322,8 +313,8 @@ MARK(mark_wins, int v)
 MARK(mark_win_in_1)
 {
   MARK_BEGIN;
-  if (table[idx2] != ILLEGAL && table[idx2] != CAPT_WIN)
-    table[idx2] = WIN_IN_ONE;
+  if (load_rlx(table[idx2]) != ILLEGAL && load_rlx(table[idx2]) != CAPT_WIN)
+    store_rlx(table[idx2], WIN_IN_ONE);
   MARK_END;
 }
 
@@ -559,7 +550,7 @@ void iter(struct thread_data *thread)
   BEGIN_ITER;
   int not_fin = 0;
   ubyte *restrict table = iter_table;
-  ubyte *restrict table_opp = iter_table_opp;
+  abyte *restrict table_opp = (abyte *)iter_table_opp;
   int *restrict pcs = iter_pcs;
   int *restrict pcs_opp = iter_pcs_opp;
 

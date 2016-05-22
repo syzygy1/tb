@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -17,6 +17,7 @@ typedef unsigned int uint32;
 typedef unsigned char ubyte;
 typedef unsigned short ushort;
 typedef ushort Move;
+typedef _Atomic ubyte abyte;
 
 #ifndef __WIN32__
 // hack to avoid warnings on Linux that seem to be incorrect.
@@ -59,6 +60,10 @@ typedef ushort Move;
 #else
 #define likely(x) __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
+#endif
+
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER == __ORDER_BIG_ENDIAN__)
+#define ARCH_BIG
 #endif
 
 #endif

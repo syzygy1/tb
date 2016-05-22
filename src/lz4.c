@@ -60,9 +60,10 @@
 // This will provide a boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
 // You can set this option to 1 in situations where data will stay within closed environment
 // This option is useless on Little_Endian CPU (such as x86)
-//#define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
 
-
+#ifdef BIG_ARCH
+#  define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
+#endif
 
 //**************************************
 // CPU Feature Detection
@@ -75,11 +76,8 @@
 #endif
 
 // Little Endian or Big Endian ?
-// Note : overwrite the below #define if you know your architecture endianess
-#if (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
+#ifdef BIG_ARCH
 #  define LZ4_BIG_ENDIAN 1
-#else
-// Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
 #endif
 
 // Unaligned memory access is automatically enabled for "common" CPU, such as x86.

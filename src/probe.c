@@ -12,6 +12,18 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#ifdef ARCH_BIG
+#define little32(x) __builtin_bswap32(x)
+#define little16(x) __builtin_bswap16(x)
+#define big64(x) (x)
+#define big32(x) (x)
+#else
+#define little32(x) (x)
+#define little16(x) (x)
+#define big64(x) __builtin_bswap64(x)
+#define big32(x) __builtin_bswap32(x)
+#endif
+
 #define LOOKUP
 #define LUBITS 12
 
@@ -1897,6 +1909,7 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {
   int s1, s2;
 
+#if 0
   int w = *(int *)(d->sympat + 3 * s);
   s2 = (w >> 12) & 0x0fff;
   if (s2 == 0x0fff)
@@ -1908,6 +1921,19 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
     d->symlen[s] = d->symlen[s1] + d->symlen[s2] + 1;
   }
   tmp[s] = 1;
+#else
+  ubyte *w = d->sympat + 3 * s;
+  s2 = (w[2] << 4) | (w[1] >> 4);
+  if (s2 == 0x0fff)
+    d->symlen[s] = 0;
+  else {
+    s1 = ((w[1] & 0x0f) << 8) | w[0];
+    if (!tmp[s1]) calc_symlen(d, s1, tmp);
+    if (!tmp[s2]) calc_symlen(d, s2, tmp);
+    d->symlen[s] = d->symlen[s1] + d->symlen[s2] + 1;
+  }
+  tmp[s] = 1;
+#endif
 }
 
 #ifdef LOOKUP
@@ -1928,12 +1954,12 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
 
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = *(uint32 *)(&data[4]);
+  int real_num_blocks = little32(*(uint32 *)(&data[4]));
   int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
-  int num_syms = *(ushort *)(&data[10 + 2 * h]);
+  int num_syms = little16(*(ushort *)(&data[10 + 2 * h]));
   ushort *offset = (ushort *)(&data[10]);
 
   int hh = h;
@@ -1944,7 +1970,7 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
   for (i = h - 1; i < hh; i++)
     tmp_base[i] = 0;
   for (i = h - 2; i >= 0; i--)
-    tmp_base[i] = (tmp_base[i + 1] + offset[i] - offset[i + 1]) / 2;
+    tmp_base[i] = (tmp_base[i + 1] + little16(offset[i]) - little16(offset[i + 1])) / 2;
   for (i = 0; i < h; i++)
     tmp_base[i] <<= 64 - (min_len + i);
 
@@ -1986,7 +2012,7 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
       int l = 0;
       while (code < tmp_base[l]) l++;
       if (l + min_len > bits) break;
-      int sym = d->offset[l] + ((code - tmp_base[l]) >> (64 - (l + min_len)));
+      int sym = little16(d->offset[l]) + ((code - tmp_base[l]) >> (64 - (l + min_len)));
       d->lookup_len[i] += d->symlen[sym] + 1;
       d->lookup_bits[i] += l + min_len;
       bits -= l + min_len;
@@ -2016,12 +2042,12 @@ static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64
 
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = *(uint32 *)(&data[4]);
+  int real_num_blocks = little32(*(uint32 *)(&data[4]));
   int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
-  int num_syms = *(ushort *)(&data[10 + 2 * h]);
+  int num_syms = little16(*(ushort *)(&data[10 + 2 * h]));
   d = malloc(sizeof(struct PairsData) + h * sizeof(long64) + num_syms);
   d->offset = (ushort *)(&data[10]);
   d->blocksize = blocksize;
@@ -2045,7 +2071,7 @@ static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64
 
   d->base[h - 1] = 0;
   for (i = h - 2; i >= 0; i--)
-    d->base[i] = (d->base[i + 1] + d->offset[i] - d->offset[i + 1]) / 2;
+    d->base[i] = (d->base[i + 1] + little16(d->offset[i]) - little16(d->offset[i + 1])) / 2;
   for (i = 0; i < h; i++)
     d->base[i] <<= 64 - (min_len + i);
 
@@ -2125,7 +2151,7 @@ static void init_table(struct TBEntry *entry, long64 key)
   long64 dummy;
   entry->data = map_file(file, 1, &dummy);
   ubyte *data = (ubyte *)entry->data;
-  if (((uint32 *)data)[0] != WDL_MAGIC) {
+  if (little32(((uint32 *)data)[0]) != WDL_MAGIC) {
     fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
@@ -2235,15 +2261,15 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
 
   uint32 mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
-  uint32 block = *(uint32 *)(d->indextable + 6 * mainidx);
-  litidx += *(ushort *)(d->indextable + 6 * mainidx + 4);
+  uint32 block = little32(*(uint32 *)(d->indextable + 6 * mainidx));
+  litidx += little16(*(ushort *)(d->indextable + 6 * mainidx + 4));
   if (litidx < 0) {
     do {
-      litidx += d->sizetable[--block] + 1;
+      litidx += little16(d->sizetable[--block] + 1);
     } while (litidx < 0);
   } else {
-    while (litidx > d->sizetable[block])
-      litidx -= d->sizetable[block++] + 1;
+    while (litidx > little16(d->sizetable[block]))
+      litidx -= little16(d->sizetable[block++] + 1);
   }
 
   uint32 *ptr = (uint32 *)(d->data + (block << d->blocksize));
@@ -2255,24 +2281,24 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
   int sym, bitcnt;
 
 #ifndef LOOKUP
-  long64 code = __builtin_bswap64(*((long64 *)ptr));
+  long64 code = big64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
     l = m;
     while (code < base[l]) l++;
-    sym = offset[l] + ((code - base[l]) >> (64 - l));
+    sym = little16(offset[l]) + ((code - base[l]) >> (64 - l));
     if (litidx < (int)symlen[sym] + 1) break;
     litidx -= (int)symlen[sym] + 1;
     code <<= l;
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
+      code |= ((long64)big32(*ptr++)) << bitcnt;
     }
   }
 #else
-  long64 code = __builtin_bswap64(*((long64 *)ptr));
+  long64 code = big64(*((long64 *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2282,7 +2308,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
 	for (;;) {
 	  l = m;
 	  while (code < base[l]) l++;
-	  sym = offset[l] + ((code - base[l]) >> (64 - l));
+	  sym = little16(offset[l]) + ((code - base[l]) >> (64 - l));
 	  if (litidx < (int)symlen[sym] + 1) break;
 	  litidx -= (int)symlen[sym] + 1;
 	  code <<= l;
@@ -2294,7 +2320,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     } else {
       l = LUBITS + 1;
       while (code < base[l]) l++;
-      sym = offset[l] + ((code - base[l]) >> (64 - l));
+      sym = little16(offset[l]) + ((code - base[l]) >> (64 - l));
       if (litidx < (int)symlen[sym] + 1) break;
       litidx -= (int)symlen[sym] + 1;
     }
@@ -2302,11 +2328,12 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
+      code |= ((long64)big32(*ptr++)) << bitcnt;
     }
   }
 #endif
 
+#if 0
   ubyte *sympat = d->sympat;
   while (symlen[sym] != 0) {
     int w = *(int *)(sympat + 3 * sym);
@@ -2318,6 +2345,20 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
       sym = (w >> 12) & 0x0fff;
     }
   }
+#else
+  ubyte *sympat = d->sympat;
+  while (symlen[sym] != 0) {
+    ubyte *w = sympat + 3 * sym;
+    int s1 = ((w[1] & 0x0f) << 8) | w[0];
+    if (litidx < (int)symlen[s1] + 1)
+      sym = s1;
+    else {
+      litidx -= (int)symlen[s1] + 1;
+      sym = (w[2] << 4) | (w[1] >> 4);
+    }
+  }
+#endif
+
 //  return (int)((char)((*(int *)(sympat + 3 * sym)) & 0x0fff));
   return *(sympat + 3 * sym);
 }

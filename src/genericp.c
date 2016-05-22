@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -35,7 +35,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #define PAWN_MASK 0xff000000000000ffULL
 
 // use bit_set
-#if 1
+#if 0
 
 #define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
@@ -183,6 +183,16 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 
 #else
 
+#define FILL_OCC64_cheap \
+  occ = bb = 0; \
+  for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6) \
+    occ |= bit[idx2 & 0x3f]; \
+  for (; i > 0; i--, idx2 >>= 6) \
+    bb |= bit[idx2 & 0x3f]; \
+  bb |= bit[piv_sq[idx2]]; \
+  occ |= bb; \
+  if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
+
 #define FILL_OCC64 \
   occ = bb = 0; \
   for (i = n - 2, idx2 = (idx ^ pw_mask) >> 6; i >= numpawns; i--, idx2 >>= 6) \
@@ -233,9 +243,10 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == numpawns && !(occ & PAWN_MASK))
 
 #define FILL_OCC \
+  occ = 0; \
   for (i = n - 1, idx2 = idx ^ pw_mask; i > 0; i--, idx2 >>= 6) \
-    bd[p[i] = CONV0x88(idx2 & 0x3f)] = i + 1; \
-  bd[p[0] = piv_sq[idx2]] = 1
+    occ |= bit[p[i] = idx2 & 0x3f]; \
+  occ |= bit[p[0] = piv_sq[idx2]]
 
 #define MAKE_IDX2 \
   idx2 = ((idx << 6) & idx_mask1[i]) | (idx & idx_mask2[i])
@@ -246,7 +257,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #endif
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func(int k, abyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_BEGIN \
   int sq; \
@@ -435,7 +446,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     k = white_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
     long64 idx3 = idx2 | (p[k] << shift[i]); \
-    func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+    func(k, (abyte *)table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
 #define LOOP_WHITE_PIECES(func, ...) \
@@ -446,7 +457,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
       k = white_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
       long64 idx3 = idx2 | (p[k] << shift[i]); \
-      func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+      func(k, (abyte *)table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 #endif
@@ -457,7 +468,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     k = black_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
     long64 idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]); \
-    func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+    func(k, (abyte *)table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
 #define LOOP_BLACK_PIECES(func, ...) \
@@ -468,7 +479,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
       long64 idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]); \
-      func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+      func(k, (abyte *)table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
 
@@ -477,7 +488,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     k = pcs[j]; \
     if (!piv_valid[p[k]]) continue; \
     long64 idx3 = idx2 | piv_idx[p[k]]; \
-    func(k, table, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+    func(k, (abyte *)table, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
 #define BEGIN_ITER \
@@ -506,7 +517,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { int j; \
     for (j = 0; pcs_opp[j] >= 0; j++) { \
       int k = pcs_opp[j]; \
-      func(k, table_opp, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
+      func(k, (abyte *)table_opp, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
     } \
   } while (0)
 
@@ -515,7 +526,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { int j; \
     for (j = 0; black_pcs[j] >= 0; j++) { \
       int k = black_pcs[j]; \
-      func(k, table_b, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
+      func(k, (abyte *)table_b, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
     } \
   } while (0)
 
@@ -523,7 +534,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { int j; \
     for (j = 0; white_pcs[j] >= 0; j++) { \
       int k = white_pcs[j]; \
-      func(k, table_w, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
+      func(k, (abyte *)table_w, idx & ~mask[k], occ, p , ##__VA_ARGS__); \
     } \
   } while (0)
 #endif

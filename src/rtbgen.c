@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -28,42 +28,33 @@
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 void reduce_tables(void);
 
-#define SET_CHANGED(x) \
-do { ubyte dummy = CHANGED; \
-__asm__( \
-"movb %2, %%al\n\t" \
-"lock cmpxchgb %1, %0" \
-: "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); } while (0)
+#define store_rlx(m,v) atomic_store_explicit(&(m),v,memory_order_relaxed)
+#define load_rlx(m) atomic_load_explicit(&(m),memory_order_relaxed)
+#define cmpxchg(m,a,b) atomic_compare_exchange_weak_explicit(&(m),a,b,memory_order_relaxed,memory_order_relaxed)
+#define cmpxchg_strong(m,a,b) atomic_compare_exchange_strong_explicit(&(m),a,b,memory_order_relaxed,memory_order_relaxed)
 
-#define SET_CAPT_VALUE(x,v) \
-do { ubyte dummy = v; __asm__( \
-"movb %0, %%al\n" \
-"0:\n\t" \
-"cmpb %1, %%al\n\t" \
-"jbe 1f\n\t" \
-"lock cmpxchgb %1, %0\n\t" \
-"jnz 0b\n" \
-"1:" \
-: "+m" (x), "+r" (dummy) : : "eax"); } while (0)
+#define SET_CHANGED(x) set_changed(&(x))
+static inline void set_changed(abyte *x)
+{
+  ubyte dummy = UNKNOWN;
+  cmpxchg_strong(*x, &dummy, CHANGED);
+}
 
-#define SET_WIN_VALUE(x,v) \
-do { ubyte dummy = v; \
-__asm__( \
-"movb %0, %%al\n" \
-"0:\n\t" \
-"cmpb %1, %%al\n\t" \
-"jbe 1f\n\t" \
-"lock cmpxchgb %1, %0\n\t" \
-"jnz 0b\n" \
-"1:" \
-: "+m" (x), "+r" (dummy) : : "eax"); } while (0)
+#define SET_CAPT_VALUE(x,v) set_capt_value(&(x),v)
+static inline void set_capt_value(abyte *x, ubyte v)
+{
+  ubyte w = load_rlx(*x);
+  while (w > v && !cmpxchg(*x,&w,v));
+}
+
+#define SET_WIN_VALUE(x,v) set_capt_value(&(x),v)
 
 ubyte win_loss[256];
 ubyte loss_win[256];
 
 // check whether all moves end up in wins for the opponent
 // if we are here, all captures are losing
-static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
+static int check_loss(int *restrict pcs, long64 idx0, abyte *restrict table,
 	bitboard occ, int *restrict p)
 {
   int sq;
@@ -77,7 +68,7 @@ static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove0(idx0, sq);
-      int v = win_loss[table[idx2]];
+      int v = win_loss[load_rlx(table[idx2])];
       if (!v) return 0;
       if (v < best) best = v;
       ClearFirst(bb);
@@ -87,7 +78,7 @@ static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove1(idx0, sq);
-      int v = win_loss[table[idx2]];
+      int v = win_loss[load_rlx(table[idx2])];
       if (!v) return 0;
       if (v < best) best = v;
       ClearFirst(bb);
@@ -99,7 +90,7 @@ static int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove2(idx, k, sq);
-      int v = win_loss[table[idx2]];
+      int v = win_loss[load_rlx(table[idx2])];
       if (!v) return 0;
       if (v < best) best = v;
       ClearFirst(bb);
@@ -131,7 +122,7 @@ lab:
 #endif
 }
 
-static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
+static int check_mate(int *restrict pcs, long64 idx0, abyte *restrict table,
 	bitboard occ, int *restrict p)
 {
   int sq;
@@ -144,7 +135,7 @@ static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove0(idx0, sq);
-      if (table[idx2] != ILLEGAL) return 0;
+      if (load_rlx(table[idx2]) != ILLEGAL) return 0;
       ClearFirst(bb);
     }
   } else { // otherwise k == 1, i.e. black king
@@ -152,7 +143,7 @@ static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove1(idx0, sq);
-      if (table[idx2] != ILLEGAL) return 0;
+      if (load_rlx(table[idx2]) != ILLEGAL) return 0;
       ClearFirst(bb);
     }
   }
@@ -162,7 +153,7 @@ static int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
     while (bb) {
       sq = FirstOne(bb);
       idx2 = MakeMove2(idx, k, sq);
-      if (table[idx2] != ILLEGAL) return 0;
+      if (load_rlx(table[idx2]) != ILLEGAL) return 0;
       ClearFirst(bb);
     }
   }
@@ -213,10 +204,10 @@ static void calc_mates(struct thread_data *thread)
 	if (chk_w == chk_b) continue;
 	p[n - 1] = i;
 	if (chk_w) {
-	  if (table_w[idx + i] == UNKNOWN && check_mate(white_pcs, idx + i, table_b, occ | bb, p))
+	  if (table_w[idx + i] == UNKNOWN && check_mate(white_pcs, idx + i, (abyte *)table_b, occ | bb, p))
 	    table_w[idx + i] = MATE;
 	} else {
-	  if (table_b[idx + i] == UNKNOWN && check_mate(black_pcs, idx + i, table_w, occ | bb, p))
+	  if (table_b[idx + i] == UNKNOWN && check_mate(black_pcs, idx + i, (abyte *)table_w, occ | bb, p))
 	    table_b[idx + i] = MATE;
 	}
       }
@@ -227,18 +218,18 @@ static void calc_mates(struct thread_data *thread)
 MARK(mark_illegal)
 {
   MARK_BEGIN;
-  table[idx2] = ILLEGAL;
+  store_rlx(table[idx2], ILLEGAL);
   MARK_END;
 }
 
 MARK_PIVOT0(mark_capt_wins)
 {
   MARK_BEGIN_PIVOT0;
-  if (table[idx2] != ILLEGAL) {
-    table[idx2] = CAPT_WIN;
+  if (load_rlx(table[idx2]) != ILLEGAL) {
+    store_rlx(table[idx2], CAPT_WIN);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
-      table[idx3] = CAPT_WIN;
+      store_rlx(table[idx3], CAPT_WIN);
     }
   }
   MARK_END;
@@ -247,11 +238,11 @@ MARK_PIVOT0(mark_capt_wins)
 MARK_PIVOT1(mark_capt_wins)
 {
   MARK_BEGIN_PIVOT1;
-  if (table[idx2] != ILLEGAL) {
-    table[idx2] = CAPT_WIN;
+  if (load_rlx(table[idx2]) != ILLEGAL) {
+    store_rlx(table[idx2], CAPT_WIN);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
-      table[idx3] = CAPT_WIN;
+      store_rlx(table[idx3], CAPT_WIN);
     }
   }
   MARK_END;
@@ -260,8 +251,8 @@ MARK_PIVOT1(mark_capt_wins)
 MARK(mark_capt_wins)
 {
   MARK_BEGIN;
-  if (table[idx2] != ILLEGAL)
-    table[idx2] = CAPT_WIN;
+  if (load_rlx(table[idx2]) != ILLEGAL)
+    store_rlx(table[idx2], CAPT_WIN);
   MARK_END;
 }
 
@@ -297,11 +288,11 @@ MARK(mark_capt_value, ubyte v)
 MARK_PIVOT0(mark_changed)
 {
   MARK_BEGIN_PIVOT0;
-  if (table[idx2] == UNKNOWN)
+  if (load_rlx(table[idx2]) == UNKNOWN)
     SET_CHANGED(table[idx2]);
   if (PIVOT_ON_DIAG(idx2)) {
     long64 idx3 = PIVOT_MIRROR(idx2);
-    if (table[idx3] == UNKNOWN)
+    if (load_rlx(table[idx3]) == UNKNOWN)
       SET_CHANGED(table[idx3]);
   }
   MARK_END;
@@ -310,11 +301,11 @@ MARK_PIVOT0(mark_changed)
 MARK_PIVOT1(mark_changed)
 {
   MARK_BEGIN_PIVOT1;
-  if (table[idx2] == UNKNOWN)
+  if (load_rlx(table[idx2]) == UNKNOWN)
     SET_CHANGED(table[idx2]);
   if (PIVOT_ON_DIAG(idx2)) {
     long64 idx3 = PIVOT_MIRROR(idx2);
-    if (table[idx3] == UNKNOWN)
+    if (load_rlx(table[idx3]) == UNKNOWN)
       SET_CHANGED(table[idx3]);
   }
   MARK_END;
@@ -323,7 +314,7 @@ MARK_PIVOT1(mark_changed)
 MARK(mark_changed)
 {
   MARK_BEGIN;
-  if (table[idx2] == UNKNOWN)
+  if (load_rlx(table[idx2]) == UNKNOWN)
     SET_CHANGED(table[idx2]);
   MARK_END;
 }
@@ -331,7 +322,7 @@ MARK(mark_changed)
 MARK_PIVOT0(mark_wins, int v)
 {
   MARK_BEGIN_PIVOT0;
-  if (table[idx2]) {
+  if (load_rlx(table[idx2])) {
     SET_WIN_VALUE(table[idx2], v);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
@@ -344,7 +335,7 @@ MARK_PIVOT0(mark_wins, int v)
 MARK_PIVOT1(mark_wins, int v)
 {
   MARK_BEGIN_PIVOT1;
-  if (table[idx2]) {
+  if (load_rlx(table[idx2])) {
     SET_WIN_VALUE(table[idx2], v);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
@@ -357,7 +348,7 @@ MARK_PIVOT1(mark_wins, int v)
 MARK(mark_wins, int v)
 {
   MARK_BEGIN;
-  if (table[idx2])
+  if (load_rlx(table[idx2]))
     SET_WIN_VALUE(table[idx2], v);
   MARK_END;
 }
@@ -501,11 +492,11 @@ static void calc_captures_b(void)
 MARK_PIVOT0(mark_win_in_1)
 {
   MARK_BEGIN_PIVOT0;
-  if (table[idx2] != ILLEGAL && table[idx2] != CAPT_WIN) {
-    table[idx2] = WIN_IN_ONE;
+  if (load_rlx(table[idx2]) != ILLEGAL && load_rlx(table[idx2]) != CAPT_WIN) {
+    store_rlx(table[idx2], WIN_IN_ONE);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
-      table[idx3] = WIN_IN_ONE;
+      store_rlx(table[idx3], WIN_IN_ONE);
     }
   }
   MARK_END;
@@ -514,11 +505,11 @@ MARK_PIVOT0(mark_win_in_1)
 MARK_PIVOT1(mark_win_in_1)
 {
   MARK_BEGIN_PIVOT1;
-  if (table[idx2] != ILLEGAL && table[idx2] != CAPT_WIN) {
-    table[idx2] = WIN_IN_ONE;
+  if (load_rlx(table[idx2]) != ILLEGAL && load_rlx(table[idx2]) != CAPT_WIN) {
+    store_rlx(table[idx2], WIN_IN_ONE);
     if (PIVOT_ON_DIAG(idx2)) {
       long64 idx3 = PIVOT_MIRROR(idx2);
-      table[idx3] = WIN_IN_ONE;
+      store_rlx(table[idx3], WIN_IN_ONE);
     }
   }
   MARK_END;
@@ -527,8 +518,8 @@ MARK_PIVOT1(mark_win_in_1)
 MARK(mark_win_in_1)
 {
   MARK_BEGIN;
-  if (table[idx2] != ILLEGAL && table[idx2] != CAPT_WIN)
-    table[idx2] = WIN_IN_ONE;
+  if (load_rlx(table[idx2]) != ILLEGAL && load_rlx(table[idx2]) != CAPT_WIN)
+    store_rlx(table[idx2], WIN_IN_ONE);
   MARK_END;
 }
 
@@ -542,7 +533,7 @@ void iter(struct thread_data *thread)
   BEGIN_ITER;
   int not_fin = 0;
   ubyte *restrict table = iter_table;
-  ubyte *restrict table_opp = iter_table_opp;
+  abyte *restrict table_opp = (abyte *)iter_table_opp;
   int *restrict pcs = iter_pcs;
   int *restrict pcs_opp = iter_pcs_opp;
 

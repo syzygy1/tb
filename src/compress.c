@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -70,10 +70,17 @@ void write_long(FILE *F, uint32 l)
   } c;
 
   c.l = l;
+#ifndef BIG_ARCH
   fputc(c.c[0], F);
   fputc(c.c[1], F);
   fputc(c.c[2], F);
   fputc(c.c[3], F);
+#else
+  fputc(c.c[3], F);
+  fputc(c.c[2], F);
+  fputc(c.c[1], F);
+  fputc(c.c[0], F);
+#endif
 }
 
 void write_short(FILE *F, ushort s)
@@ -84,8 +91,13 @@ void write_short(FILE *F, ushort s)
   } c;
 
   c.s = s;
+#ifndef BIG_ARCH
   fputc(c.c[0], F);
   fputc(c.c[1], F);
+#else
+  fputc(c.c[1], F);
+  fputc(c.c[0], F);
+#endif
 }
 
 void write_byte(FILE *F, ubyte b)

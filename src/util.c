@@ -75,9 +75,8 @@ void unmap_file(char *data, long64 size)
 ubyte *alloc_aligned(long64 size, uintptr_t alignment)
 {
 #ifndef __WIN32__
-  ubyte *ptr;
+  ubyte *ptr = aligned_alloc(alignment, size);
 
-  posix_memalign((void **)&ptr, alignment, size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
@@ -101,15 +100,14 @@ ubyte *alloc_aligned(long64 size, uintptr_t alignment)
 ubyte *alloc_huge(long64 size)
 {
 #ifndef __WIN32__
-  ubyte *ptr;
+  ubyte *ptr = aligned_alloc(2 * 1024 * 1024, size);
 
-  posix_memalign((void **)&ptr, 2 * 1024 * 1024, size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(1);
   }
 #ifdef MADV_HUGEPAGE
-  madvise((void *)ptr, size, MADV_HUGEPAGE);
+  madvise(ptr, size, MADV_HUGEPAGE);
 #endif
 
   return ptr;

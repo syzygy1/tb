@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -299,13 +299,13 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   idx2 = ((idx << 6) & idx_mask1[i]) | (idx & idx_mask2[i])
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func(int k, abyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT0(func, ...) \
-static void func##_pivot0(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func##_pivot0(abyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT1(func, ...) \
-static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func##_pivot1(abyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define WhiteKingMoves (KingRange(p[0]) & ~(KingRange(p[1]) | occ))
 #define BlackKingMoves (KingRange(p[1]) & ~(KingRange(p[0]) | occ))
@@ -373,22 +373,22 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 #define LOOP_WHITE_PIECES(func, ...) \
   do { \
     long64 idx3 = idx2 | (p[0] << shift[i]); \
-    func##_pivot0(table_w, idx3, occ, p, ##__VA_ARGS__); \
+    func##_pivot0((abyte *)table_w, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
       long64 idx3 = idx2 | (p[k] << shift[i]); \
-      func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+      func(k, (abyte *)table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 
 #define LOOP_BLACK_PIECES(func, ...) \
   do { \
     long64 idx3 = idx2 | (p[1] << shift[i]); \
-    func##_pivot1(table_b, idx3, occ, p, ##__VA_ARGS__); \
+    func##_pivot1((abyte *)table_b, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
       long64 idx3 = idx2 | (p[k] << shift[i]); \
-      func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+      func(k, (abyte *)table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 
@@ -431,7 +431,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
     k = white_pcs[j]; \
     if (KK_map[p[0]][p[k]] < 0 || mirror[p[0]][p[k]] < 0) continue; \
     long64 idx3 = idx2 | (((long64)KK_map[p[0]][p[k]]) << shift[1]); \
-    func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+    func(k, (abyte *)table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
 #define LOOP_CAPTS_PIVOT0 \
@@ -463,7 +463,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
     if ((p[k] & 0x24) || KK_map[p[k]][p[1]] < 0 || mirror[p[k]][p[1]] < 0) \
       continue; \
     long64 idx3 = idx2 | (((long64)KK_map[p[k]][p[1]]) << shift[1]); \
-    func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
+    func(k, (abyte *)table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
 #define BEGIN_ITER \
