@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -1954,8 +1954,9 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
 
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = little32(*(uint32 *)(&data[4]));
-  int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32 real_num_blocks = data[4]|(data[5] << 8)|(data[6] << 16)|(data[7] << 24);
+//  int real_num_blocks = little32(*(uint32 *)(&data[4]));
+  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
@@ -2042,8 +2043,9 @@ static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64
 
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = little32(*(uint32 *)(&data[4]));
-  int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32 real_num_blocks = data[4]|(data[5] << 8)|(data[6] << 16)|(data[7] << 24);
+//  int real_num_blocks = little32(*(uint32 *)(&data[4]));
+  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;

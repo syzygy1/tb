@@ -100,7 +100,7 @@ static int check_loss(int *restrict pcs, long64 idx0, abyte *restrict table,
   return best;
 }
 
-#define ASM_GOTO
+//#define ASM_GOTO
 static int is_attacked(int sq, const int *restrict pcs, bitboard occ,
 			const int *restrict p)
 {
