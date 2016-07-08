@@ -213,7 +213,7 @@ static int probe_dtz_table(Position& pos, int wdl, int *success)
 
   if (DTZ_table[0].key1 != key && DTZ_table[0].key2 != key) {
     for (i = 1; i < DTZ_ENTRIES; i++)
-      if (DTZ_table[i].key1 == key) break;
+      if (DTZ_table[i].key1 == key || DTZ_table[i].key2 == key) break;
     if (i < DTZ_ENTRIES) {
       struct DTZTableEntry table_entry = DTZ_table[i];
       for (; i > 0; i--)
