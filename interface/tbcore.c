@@ -258,7 +258,13 @@ void init_tablebases(char *path)
   char str[16];
   int i, j, k, l;
 
-  if (initialized) {
+  if (!initialized) {
+    init_indices();
+    initialized = 1;
+  }
+
+  // if path_string is set, we need to clean up first.
+  if (path_string) {
     free(path_string);
     free(paths);
     struct TBEntry *entry;
@@ -273,13 +279,14 @@ void init_tablebases(char *path)
     for (i = 0; i < DTZ_ENTRIES; i++)
       if (DTZ_table[i].entry)
 	free_dtz_entry(DTZ_table[i].entry);
-  } else {
-    init_indices();
-    initialized = 1;
+    LOCK_DESTROY(TB_mutex);
+    path_string = NULL;
   }
 
+  // if path is an empty string or equals "<empty>", we are done.
   char *p = path;
   if (strlen(p) == 0 || !strcmp(p, "<empty>")) return;
+
   path_string = (char *)malloc(strlen(p) + 1);
   strcpy(path_string, p);
   num_paths = 0;
