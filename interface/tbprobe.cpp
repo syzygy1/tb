@@ -341,7 +341,7 @@ static int probe_ab(Position& pos, int alpha, int beta, int *success)
   ExtMove *moves, *end;
   StateInfo st;
 
-  // Generate (at least) all legal non-ep captures including (under)promotions.
+  // Generate (at least) all legal captures including (under)promotions.
   // It is OK to generate more, as long as they are filtered out below.
   if (!pos.checkers()) {
     end = generate<CAPTURES>(pos, stack);
@@ -354,31 +354,22 @@ static int probe_ab(Position& pos, int alpha, int beta, int *success)
 
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
-    if (!pos.capture(capture) || type_of(capture) == ENPASSANT
-			|| !pos.pl_move_is_legal(capture, ci.pinned))
+    if (!pos.capture(capture) || !pos.legal(capture, ci.pinned))
       continue;
     pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
     v = -probe_ab(pos, -beta, -alpha, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
     if (v > alpha) {
-      if (v >= beta) {
-        *success = 2;
+      if (v >= beta)
 	return v;
-      }
       alpha = v;
     }
   }
 
   v = probe_wdl_table(pos, success);
-  if (*success == 0) return 0;
-  if (alpha >= v) {
-    *success = 1 + (alpha > 0);
-    return alpha;
-  } else {
-    *success = 1;
-    return v;
-  }
+
+  return alpha >= v ? alpha : v;
 }
 
 // Probe the WDL table for a particular position.
@@ -391,162 +382,73 @@ static int probe_ab(Position& pos, int alpha, int beta, int *success)
 //  2 : win
 int probe_wdl(Position& pos, int *success)
 {
-  int v;
-
   *success = 1;
-  v = probe_ab(pos, -2, 2, success);
 
-  // If en passant is not possible, we are done.
-  if (pos.ep_square() == SQ_NONE)
-    return v;
-  if (!(*success)) return 0;
-
-  // Now handle en passant.
-  int v1 = -3;
   // Generate (at least) all legal en passant captures.
   ExtMove stack[192];
   ExtMove *moves, *end;
   StateInfo st;
 
-  if (!pos.checkers())
+  // Generate (at least) all legal captures including (under)promotions.
+  if (!pos.checkers()) {
     end = generate<CAPTURES>(pos, stack);
-  else
+    end = add_underprom_caps(pos, stack, end);
+  } else
     end = generate<EVASIONS>(pos, stack);
 
   CheckInfo ci(pos);
 
+  int best = -2, v_ep = -3;
+
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
-    if (type_of(capture) != ENPASSANT
-	  || !pos.legal(capture, ci.pinned))
+    if (!pos.capture(capture) || !pos.pl_move_is_legal(capture, ci.pinned))
       continue;
     pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
-    int v0 = -probe_ab(pos, -2, 2, success);
+    int v = -probe_ab(pos, -2, 2, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
-    if (v0 > v1) v1 = v0;
+    if (v > best) {
+      if (v == 2) {
+	*success = 2;
+	return 2;
+      }
+      best = v;
+    }
+    if (type_of(capture) == ENPASSANT && v > v_ep)
+      v_ep = v;
   }
-  if (v1 > -3) {
-    if (v1 >= v) v = v1;
-    else if (v == 0) {
-      // Check whether there is at least one legal non-ep move.
-      for (moves = stack; moves < end; moves++) {
-	Move capture = moves->move;
-	if (type_of(capture) == ENPASSANT) continue;
-	if (pos.legal(capture, ci.pinned)) break;
+
+  int v = probe_wdl_table(pos, success);
+  if (*success == 0) return 0;
+
+  if (best >= v) {
+    *success = 1 + (best > 0);
+    return best;
+  }
+
+  if (v_ep > -3 && v == 0) {
+    // Check for stalemate.
+    for (moves = stack; moves < end; moves++) {
+      Move move = moves->move;
+      if (type_of(move) == ENPASSANT) continue;
+      if (pos.legal(move, ci.pinned)) break;
+    }
+    if (moves == end && !pos.checkers()) {
+      end = generate<QUIETS>(pos, end);
+      for (; moves < end; moves++) {
+        Move move = moves->move;
+        if (pos.legal(move, ci.pinned))
+          break;
       }
-      if (moves == end && !pos.checkers()) {
-	end = generate<QUIETS>(pos, end);
-	for (; moves < end; moves++) {
-	  Move move = moves->move;
-	  if (pos.legal(move, ci.pinned))
-	    break;
-	}
-      }
-      // If not, then we are forced to play the losing ep capture.
-      if (moves == end)
-	v = v1;
+    }
+    if (moves == end) {
+      *success = 2;
+      return v_ep;
     }
   }
 
   return v;
-}
-
-// This routine treats a position with en passant captures as one without.
-static int probe_dtz_no_ep(Position& pos, int *success)
-{
-  int wdl, dtz;
-
-  wdl = probe_ab(pos, -2, 2, success);
-  if (*success == 0) return 0;
-
-  if (wdl == 0) return 0;
-
-  if (*success == 2)
-    return wdl == 2 ? 1 : 101;
-
-  ExtMove stack[192];
-  ExtMove *moves, *end = NULL;
-  StateInfo st;
-  CheckInfo ci(pos);
-
-  if (wdl > 0) {
-    // Generate at least all legal non-capturing pawn moves
-    // including non-capturing promotions.
-    // (The call to generate<>() in fact generates all moves.)
-    if (!pos.checkers())
-      end = generate<NON_EVASIONS>(pos, stack);
-    else
-      end = generate<EVASIONS>(pos, stack);
-
-    for (moves = stack; moves < end; moves++) {
-      Move move = moves->move;
-      if (type_of(pos.moved_piece(move)) != PAWN || pos.capture(move)
-		|| !pos.legal(move, ci.pinned))
-	continue;
-      pos.do_move(move, st, ci, pos.gives_check(move, ci));
-      int v = pos.ep_square() == SQ_NONE ? -probe_ab(pos, -2, -wdl + 1, success)
-                                         : -probe_wdl(pos, success);
-
-      pos.undo_move(move);
-      if (*success == 0) return 0;
-      if (v == wdl)
-	return v == 2 ? 1 : 101;
-    }
-  }
-
-  dtz = 1 + probe_dtz_table(pos, wdl, success);
-  if (*success >= 0) {
-    if (wdl & 1) dtz += 100;
-    return wdl >= 0 ? dtz : -dtz;
-  }
-
-  if (wdl > 0) {
-    int best = 0xffff;
-    // Non-capturing non-pawn moves should be generated now if that was not
-    // done before. (We have done it before by calling generate<>().)
-    for (moves = stack; moves < end; moves++) {
-      Move move = moves->move;
-      if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
-		|| !pos.legal(move, ci.pinned))
-	continue;
-      pos.do_move(move, st, ci, pos.gives_check(move, ci));
-      int v = -probe_dtz(pos, success);
-      pos.undo_move(move);
-      if (*success == 0) return 0;
-      if (v > 0 && v + 1 < best)
-	best = v + 1;
-    }
-    return best;
-  } else {
-    int best = -1;
-    // Generate all legal moves.
-    if (!pos.checkers())
-      end = generate<NON_EVASIONS>(pos, stack);
-    else
-      end = generate<EVASIONS>(pos, stack);
-    for (moves = stack; moves < end; moves++) {
-      int v;
-      Move move = moves->move;
-      if (!pos.legal(move, ci.pinned))
-	continue;
-      pos.do_move(move, st, ci, pos.gives_check(move, ci));
-      if (st.rule50 == 0) {
-	if (wdl == -2) v = -1;
-	else {
-	  v = probe_ab(pos, 1, 2, success);
-	  v = (v == 2) ? 0 : -101;
-	}
-      } else {
-	v = -probe_dtz(pos, success) - 1;
-      }
-      pos.undo_move(move);
-      if (*success == 0) return 0;
-      if (v < best)
-	best = v;
-    }
-    return best;
-  }
 }
 
 static int wdl_to_dtz[] = {
@@ -581,76 +483,83 @@ static int wdl_to_dtz[] = {
 //
 int probe_dtz(Position& pos, int *success)
 {
-  *success = 1;
-  int v = probe_dtz_no_ep(pos, success);
-
-  if (pos.ep_square() == SQ_NONE)
-    return v;
+  int wdl = probe_wdl(pos, success);
   if (*success == 0) return 0;
 
-  // Now handle en passant.
-  int v1 = -3;
+  // If draw, then dtz = 0.
+  if (wdl == 0) return 0;
+
+  // Check for winning capture or en passant capture as only move.
+  if (*success == 2)
+    return wdl_to_dtz[wdl + 2];
 
   ExtMove stack[192];
-  ExtMove *moves, *end;
+  ExtMove *moves, *end = NULL;
   StateInfo st;
-
-  // Generate at least the legal en passant captures.
-  // (We generate many more, but filter out the unnecessary ones below.)
-  if (!pos.checkers())
-    end = generate<CAPTURES>(pos, stack);
-  else
-    end = generate<EVASIONS>(pos, stack);
   CheckInfo ci(pos);
 
-  for (moves = stack; moves < end; moves++) {
-    Move capture = moves->move;
-    if (type_of(capture) != ENPASSANT
-		|| !pos.legal(capture, ci.pinned))
-      continue;
-    pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
-    int v0 = -probe_ab(pos, -2, 2, success);
-    pos.undo_move(capture);
-    if (*success == 0) return 0;
-    if (v0 > v1) v1 = v0;
-  }
-  if (v1 > -3) {
-    v1 = wdl_to_dtz[v1 + 2];
-    if (v < -100) {
-      if (v1 >= 0)
-	v = v1;
-    } else if (v < 0) {
-      if (v1 >= 0 || v1 < -100)
-	v = v1;
-    } else if (v > 100) {
-      if (v1 > 0)
-	v = v1;
-    } else if (v > 0) {
-      if (v1 == 1)
-	v = v1;
-    } else if (v1 >= 0) {
-      v = v1;
-    } else {
-      for (moves = stack; moves < end; moves++) {
-	Move move = moves->move;
-	if (type_of(move) == ENPASSANT) continue;
-	if (pos.legal(move, ci.pinned)) break;
-      }
-      if (moves == end && !pos.checkers()) {
-        // Check for stalemate.
-	end = generate<QUIETS>(pos, end);
-	for (; moves < end; moves++) {
-	  Move move = moves->move;
-	  if (pos.legal(move, ci.pinned))
-	    break;
-	}
-      }
-      if (moves == end)
-	v = v1;
+  // If winning, check for a winning pawn move.
+  if (wdl > 0) {
+    // Generate at least all legal non-capturing pawn moves
+    // including non-capturing promotions.
+    // (The call to generate<>() in fact generates all moves.)
+    if (!pos.checkers())
+      end = generate<NON_EVASIONS>(pos, stack);
+    else
+      end = generate<EVASIONS>(pos, stack);
+
+    for (moves = stack; moves < end; moves++) {
+      Move move = moves->move;
+      if (type_of(pos.moved_piece(move)) != PAWN || pos.capture(move)
+                || !pos.legal(move, ci.pinned))
+        continue;
+      pos.do_move(move, st, ci, pos.gives_check(move, ci));
+      int v = -probe_wdl(pos, success);
+      pos.undo_move(move);
+      if (*success == 0) return 0;
+      if (v == wdl)
+        return wdl_to_dtz[wdl + 2];
     }
   }
 
-  return v;
+  // If we are here, we know that the best move is not an ep capture;
+  // it is therefore safe to probe the DTZ table with the current value of wdl.
+  int dtz = probe_dtz_table(pos, wdl, success);
+  if (*success >= 0)
+    return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
+
+  // *success < 0 means we need to probe DTZ for the other side to move.
+  int best;
+  if (wdl > 0) {
+    best = INT32_MAX;
+    // If wdl > 0, we already generated all moves.
+  } else {
+    best = wdl_to_dtz[wdl + 2];
+    if (!pos.checkers())
+      end = generate<NON_EVASIONS>(pos, stack);
+    else
+      end = generate<EVASIONS>(pos, stack);
+  }
+
+  for (moves = stack; moves < end; moves++) {
+    Move move = moves->move;
+    // We can skip pawn moves and captures.
+    if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
+              || !pos.legal(move, ci.pinned))
+      continue;
+    pos.do_move(move, st, ci, pos.gives_check(move, ci));
+    int v = -probe_dtz(pos, success);
+    pos.undo_move(move);
+    if (*success == 0) return 0;
+    if (wdl > 0) {
+      if (v > 0 && v + 1 < best)
+        best = v + 1;
+    } else {
+      if (v -1 < best)
+        best = v - 1;
+    }
+  }
+  return best;
 }
 
 // Check whether there has been at least one repetition of positions
