@@ -201,6 +201,8 @@ static int probe_wdl_table(Position& pos, int *success)
   return ((int)res) - 2;
 }
 
+// The value of wdl MUST correspond to the WDL value of the position without
+// en passant rights.
 static int probe_dtz_table(Position& pos, int wdl, int *success)
 {
   struct TBEntry *ptr;
@@ -373,7 +375,14 @@ static int probe_ab(Position& pos, int alpha, int beta, int *success)
 }
 
 // Probe the WDL table for a particular position.
+//
 // If *success != 0, the probe was successful.
+//
+// If *success == 2, the position has a winning capture, or the position
+// is a cursed win and has a cursed winning capture, or the position
+// has an ep capture as only best move.
+// This is used in probe_dtz().
+//
 // The return value is from the point of view of the side to move:
 // -2 : loss
 // -1 : loss, but draw under 50-move rule
@@ -398,37 +407,62 @@ int probe_wdl(Position& pos, int *success)
 
   CheckInfo ci(pos);
 
-  int best = -2, v_ep = -3;
+  int best_cap = -3, best_ep = -3;
+
+  // We do capture resolution, letting best_cap keep track of the best
+  // capture without ep rights and letting best_ep keep track of still
+  // better ep captures if they exist.
 
   for (moves = stack; moves < end; moves++) {
     Move capture = moves->move;
-    if (!pos.capture(capture) || !pos.pl_move_is_legal(capture, ci.pinned))
+    if (!pos.capture(capture) || !pos.legal(capture, ci.pinned))
       continue;
     pos.do_move(capture, st, ci, pos.gives_check(capture, ci));
-    int v = -probe_ab(pos, -2, 2, success);
+    int v = -probe_ab(pos, -2, -best_cap, success);
     pos.undo_move(capture);
     if (*success == 0) return 0;
-    if (v > best) {
+    if (v > best_cap) {
       if (v == 2) {
 	*success = 2;
 	return 2;
       }
-      best = v;
+      if (type_of(capture) != ENPASSANT)
+        best_cap = v;
+      else if (v > best_ep)
+        best_ep = v;
     }
-    if (type_of(capture) == ENPASSANT && v > v_ep)
-      v_ep = v;
   }
 
   int v = probe_wdl_table(pos, success);
   if (*success == 0) return 0;
 
-  if (best >= v) {
-    *success = 1 + (best > 0);
-    return best;
+  // Now max(v, best_cap) is the WDL value of the position without ep rights.
+  // If the position without ep rights is not stalemate or no ep captures
+  // exist, then the value of the position is max(v, best_cap, best_ep).
+  // If the position without ep rights is stalemate and best_ep > -3,
+  // then the value of the position is best_ep (and we will have v == 0).
+
+  if (best_ep > best_cap) {
+    if (best_ep > v) { // ep capture (possibly cursed losing) is best.
+      *success = 2;
+      return best_ep;
+    }
+    best_cap = best_ep;
   }
 
-  if (v_ep > -3 && v == 0) {
-    // Check for stalemate.
+  // Now max(v, best_cap) is the WDL value of the position unless
+  // the position without ep rights is stalemate and best_ep > -3.
+
+  if (best_cap >= v) {
+    // No need to test for the stalemate case here: either there are
+    // non-ep captures, or best_cap == best_ep >= v anyway.
+    *success = 1 + (best_cap > 0);
+    return best_cap;
+  }
+
+  // Now handle the stalemate case.
+  if (best_ep > -3 && v == 0) {
+    // Check for stalemate in the position with ep captures.
     for (moves = stack; moves < end; moves++) {
       Move move = moves->move;
       if (type_of(move) == ENPASSANT) continue;
@@ -442,11 +476,13 @@ int probe_wdl(Position& pos, int *success)
           break;
       }
     }
-    if (moves == end) {
+    if (moves == end) { // Stalemate detected.
       *success = 2;
-      return v_ep;
+      return best_ep;
     }
   }
+
+  // Stalemate / en passant not an issue, so v is the correct value.
 
   return v;
 }
@@ -464,12 +500,14 @@ static int wdl_to_dtz[] = {
 //     1 < n <= 100 : win in n ply (assuming 50-move counter == 0)
 //   100 < n        : win, but draw under 50-move rule
 //
+// If the position is mate, -1 is returned instead of 0.
+//
 // The return value n can be off by 1: a return value -n can mean a loss
 // in n+1 ply and a return value +n can mean a win in n+1 ply. This
 // cannot happen for tables with positions exactly on the "edge" of
 // the 50-move rule.
 //
-// This implies that if dtz > 0 is returned, the position is certainly
+// This means that if dtz > 0 is returned, the position is certainly
 // a win if dtz + 50-move-counter <= 99. Care must be taken that the engine
 // picks moves that preserve dtz + 50-move-counter <= 99.
 //
@@ -489,7 +527,7 @@ int probe_dtz(Position& pos, int *success)
   // If draw, then dtz = 0.
   if (wdl == 0) return 0;
 
-  // Check for winning capture or en passant capture as only move.
+  // Check for winning (cursed) capture or ep capture as only best move.
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
@@ -522,8 +560,11 @@ int probe_dtz(Position& pos, int *success)
     }
   }
 
-  // If we are here, we know that the best move is not an ep capture;
-  // it is therefore safe to probe the DTZ table with the current value of wdl.
+  // If we are here, we know that the best move is not an ep capture.
+  // In other words, the value of wdl corresponds to the WDL value of
+  // the position without ep rights. It is therefore safe to probe the
+  // DTZ table with the current value of wdl.
+
   int dtz = probe_dtz_table(pos, wdl, success);
   if (*success >= 0)
     return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
@@ -534,6 +575,9 @@ int probe_dtz(Position& pos, int *success)
     best = INT32_MAX;
     // If wdl > 0, we already generated all moves.
   } else {
+    // If (cursed) loss, the worst case is a losing capture or pawn move
+    // as the "best" move, leading to dtz of -1 or -101.
+    // In case of mate, this will cause -1 to be returned.
     best = wdl_to_dtz[wdl + 2];
     if (!pos.checkers())
       end = generate<NON_EVASIONS>(pos, stack);
@@ -544,6 +588,8 @@ int probe_dtz(Position& pos, int *success)
   for (moves = stack; moves < end; moves++) {
     Move move = moves->move;
     // We can skip pawn moves and captures.
+    // If wdl > 0, we already caught them. If wdl < 0, the initial value
+    // of best already takes account of them.
     if (pos.capture(move) || type_of(pos.moved_piece(move)) == PAWN
               || !pos.legal(move, ci.pinned))
       continue;
