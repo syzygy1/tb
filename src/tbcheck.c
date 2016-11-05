@@ -18,18 +18,18 @@ static void compare_checksums(char *file)
 
   FILE *F = fopen(file, "r");
   if (!F) {
-    printf("Could not open %s.\n", file);
+    fprintf(stderr, "Could not open %s.\n", file);
     return;
   }
   while (!feof(F)) {
     int num = fscanf(F, "%100[KQRBNP|v|rtbwz|.]: %32[0-9|a-f]\n", name, sum);
     if (num != 2 || strlen(sum) != 32) {
-      printf("Could not completely parse %s.\n", file);
+      fprintf(stderr, "Could not completely parse %s.\n", file);
       break;
     }
     FILE *G = fopen(name, "rb");
     if (!G) {
-      printf("Tablebase file %s not found.\n", name);
+      fprintf(stderr, "Tablebase file %s not found.\n", name);
     } else {
       fclose(G);
       print_checksum(name, sum2);
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
   } while (val != EOF);
 
   if (optind >= argc) {
-    printf("No tablebase specified.\n");
+    fprintf(stderr, "No tablebase specified.\n");
     exit(0);
   }
 

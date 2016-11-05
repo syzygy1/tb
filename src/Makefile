@@ -29,13 +29,13 @@ LDFLAGS =
 
 export FLAGS CC CFLAGS LDFLAGS
 
+all: rtbgen rtbgenp rtbver rtbverp tbcheck
+
 rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 	@$(MAKE) -f Makefile.regular $@
 
 atbgen atbgenp atbver atbverp aclean:
 	@$(MAKE) -f Makefile.atomic $@
-
-all: rtbgen rtbgenp rtbver rtbverp tbcheck
 
 atomic: atbgen atbgenp atbver atbverp tbcheck
 

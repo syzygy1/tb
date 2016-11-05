@@ -162,8 +162,8 @@ int main(int argc, char **argv)
   } while (val != EOF);
 
   if (optind >= argc) {
-    printf("No tablebase specified.\n");
-    exit(0);
+    fprintf(stderr, "No tablebase specified.\n");
+    exit(1);
   }
   tablename = argv[optind];
 
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
   if (!color) exit(1);
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
-    printf("Can't handle pawns.\n");
+    fprintf(stderr, "Can't handle pawns.\n");
     exit(1);
   }
 

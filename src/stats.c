@@ -81,7 +81,7 @@ static long64 find_val(ubyte *table, ubyte v)
   run_threaded(find_loop, work_g, 0);
 
   if (found_idx == 0xffffffffffffffffULL)
-    printf("find_val: not found!\n");
+    fprintf(stderr, "find_val: not found!\n");
 
   return found_idx;
 }

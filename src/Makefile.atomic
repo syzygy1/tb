@@ -1,0 +1,13 @@
+GENTBNAME = atbgen
+GENTBPNAME = atbgenp
+VERTBNAME = atbver
+VERTBPNAME = atbverp
+CLEAN = aclean
+
+DEPDIR = .depsa
+OBJDIR = objsa
+
+FLAGS += -DATOMIC
+
+include Makefile.general
+

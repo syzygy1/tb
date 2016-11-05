@@ -567,8 +567,8 @@ int main(int argc, char **argv)
   } while (val != EOF);
 
   if (optind >= argc) {
-    printf("No tablebase specified.\n");
-    exit(0);
+    fprintf(stderr, "No tablebase specified.\n");
+    exit(1);
   }
   tablename = argv[optind];
 
@@ -617,23 +617,23 @@ int main(int argc, char **argv)
 
 #ifndef SUICIDE
   if (pcs[WKING] != 1 || pcs[BKING] != 1) {
-    printf("Need one white king and one black king.\n");
+    fprintf(stderr, "Need one white king and one black king.\n");
     exit(1);
   }
 
   if (numpcs < 3) {
-    printf("Need at least 3 pieces.\n");
+    fprintf(stderr, "Need at least 3 pieces.\n");
     exit(1);
   }
 #else
   if (numpcs < 2) {
-    printf("Need at least 2 pieces.\n");
+    fprintf(stderr, "Need at least 2 pieces.\n");
     exit(1);
   }
 #endif
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
-    printf("Can't handle pawns.\n");
+    fprintf(stderr, "Can't handle pawns.\n");
     exit(1);
   }
 

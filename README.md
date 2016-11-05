@@ -47,6 +47,10 @@ There are five programs:
 * tbcheck for verifying integrity of tablebase files based on an embedded
 checksum.
 
+**Note 1:** Since a correct set of checksums is known, there is no need for anyone to run rtbver and rtbverp.
+
+**Note 2:** The checksums are **not** md5sums. However, correct md5sums are known as well, and these can also be used to verify integrity. See http://kirill-kryukov.com/chess/tablebases-online/
+
 **Usage:** `rtbgen KQRvKR`   (or `rtbgenp KRPvKR`)  
 Produces two compressed files: KQRvKR.rtbw and KQRvKR.rtbz. Both files
 contain an embedded checksum.  
@@ -74,7 +78,7 @@ or to ./KQRvKR.txt if $RTBSTATSDIR is not set.
 Reduce RAM usage during compression. This takes a bit more time because
 tables are temporarily saved to disk. **This option is necessary to
 generate 6-piece tables on systems with 16 GB RAM.** This option is
-not needed on system with 24 GB RAM or more.
+not needed on systems with 24 GB RAM or more.
 
 **Usage:** `rtbver KQRvKR`   (or `rtbverp KRPvKR`)  
 Verifies consistency of KQRvKR.rtbw and KQRvKR.rtbz. This should detect
@@ -106,10 +110,14 @@ See above.
 --print  (or -p)  
 Print embedded checksums. Do not check correctness.
 
+**Alternative usage:** `tbcheck --compare wdl345.txt`
+Compares the embedded checksum for each tablebase file listed in wdl345.txt
+with the checksum specified in wdl345.txt. Note that these are not md5sums.
 
 Note: The programs rtbgen, rtbgenp, rtbver and rtbverp require access
 to WDL tablebase files for "subtables". These should be present in
-the directory $RTBWDIR.
+the directory $RTBWDIR. The program tbcheck only looks in the current working
+directory.
 
 
 ### Scripts
@@ -148,21 +156,26 @@ form of a shared library, and requires some work to integrate into an
 engine. The main reason for this is efficiency. There are four files:
 tbcore.c, tbcore.h, tbprobe.cpp, tbprobe.h.
 
-The files tbcore.c and tbcore.h should not require much changes, although
+The files tbcore.c and tbcore.h should not require many changes, although
 engine authors might want to replace some printf()s with suitable logging
 statements. The files tbprobe.cpp and tbprobe.h do require some changes
 but these should be fairly straightforward when following the comments.
 The only reason for tbprobe.cpp having the .cpp extension is that I have
-used Stockfish as example. The probing code expects WDL files in $RTBWDIR
-and DTZ files in $RTBZDIR.
+used Stockfish as example. The probing code is initialised by calling
+init_tablebases(path), where path contains the directories (separated with
+a colon on Linux and with a semicolon on Windows) where the WDL and DTZ
+files are to be found.
 
 The files main.cpp, search.cpp and types.h are from Stockfish with calls
 to the probing code added (see // TB comments). The change in types.h is
 necessary in order to make room for "tablebase win in n" values distinct
 from "mate in n" values. Please note that the integration of probing code
-into Stockfish is merely intended as a proof of concept. It is far from
-perfect and might have some bugs.
+into Stockfish is merely intended as a proof of concept.
 
+Note that when properly integrating the interface code in an engine that is
+not Stockfish, no trace of Stockfish will be left. The engine author will
+have to rewrite the Stockfish-specific glueing code to match his or her
+engine. Therefore no copyright issues can arise (see also below).
 
 
 ### Terms of use
@@ -172,13 +185,19 @@ released under the BSD 2-Clause License. The files city-c.c, city-c.h and
 citycrc.h in src/ (ported by me from C++ to C) are copyrighted by Google,
 Inc. and were released under an even more liberal license. Both licenses
 are compatible with the GPL. All other files in src/ are released under
-the GNU Public License, version 2.
+the GNU Public License, version 2 (only).
 
 The files main.cpp, search.cpp and types.h in interface/ obviously are
-copyrighted by the Stockfish authors and covered by the Stockfish GPL.
+copyrighted by the Stockfish authors and covered by the Stockfish GPL with
+the exception of the code fragments preceded by // TB comments. These
+fragments may be freely modified and redistributed in source and/or binary
+format.
 
-The files tbcore.c, tbcore.h, tbprobe.cpp and tbprobe.h in interface/ may
-be freely modified and redistributed in source and/or binary format.
+All tablebase files generated using this generator may be freely redistributed.
+In fact, those files are free of copyright at least under US law (following
+Feist Publications, Inc., v. Rural Telephone Service Co., 499 U.S. 340 (1991))
+and under EU law (following Football Dataco and Others v. Yahoo! UK Ltd and
+Others (C-604/10)).
 
 
 Ronald de Man  

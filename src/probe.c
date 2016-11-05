@@ -116,7 +116,7 @@ void add_to_hash(struct TBEntry *ptr, long64 key)
   while (i < HSHMAX && TB_hash[hshidx][i].ptr)
     i++;
   if (i == HSHMAX) {
-    printf("HSHMAX too low!\n");
+    fprintf(stderr, "HSHMAX too low!\n");
     exit(1);
   } else {
     TB_hash[hshidx][i].key = key;
@@ -180,13 +180,13 @@ static void init_tb(char *str)
   }
   if (pcs[WPAWN] + pcs[BPAWN] == 0) {
     if (TBnum_piece == TBMAX_PIECE) {
-      printf("TBMAX_PIECE limit too low!\n");
+      fprintf(stderr, "TBMAX_PIECE limit too low!\n");
       exit(1);
     }
     entry = (struct TBEntry *)&TB_piece[TBnum_piece++];
   } else {
     if (TBnum_pawn == TBMAX_PAWN) {
-      printf("TBMAX_PAWN limit too low!\n");
+      fprintf(stderr, "TBMAX_PAWN limit too low!\n");
       exit(1);
     }
     entry = (struct TBEntry *)&TB_pawn[TBnum_pawn++];
@@ -2135,7 +2135,7 @@ static void init_table(struct TBEntry *entry, long64 key)
   entry->data = map_file(file, 1, &dummy);
   ubyte *data = (ubyte *)entry->data;
   if (((uint32 *)data)[0] != WDL_MAGIC) {
-    printf("Corrupted table.\n");
+    fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
 
@@ -3039,7 +3039,7 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
       if (pieces[j] == BKING - i)
 	str[k++] = pchr[i];
   str[k] = 0;
-  printf("Missing table: %s\n", str);
+  fprintf(stderr, "Missing table: %s\n", str);
   exit(1);
 }
 

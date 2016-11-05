@@ -29,16 +29,16 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
   if (!lz4_buf) {
     lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
     if (!lz4_buf) {
-      printf("Out of memory.\n");
-      exit(0);
+      fprintf(stderr, "Out of memory.\n");
+      exit(1);
     }
   }
 
   if (local == num_saves) {
     sprintf(name, "%s.%c.%d", tablename, color, num_saves);
     if (!(F = fopen(name, "wb"))) {
-      printf("Could not open %s for writing.\n", name);
-      exit(-1);
+      fprintf(stderr, "Could not open %s for writing.\n", name);
+      exit(1);
     }
     tmp_table[num_saves][color == 'w' ? 0 : 1] = F;
   } else {
@@ -113,8 +113,8 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
   sprintf(name, "%s.%c.%d", tablename, color, k);
 
   if (!(F = fopen(name, "rb"))) {
-    printf("Could not open %s for writing.\n", name);
-    exit(-1);
+    fprintf(stderr, "Could not open %s for writing.\n", name);
+    exit(1);
   }
 
   ubyte *ptr = table;
@@ -184,8 +184,10 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       verify_ok = 0;
     }
 
-  if (!verify_ok)
+  if (!verify_ok) {
+    fprintf(stderr, "Verification of reconstructed table failed.\n");
     exit(1);
+  }
 }
 
 void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
@@ -441,16 +443,16 @@ void store_table(ubyte *table, char color)
   if (!lz4_buf) {
     lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
     if (!lz4_buf) {
-      printf("Out of memory.\n");
-      exit(0);
+      fprintf(stderr, "Out of memory.\n");
+      exit(1);
     }
   }
 
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "wb"))) {
-    printf("Could not open %s for writing.\n", name);
-    exit(-1);
+    fprintf(stderr, "Could not open %s for writing.\n", name);
+    exit(1);
   }
 
   ubyte *ptr = table;
@@ -476,8 +478,8 @@ void load_table(ubyte *table, char color)
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "rb"))) {
-    printf("Could not open %s for writing.\n", name);
-    exit(-1);
+    fprintf(stderr, "Could not open %s for writing.\n", name);
+    exit(1);
   }
 
   ubyte *ptr = table;

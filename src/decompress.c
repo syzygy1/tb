@@ -273,7 +273,7 @@ void decomp_init_table(struct tb_handle *H)
   magic = 0;
   fread(&magic, 1, 4, F);
   if (magic != (H->wdl ? WDL_MAGIC : DTZ_MAGIC)) {
-    printf("Corrupted table.\n");
+    fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
 
@@ -468,7 +468,7 @@ static void decompress_worker(struct thread_data *thread)
     while (idx + size > idx2) {
       if (*((uint32 *)(d->indextable + 6 * mainidx)) != block
 	      || *((ushort *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx) {
-	printf("ERROR in main index!!\n");
+	fprintf(stderr, "ERROR in main index!!\n");
 	exit(1);
       }
       idx2 += 1ULL << d->idxbits;
@@ -536,7 +536,7 @@ struct tb_handle *open_tb(char *tablename, int wdl)
   strcat(name, tablename);
   strcat(name, wdl ? WDLSUFFIX : DTZSUFFIX);
   if (!(H->F = fopen(name, "rb"))) {
-    printf("Could not open %s for reading.\n", name);
+    fprintf(stderr, "Could not open %s for reading.\n", name);
     exit(1);
   }
   H->data = (ubyte *)map_file(name, 1, &(H->data_size));

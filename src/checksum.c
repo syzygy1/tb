@@ -59,7 +59,7 @@ static void calc_checksum(char *name)
     checksum_found = 1;
   } else {
     if (size & 0x3f) {
-      printf("Size of %s is not a multiple of 64.\n", name);
+      fprintf(stderr, "Size of %s is not a multiple of 64.\n", name);
       exit(1);
     }
     checksum_found = 0;
@@ -84,7 +84,7 @@ void print_checksum(char *name, char *sum)
   if ((size & 0x3f) == 0x10) {
     memcpy(checksum1, data + (size & ~0x3fULL), 16);
   } else {
-    printf("No checksum found.\n");
+    fprintf(stderr, "No checksum found.\n");
     exit(1);
   }
   unmap_file(data, size);
@@ -105,12 +105,12 @@ void add_checksum(char *name)
 {
   calc_checksum(name);
   if (checksum_found) {
-    printf("%s checksum already present.\n", checksum_match ? "Matching" : "Non-matching");
+    fprintf(stderr, "%s checksum already present.\n", checksum_match ? "Matching" : "Non-matching");
     exit(1);
   }
   FILE *F = fopen(name, "ab");
   if (!F) {
-    printf("Could not open %s for appending.\n", name);
+    fprintf(stderr, "Could not open %s for appending.\n", name);
     exit(1);
   }
   fwrite(checksum2, 16, 1, F);
@@ -122,7 +122,7 @@ void verify_checksum(char *name)
   printf("%s: ", name);
   calc_checksum(name);
   if (!checksum_found) {
-    printf("No checksum present.\n");
+    fprintf(stderr, "No checksum present.\n");
     exit(1);
   }
   if (!checksum_match)

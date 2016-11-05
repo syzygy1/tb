@@ -142,7 +142,7 @@ void init_threads(int pawns)
     int rc = pthread_create(&threads[i], NULL, worker,
 				  (void *)&(thread_data[i]));
     if (rc) {
-      printf("ERROR: pthread_create() returned %d\n", rc);
+      fprintf(stderr, "ERROR: pthread_create() returned %d\n", rc);
       exit(1);
     }
   }
@@ -151,7 +151,7 @@ void init_threads(int pawns)
     start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (!start_event[i] || !stop_event[i]) {
-      printf("CreateEvent() failed.\n");
+      fprintf(stderr, "CreateEvent() failed.\n");
       exit(1);
     }
   }
@@ -159,7 +159,7 @@ void init_threads(int pawns)
     threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
 				  0, NULL);
     if (threads[i] == NULL) {
-      printf("CreateThread() failed.\n");
+      fprintf(stderr, "CreateThread() failed.\n");
       exit(1);
     }
   }

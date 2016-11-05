@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2015 Ronald de Man
 */
 
 #ifndef TBCORE_H
@@ -7,18 +7,26 @@
 
 #ifndef __WIN32__
 #include <pthread.h>
+#define SEP_CHAR ':'
+#define FD int
+#define FD_ERR -1
 #else
 #include <windows.h>
+#define SEP_CHAR ';'
+#define FD HANDLE
+#define FD_ERR INVALID_HANDLE_VALUE
 #endif
 
 #ifndef __WIN32__
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
+#define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
 #define LOCK(x) pthread_mutex_lock(&(x))
 #define UNLOCK(x) pthread_mutex_unlock(&(x))
 #else
 #define LOCK_T HANDLE
 #define LOCK_INIT(x) do { x = CreateMutex(NULL, FALSE, NULL); } while (0)
+#define LOCK_DESTROY(x) CloseHandle(x)
 #define LOCK(x) WaitForSingleObject(x, INFINITE)
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
@@ -63,6 +71,7 @@ struct PairsData {
 struct TBEntry {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -72,6 +81,7 @@ struct TBEntry {
 struct TBEntry_piece {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -86,6 +96,7 @@ struct TBEntry_piece {
 struct TBEntry_pawn {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -102,6 +113,7 @@ struct TBEntry_pawn {
 struct DTZEntry_piece {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -111,7 +123,6 @@ struct DTZEntry_piece {
   int factor[TBPIECES];
   ubyte pieces[TBPIECES];
   ubyte norm[TBPIECES];
-  uint64 mapped_size;
   ubyte flags; // accurate, mapped, side
   ushort map_idx[4];
   ubyte *map;
@@ -120,6 +131,7 @@ struct DTZEntry_piece {
 struct DTZEntry_pawn {
   char *data;
   uint64 key;
+  uint64 mapping;
   ubyte ready;
   ubyte num;
   ubyte symmetric;
@@ -131,7 +143,6 @@ struct DTZEntry_pawn {
     ubyte pieces[TBPIECES];
     ubyte norm[TBPIECES];
   } file[4];
-  uint64 mapped_size;
   ubyte flags[4];
   ushort map_idx[4][4];
   ubyte *map;
