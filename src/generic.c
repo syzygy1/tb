@@ -102,17 +102,17 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 // use bit_set
 #if 1
 
-#define bit_set(x,y) { long64 dummy = y; asm("bts %1,%0" : "+r" (x) : "r" (dummy));}
-#define bit_set(x,y) { long64 dummy = y; asm("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define jump_bit_set(x,y,lab) \
-  asm goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
 
 #define jump_bit_clear(x,y,lab) \
-  asm goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
 
 #define bit_set_jump_set(x,y,lab) \
-  asm goto ("bts %1, %0; jc %l[lab]" : "+r" (x) : "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bts %1, %0; jc %l[lab]" : "+r" (x) : "r" ((long64)(y)) : : lab);
 
 #define FILL_OCC64_cheap \
   occ = 0; \

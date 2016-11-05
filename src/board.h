@@ -95,6 +95,30 @@ static __inline__ bitboard PieceMoves(int sq, int type, bitboard occ)
   return PieceRange(sq, type, occ) & ~occ;
 }
 
+// only used in rtbgenp / rtbverp
+static __inline__ bitboard PieceRange1(int sq, int type, bitboard occ)
+{
+  switch (type & 0x07) {
+  case KING:
+    return KingRange(sq);
+  case KNIGHT:
+    return KnightRange(sq);
+  case BISHOP:
+    return BishopRange(sq, occ);
+  case ROOK:
+    return RookRange(sq, occ);
+  case QUEEN:
+    return QueenRange(sq, occ);
+  default:
+    assume(0);
+  }
+}
+
+static __inline__ bitboard PieceMoves1(int sq, int type, bitboard occ)
+{
+  return PieceRange1(sq, type, occ) & ~occ;
+}
+
 // only used in rtbgen / rtbver
 static __inline__ bitboard PieceRange2(int sq, int type, bitboard occ)
 {

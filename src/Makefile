@@ -13,6 +13,7 @@ FLAGS += -DUSE_POPCNT
 
 # Specify the compiler
 # regular linux
+#CC = /usr/bin/gcc -pthread
 CC = gcc -pthread
 # cross compiling from Linux to Windows
 #CC = x86_64-w64-mingw32-gcc
@@ -20,15 +21,24 @@ CC = gcc -pthread
 # Compilation flags
 # Remove or replace -march=corei7 and -msse4.2 if necessary.
 # For Haswell add -mbmi2 and select -DBMI2 above.
-#CFLAGS = -g -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2
-CFLAGS = -g -O3 -march=corei7 -msse4.2 -pipe -D_GNU_SOURCE -Wall -std=c99 -Wstrict-aliasing=2 -flto -Wno-array-bounds -Wno-maybe-uninitialized
+#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c99 -Wno-array-boungs -flto
+CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c99 -Wno-array-bounds -flto
+#CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c99 -fsanitize=undefined -Wno-array-bounds -flto -fprofile-use -lgcov
+#LDFLAGS = -lubsan
+LDFLAGS = 
 
-export FLAGS CC CFLAGS
+export FLAGS CC CFLAGS LDFLAGS
 
 rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 	@$(MAKE) -f Makefile.regular $@
 
+atbgen atbgenp atbver atbverp aclean:
+	@$(MAKE) -f Makefile.atomic $@
+
 all: rtbgen rtbgenp rtbver rtbverp tbcheck
 
-.PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean
+atomic: atbgen atbgenp atbver atbverp tbcheck
+
+.PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
+	atbgen atbgenp atbver atbverp aclean
 

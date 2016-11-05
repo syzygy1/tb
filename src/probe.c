@@ -817,6 +817,10 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     idx = KK_idx[triangle[pos[0]]][pos[1]];
     i = 2;
     break;
+
+  default:
+    assume(0);
+    break;
   }
   idx *= factor[0];
 
@@ -889,6 +893,10 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       else
 	idx = 6*63 + 4*28 + (diag[pos[0]]) * 7 + (diag[pos[1]] - i);
       i = 2;
+      break;
+
+    default:
+      assume(0);
       break;
 
     }
@@ -1617,6 +1625,7 @@ void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
   sub[order[i]] = idx;
 
   q = sub[0];
+assume(ptr->pawns[0] <= 6);
   t = ptr->pawns[0] - 1;
   for (i = 0; i < 5; i++)
     if (pawnidx[t][6 * file + i + 1] > q) break;

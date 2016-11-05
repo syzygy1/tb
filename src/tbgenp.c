@@ -108,13 +108,12 @@ void *permute_pawn_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *
 long64 estimate_pawn_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, int file, ubyte *v);
 void permute_pawn_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, int file, ubyte *v);
 struct tb_handle *create_tb(char *tablename, int wdl, int blocksize);
-void compress_tb(struct tb_handle *F, unsigned char *data, ubyte *perm, int minfreq, int maxsymbols);
+void compress_tb(struct tb_handle *F, ubyte *restrict data, ubyte *restrict perm, int minfreq);
 void merge_tb(struct tb_handle *F);
 void compress_init_wdl(int *vals, int flags);
 void compress_init_dtz(struct dtz_map *map);
 
 static int minfreq = 8;
-static int maxsymbols = 4095;
 static int only_generate = 0;
 static int generate_dtz = 1;
 static int generate_wdl = 1;
@@ -1047,7 +1046,7 @@ int main(int argc, char **argv)
       printf("find optimal permutation for file wtm / wdl, file %c\n", 'a' + file);
       permute_pawn_wdl(tb_table, pcs, pt, table_w, best_w, file, v);
       printf("compressing data for wtm / wdl, file %c\n", 'a' + file);
-      compress_tb(G, tb_table, best_w, minfreq, maxsymbols);
+      compress_tb(G, tb_table, best_w, minfreq);
 
       if (!symmetric) {
 	if (save_to_disk) {
@@ -1059,7 +1058,7 @@ int main(int argc, char **argv)
 	printf("find optimal permutation for file btm / wdl, file %c\n", 'a' + file);
 	permute_pawn_wdl(tb_table, pcs, pt, table_b, best_b, file, v);
 	printf("compressing data for btm / wdl, file %c\n", 'a' + file);
-	compress_tb(G, tb_table, best_b, minfreq, maxsymbols);
+	compress_tb(G, tb_table, best_b, minfreq);
       }
     }
 
@@ -1107,14 +1106,14 @@ int main(int argc, char **argv)
 	printf("permute table for wtm / dtz, file %c\n", 'a' + file);
 	permute_pawn_dtz(tb_table, pcs, table_w, bestp_w, file, v);
 	printf("compressing data for wtm/dtz, file %c\n", 'a' + file);
-	compress_tb(H, tb_table, best_w, minfreq, maxsymbols);
+	compress_tb(H, tb_table, best_w, minfreq);
       } else {
 	tb_table = table_w;
 	prepare_dtz_map(v, &map_b[file]);
 	printf("permute table for btm / dtz, file %c\n", 'a' + file);
 	permute_pawn_dtz(tb_table, pcs, table_b, bestp_b, file, v);
 	printf("compressing data for btm/dtz, file %c\n", 'a' + file);
-	compress_tb(H, tb_table, best_b, minfreq, maxsymbols);
+	compress_tb(H, tb_table, best_b, minfreq);
       }
     }
 

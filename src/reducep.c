@@ -155,7 +155,7 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats[j] += thread_data[i].stats[j];
 
   stats2[inv_map[0][0]] = tot_stats[0];
-  stats2[inv_map[1][0]] = tot_stats[STAT_MATE];
+  stats2[inv_map[1][0]] += tot_stats[STAT_MATE];
   if (map->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
       stats2[inv_map[0][i]] += tot_stats[i + 1];

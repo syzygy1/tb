@@ -170,6 +170,9 @@ static void init_magics(struct MagicInit *magic_init, struct Magic *magic,
   bitboard bb, bb2;
   int squares[12];
 
+  for (i = 0; i < 12; i++)
+    squares[i] = 0;
+
   for (sq = 0; sq < 64; sq++) {
     magic[sq].magic = magic_init[sq].magic;
     magic[sq].data = &attacks_table[magic_init[sq].index];

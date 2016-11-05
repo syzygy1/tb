@@ -14,7 +14,7 @@
 #include "defs.h"
 #include "util.h"
 
-char *map_file(char *name, int shared, long64 *size)
+void *map_file(char *name, int shared, long64 *size)
 {
 #ifndef __WIN32__
   struct stat statbuf;
@@ -26,12 +26,12 @@ char *map_file(char *name, int shared, long64 *size)
   fstat(fd, &statbuf);
   *size = statbuf.st_size;
 #ifdef __linux__
-  char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ,
-	    shared ? MAP_SHARED : MAP_PRIVATE | MAP_POPULATE, fd, 0);
+  void *data = mmap(NULL, statbuf.st_size, PROT_READ,
+		    shared ? MAP_SHARED : MAP_PRIVATE | MAP_POPULATE, fd, 0);
 #else
-  char *data = (char *)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+  void *data = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 #endif
-  if (data == (char *)(-1)) {
+  if (data == MAP_FAILED) {
     printf("Could not mmap() %s.\n", name);
     exit(1);
   }
@@ -53,7 +53,7 @@ char *map_file(char *name, int shared, long64 *size)
     printf("CreateFileMapping() failed.\n");
     exit(1);
   }
-  char *data = (char *)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
+  void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
     printf("MapViewOfFile() failed.\n");
     exit(1);
@@ -63,7 +63,7 @@ char *map_file(char *name, int shared, long64 *size)
 #endif
 }
 
-void unmap_file(char *data, long64 size)
+void unmap_file(void *data, long64 size)
 {
 #ifndef __WIN32__
   munmap(data, size);
@@ -72,12 +72,12 @@ void unmap_file(char *data, long64 size)
 #endif
 }
 
-ubyte *alloc_aligned(long64 size, uintptr_t alignment)
+void *alloc_aligned(long64 size, uintptr_t alignment)
 {
 #ifndef __WIN32__
-  ubyte *ptr;
+  void *ptr;
 
-  posix_memalign((void **)&ptr, alignment, size);
+  posix_memalign(&ptr, alignment, size);
   if (ptr == NULL) {
     printf("Could not allocate sufficient memory.\n");
     exit(1);
@@ -85,36 +85,36 @@ ubyte *alloc_aligned(long64 size, uintptr_t alignment)
 
   return ptr;
 #else
-  ubyte *ptr;
+  void *ptr;
 
   ptr = malloc(size + alignment - 1);
   if (ptr == NULL) {
     printf("Could not allocate sufficient memory.\n");
     exit(1);
   }
-  ptr = (ubyte *)((uintptr_t)(ptr + alignment - 1) & ~(alignment - 1));
+  ptr = (void *)((uintptr_t)(ptr + alignment - 1) & ~(alignment - 1));
 
   return ptr;
 #endif
 }
 
-ubyte *alloc_huge(long64 size)
+void *alloc_huge(long64 size)
 {
 #ifndef __WIN32__
-  ubyte *ptr;
+  void *ptr;
 
-  posix_memalign((void **)&ptr, 2 * 1024 * 1024, size);
+  posix_memalign(&ptr, 2 * 1024 * 1024, size);
   if (ptr == NULL) {
     printf("Could not allocate sufficient memory.\n");
     exit(1);
   }
 #ifdef __linux__
-  madvise((void *)ptr, size, MADV_HUGEPAGE);
+  madvise(ptr, size, MADV_HUGEPAGE);
 #endif
 
   return ptr;
 #else
-  ubyte *ptr;
+  void *ptr;
 
   ptr = malloc(size);
   if (ptr == NULL) {

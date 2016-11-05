@@ -611,7 +611,7 @@ int check_mate_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -688,6 +688,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -711,6 +712,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -769,6 +771,7 @@ void calc_broken_pp(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
 //  int p[MAX_PIECES];
@@ -850,6 +853,7 @@ void calc_broken_pp(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -922,6 +926,7 @@ void calc_mates(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ;
   int *p = thread->p;
   long64 end = thread->end;
@@ -1040,6 +1045,9 @@ void probe_captures_w(struct thread_data *thread)
       case 2:
 	LOOP_WHITE_PIECES(mark_capt_losses);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -1072,6 +1080,9 @@ void probe_captures_b(struct thread_data *thread)
       case 2:
 	LOOP_BLACK_PIECES(mark_capt_losses);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -1102,6 +1113,9 @@ void probe_pivot_captures(struct thread_data *thread)
 	break;
       case 2:
 	LOOP_PIECES_PIVOT(mark_capt_losses);
+	break;
+      default:
+	assume(0);
 	break;
       }
     }
@@ -1207,6 +1221,7 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitbo
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
+  assume(numpcs >= 3 && numpcs <= 6);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -1301,6 +1316,7 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -1310,6 +1326,7 @@ void load_wdl(struct thread_data *thread)
   int *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
+  v1_p = 0; // suppress bogus warning
   for (idx = thread->begin; idx < end; idx++) {
     v1_p = table[idx];
     if (v1_p < WDL_ILLEGAL) break;
@@ -1348,6 +1365,7 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -1377,6 +1395,7 @@ void load_dtz(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -1398,7 +1417,7 @@ void load_dtz(struct thread_data *thread)
     idx2 = encode_pawn_ver(entry, norm, pos, factor);
     v2 = src[idx2];
     table[idx] = wdl_to_dtz[v1][v2];
-if(table[idx]==DTZ_ERROR)
+if(unlikely(table[idx]==DTZ_ERROR))
 error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx, v1, v2, idx2);
   }
 }
@@ -1408,6 +1427,7 @@ void load_dtz_mapped(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -1431,7 +1451,7 @@ void load_dtz_mapped(struct thread_data *thread)
     idx2 = encode_pawn_ver(entry, norm, pos, factor);
     v2 = map[wdl][src[idx2]];
     table[idx] = wdl_to_dtz[v1][v2];
-if(table[idx]==DTZ_ERROR)
+if(unlikely(table[idx]==DTZ_ERROR))
 error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx, v1, v2, idx2);
   }
 }
@@ -1444,7 +1464,7 @@ static int has_moves_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, i
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -1526,7 +1546,7 @@ static int compute_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -1545,6 +1565,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bit
   int i, m, v;
   int pcs[MAX_PIECES];
   int pt2[MAX_PIECES];
+  assume(numpcs >= 3 && numpcs <= 6);
 
   occ ^= bit[sq] ^ bit[ep] ^ bit[p[k]];
   p[l] = ep;
@@ -1570,6 +1591,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1648,6 +1670,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1668,7 +1691,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
 	bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
 	if (is_attacked(p[black_king], white_all, bb, p))
 	  continue;
-	for (k = 0; k < numpcs; k++) {
+	for (k = 0; k < n; k++) {
 	  pos[k] = p[k];
 	  pt2[k] = pt[k];
 	}
@@ -1732,7 +1755,7 @@ void verify_opp(struct thread_data *thread)
     int v = opp_table[idx];
     if (v >= WDL_ILLEGAL) {
       opp_table[idx] = wdl_to_dtz_c[v - WDL_ERROR];
-      if (v == WDL_ERROR)
+      if (unlikely(v == WDL_ERROR))
 	error("ERROR: opp table, idx = %llu, v = WDL_ERROR\n", idx);
       continue;
     }
@@ -1740,7 +1763,7 @@ void verify_opp(struct thread_data *thread)
     int w = compute_pieces(opp_pieces, idx, dtz_table, occ, p);
     int z = dtz_to_opp[v][w];
     opp_table[idx] = z;
-    if (z == DTZ_ERROR)
+    if (unlikely(z == DTZ_ERROR))
       error("ERROR: opp table, idx = %llu, v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1755,13 +1778,13 @@ void verify_dtz(struct thread_data *thread)
   LOOP_ITER_ALL {
     int v = dtz_table[idx];
     if (v == DTZ_ILLEGAL || v >= DTZ_ERROR) {
-      if (v == DTZ_ERROR)
+      if (unlikely(v == DTZ_ERROR))
 	error("ERROR: dtz table, idx = %llu, v = DTZ_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
     int w = compute_pieces(dtz_pieces, idx, opp_table, occ, p);
-    if (!dtz_matrix[v][w])
+    if (unlikely(!dtz_matrix[v][w]))
       error("ERROR: dtz table, idx = %llu, v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1778,7 +1801,7 @@ void verify_wdl_w(struct thread_data *thread)
     if (w_skip[v]) continue;
     FILL_OCC;
     int w = compute_pieces(pieces, idx, opp_table, occ, p);
-    if (!w_matrix[v][w])
+    if (unlikely(!w_matrix[v][w]))
       error("ERROR: wdl table, idx = %llu, v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1795,7 +1818,7 @@ void verify_wdl_b(struct thread_data *thread)
     if (w_skip[v]) continue;
     FILL_OCC;
     int w = compute_pieces(pieces, idx, opp_table, occ, p);
-    if (!w_matrix[v][w])
+    if (unlikely(!w_matrix[v][w]))
       error("ERROR: wdl table, idx = %llu, v = %d, w = %d\n", idx, v, w);
   }
 }
@@ -1805,6 +1828,7 @@ void wdl_load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
@@ -1826,7 +1850,7 @@ void wdl_load_wdl(struct thread_data *thread)
     idx2 = encode_pawn_ver(entry, norm, pos, factor);
     v2 = src[idx2];
     table[idx] = w_wdl_matrix[v2][v1];
-if(table[idx]==W_ERROR)
+if(unlikely(table[idx]==W_ERROR))
 error("W_ERROR: idx = %llu, v2 = %d, v1 = %d\n", idx, v2, v1);
   }
 }

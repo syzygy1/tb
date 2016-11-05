@@ -119,7 +119,7 @@ int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -156,7 +156,7 @@ int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -175,6 +175,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -198,6 +199,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -247,6 +249,7 @@ void calc_mates(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   bitboard occ, bb = thread->occ;
   int *p = thread->p;
   long64 end = begin + thread->end;
@@ -383,6 +386,9 @@ void probe_captures_w(struct thread_data *thread)
       case 2:
 	LOOP_WHITE_PIECES(mark_changed);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -420,6 +426,9 @@ void probe_captures_b(struct thread_data *thread)
       case 2:
 	LOOP_BLACK_PIECES(mark_changed);
 	break;
+      default:
+	assume(0);
+	break;
       }
     }
   }
@@ -455,6 +464,9 @@ void probe_pivot_captures(struct thread_data *thread)
 	break;
       case 2:
 	LOOP_PIECES_PIVOT(mark_changed);
+	break;
+      default:
+	assume(0);
 	break;
       }
     }
@@ -595,6 +607,9 @@ void iter(struct thread_data *thread)
       } else {
 	table[idx] = UNKNOWN;
       }
+      break;
+    default:
+      assume(0);
       break;
     }
   }
@@ -769,6 +784,7 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
+  assume(numpcs >= 3 && numpcs <= 6);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -879,6 +895,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
   int i, m, v;
   int pcs[MAX_PIECES];
   int pt2[MAX_PIECES];
+  assume(numpcs >= 3 && numpcs <= 6);
 
   occ ^= bit[sq] | bit[ep] | bit[p[k]];
   p[l] = ep;
@@ -907,7 +924,7 @@ static int has_moves(int *restrict pcs, long64 idx0, ubyte *table,
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);
@@ -925,6 +942,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1005,6 +1023,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
+  assume(n >= 3 && n <= 6);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1026,7 +1045,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
 	bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
 	if (is_attacked(p[black_king], white_all, bb, p))
 	  continue;
-	for (k = 0; k < numpcs; k++) {
+	for (k = 0; k < n; k++) {
 	  pos[k] = p[k];
 	  pt2[k] = pt[k];
 	}
@@ -1204,6 +1223,7 @@ int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
+  assume(numpcs >= 3 && numpcs <= 6);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -1299,7 +1319,7 @@ int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
 
   do {
     int k = *pcs;
-    bb = PieceMoves(p[k], pt[k], occ);
+    bb = PieceMoves1(p[k], pt[k], occ);
     idx = idx0 & ~mask[k];
     while (bb) {
       sq = FirstOne(bb);

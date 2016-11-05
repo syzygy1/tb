@@ -797,6 +797,7 @@ void load_wdl(struct thread_data *thread)
   int *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
+  v1_p = 0; // suppress bogus warning
   for (idx = thread->begin; idx < end; idx++) {
     v1_p = table[idx];
     if (v1_p < WDL_ILLEGAL) break;
@@ -883,6 +884,7 @@ void load_dtz(struct thread_data *thread)
   int *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
+  v1_p = 0; // suppress bogus warning
   for (idx = thread->begin; idx < end; idx++) {
     v1_p = table[idx];
     if (v1_p < WDL_ERROR)

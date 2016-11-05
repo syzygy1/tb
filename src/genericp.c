@@ -83,6 +83,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #define FILL_OCC_CAPTS_PIVOT \
   long64 idx2 = idx ^ pw_mask; \
   occ = bb = 0; \
+  assume(numpawns >= 0); \
   for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
   for (; k > 0; k--, idx2 >>= 6) \
@@ -251,7 +252,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
 #define MARK_BEGIN \
   int sq; \
   long64 idx2; \
-  bitboard bb = PieceMoves(p[k], pt[k], occ); \
+  bitboard bb = PieceMoves1(p[k], pt[k], occ); \
   while (bb) { \
     sq = FirstOne(bb); \
     idx2 = MakeMove(idx, k, sq)
@@ -268,6 +269,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   long64 end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
@@ -280,6 +282,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   long64 end = thread->end >> 6
 
 #ifndef SUICIDE
@@ -291,6 +294,8 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
+  assume(numpawns > 0); \
   int king, wtm; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -317,6 +322,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   int king, opp_king, wtm; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -342,6 +348,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   int king; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -363,6 +370,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   int wtm; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -386,6 +394,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   ubyte *restrict table; \
   int *restrict pcs; \
   long64 end = thread->end; \
@@ -484,6 +493,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   long64 idx, idx2; \
   int i; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   bitboard occ, bb = thread->occ; \
   int *p = thread->p; \
   long64 end = begin + thread->end
@@ -495,6 +505,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   long64 idx, idx2; \
   int i; \
   int n = numpcs; \
+  assume(n >= 3 && n <= 6); \
   bitboard occ; \
   int p[MAX_PIECES]; \
   long64 end = thread->end
