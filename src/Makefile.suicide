@@ -1,0 +1,13 @@
+GENTBNAME = stbgen
+GENTBPNAME = stbgenp
+VERTBNAME = stbver
+VERTBPNAME = stbverp
+CLEAN = sclean
+
+DEPDIR = .depss
+OBJDIR = objss
+
+FLAGS += -DSUICIDE
+
+include Makefile.general
+

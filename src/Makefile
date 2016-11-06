@@ -37,8 +37,14 @@ rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 atbgen atbgenp atbver atbverp aclean:
 	@$(MAKE) -f Makefile.atomic $@
 
+stbgen stbgenp sclean:
+	@$(MAKE) -f Makefile.suicide $@
+
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
+suicide: stbgen stbgenp tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
-	atbgen atbgenp atbver atbverp aclean
+	atbgen atbgenp atbver atbverp aclean \
+	stbgen stbgenp sclean
 

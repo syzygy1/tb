@@ -65,7 +65,13 @@ static int num_saves;
 static int cursed_capt[MAX_PIECES];
 static int cursed_pawn_capt_w, cursed_pawn_capt_b;
 static int has_cursed_capts, has_cursed_pawn_moves;
+#ifndef SUICIDE
 static int to_fix_w, to_fix_b;
+#endif
+
+#ifdef SUICIDE
+int threat_dc, wdl_threat_win, wdl_threat_cwin, wdl_threat_draw;
+#endif
 
 static long64 total_stats_w[MAX_STATS];
 static long64 total_stats_b[MAX_STATS];
@@ -266,6 +272,7 @@ void calc_pawn_table_threaded(void)
 #endif
 }
 
+#ifndef SUICIDE
 static LOCK_T tc_mutex;
 static ubyte *tc_table;
 static ubyte *tc_v;
@@ -329,6 +336,7 @@ void test_closs(long64 *restrict stats, ubyte *restrict table, int to_fix)
       tc_closs = 1;
   }
 }
+#endif
 
 void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 {
@@ -359,23 +367,18 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 #else
   for (i = 0; i <= DRAW_RULE; i++)
     if (stats[i]) break;
-  if (i <= DRAW_RULE)
-    vals[4] = 1;
+  vals[4] = (i <= DRAW_RULE) || (!threat_dc && stats[STAT_THREAT_WIN1] + stats[STAT_THREAT_WIN2] != 0);
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[i]) break;
-  if (i <= MAX_PLY)
-    vals[3] = 1;
-  if (stats[STAT_DRAW])
-    vals[2] = 1;
+  vals[3] = (i <= MAX_PLY) || (!threat_dc && stats[STAT_THREAT_CWIN1] + stats[STAT_THREAT_CWIN2] != 0);
+  vals[2] = (stats[STAT_DRAW] != 0) || (!threat_dc && stats[STAT_THREAT_DRAW]);
   // FIXME: probably should scan the table for non-CAPT_CLOSS cursed losses
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[STAT_MATE - i]) break;
-  if (i <= MAX_PLY)
-    vals[1] = 1;
+  vals[1] = (i <= MAX_PLY);
   for (i = 0; i <= DRAW_RULE; i++)
     if (stats[STAT_MATE - i]) break;
-  if (i <= DRAW_RULE)
-    vals[0] = 1;
+  vals[0] = (i <= DRAW_RULE);
 #endif
 
   for (i = 0; i < 4; i++)
@@ -387,8 +390,8 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   dc[0] = tc_capt_closs;
 #else
   dc[3] = 1;
-  dc[2] = (stats[STAT_THREAT_CWIN2] + stats[STAT_THREAT_CWIN1] != 0);
-  dc[1] = (stats[STAT_THREAT_DRAW] != 0);
+  dc[2] = threat_dc && (stats[STAT_THREAT_CWIN2] + stats[STAT_THREAT_CWIN1] != 0);
+  dc[1] = threat_dc && (stats[STAT_THREAT_DRAW] != 0);
 //  dc[0] = (stats[515] != 0); // THREAT_CLOSS
   dc[0] = 0; // FIXME: CAPT_CLOSS
 #endif
@@ -433,15 +436,15 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   v[BROKEN] = 8;
   v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = 8;
   v[CAPT_CLOSS] = v[CAPT_LOSS] = 8;
-  v[THREAT_DRAW] = 6;
+  v[THREAT_DRAW] = wdl_threat_draw;
   v[UNKNOWN] = v[PAWN_DRAW] = 2;
   if (num_saves == 0) {
     v[STALE_WIN] = v[STALE_WIN + 1] = 4;
-    v[THREAT_WIN1] = v[THREAT_WIN2] = 8;
+    v[THREAT_WIN1] = v[THREAT_WIN2] = wdl_threat_win;
     for (i = 2; i <= DRAW_RULE; i++)
       v[BASE_WIN + i] = 4;
     v[BASE_WIN + DRAW_RULE + 1] = 3;
-    v[THREAT_CWIN1] = v[THREAT_CWIN2] = 7;
+    v[THREAT_CWIN1] = v[THREAT_CWIN2] = wdl_threat_cwin;
     for (i = DRAW_RULE + 2; i <= REDUCE_PLY; i++)
       v[BASE_WIN + i + 2] = 3;
     for (i = DRAW_RULE + 1; i <= REDUCE_PLY; i++)
@@ -449,9 +452,9 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
     for (i = 0; i <= DRAW_RULE; i++)
       v[BASE_LOSS - i] = 0;
   } else {
-    v[THREAT_WIN_RED] = 8;
+    v[THREAT_WIN_RED] = wdl_threat_win;
     v[BASE_WIN_RED] = 4;
-    v[THREAT_CWIN_RED] = 7;
+    v[THREAT_CWIN_RED] = wdl_threat_cwin;
     v[BASE_CWIN_RED] = 3;
     v[BASE_LOSS_RED] = 0;
     v[BASE_CLOSS_RED] = 1;
@@ -900,6 +903,19 @@ int main(int argc, char **argv)
       if (pt[i] & 0x08) break;
     last_b = i;
   }
+
+  if (numpcs < 6) {
+    threat_dc = 0;
+    wdl_threat_win = 4;
+    wdl_threat_cwin = 3;
+    wdl_threat_draw = 2;
+  } else {
+    threat_dc = 1;
+    wdl_threat_win = 8;
+    wdl_threat_cwin = 7;
+    wdl_threat_draw = 6;
+  }
+
 #endif
 
   table_w = alloc_huge(2 * size);
@@ -908,7 +924,9 @@ int main(int argc, char **argv)
   init_threads(1);
   init_tables();
 
+#ifndef SUICIDE
   LOCK_INIT(tc_mutex);
+#endif
   LOCK_INIT(stats_mutex);
 
   gettimeofday(&start_time, NULL);
@@ -1009,6 +1027,7 @@ int main(int argc, char **argv)
     tb_table = NULL;
 
     if (G || H) {
+#ifndef SUICIDE
       reset_piece_captures();
       if (cursed_pawn_capt_w) {
 	printf("Resetting white cursed pawn captures.\n");
@@ -1018,7 +1037,9 @@ int main(int argc, char **argv)
 	printf("Resetting black cursed pawn captures.\n");
 	run_threaded(reset_pawn_captures_b, work_g, 1);
       }
+#endif
 
+#ifndef SUICIDE
       if (save_to_disk || !G
 		|| (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
 	tb_table = table_b;
@@ -1029,6 +1050,15 @@ int main(int argc, char **argv)
       } else if (save_to_disk && G && H && (to_fix_w || cursed_pawn_capt_w)) {
 	store_table(table_b, 'b');
       }
+#else
+      if (save_to_disk || !G || symmetric)
+	tb_table = table_b;
+      tb_table = init_permute_file(pcs, file, tb_table);
+      if (save_to_disk && G && !symmetric) {
+	store_table(table_w, 'w');
+	store_table(table_b, 'b');
+      }
+#endif
 
       ply_accurate_w = 0;
       if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
@@ -1041,7 +1071,9 @@ int main(int argc, char **argv)
 
     // wdl
     if (G) {
+#ifndef SUICIDE
       test_closs(total_stats_w, table_w, to_fix_w);
+#endif
       prepare_wdl_map(total_stats_w, v, ply_accurate_w, ply_accurate_b);
       printf("find optimal permutation for file wtm / wdl, file %c\n", 'a' + file);
       permute_pawn_wdl(tb_table, pcs, pt, table_w, best_w, file, v);
@@ -1053,7 +1085,9 @@ int main(int argc, char **argv)
 	  load_table(table_b, 'b');
 	  tb_table = table_w;
 	}
+#ifndef SUICIDE
 	test_closs(total_stats_b, table_b, to_fix_b);
+#endif
 	prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
 	printf("find optimal permutation for file btm / wdl, file %c\n", 'a' + file);
 	permute_pawn_wdl(tb_table, pcs, pt, table_b, best_b, file, v);
@@ -1067,12 +1101,17 @@ int main(int argc, char **argv)
 
     // dtz
     if (H) {
+#ifndef SUICIDE
       if (tb_table == table_w)
 	load_table(table_w, 'w');
       else if (tb_table == table_b && G && (to_fix_w || cursed_pawn_capt_w))
 	load_table(table_b, 'b');
       if (symmetric)
 	to_fix_b = cursed_pawn_capt_b = 0;
+#else
+      if (tb_table == table_w)
+	load_table(table_w, 'w');
+#endif
 
 #if defined(REGULAR) || defined(ATOMIC)
       fix_closs();

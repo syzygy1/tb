@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2014 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -59,7 +59,13 @@ static int ply_accurate_w, ply_accurate_b;
 static int num_saves;
 static int cursed_capt[MAX_PIECES];
 static int has_cursed_capts;
+#ifndef SUICIDE
 static int to_fix_w, to_fix_b;
+#endif
+
+#ifdef SUICIDE
+int threat_dc, wdl_threat_win, wdl_threat_cwin, wdl_threat_draw;
+#endif
 
 static long64 total_stats_w[1024];
 static long64 total_stats_b[1024];
@@ -146,6 +152,7 @@ void transform_table(struct thread_data *thread)
 
 #include "reduce.c"
 
+#ifndef SUICIDE
 static LOCK_T tc_mutex;
 static ubyte *tc_table;
 static ubyte *tc_v;
@@ -209,6 +216,7 @@ void test_closs(long64 *stats, ubyte *table, int to_fix)
       tc_closs = 1;
   }
 }
+#endif
 
 void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 {
@@ -239,23 +247,18 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 #else
   for (i = MIN_PLY_WIN; i <= DRAW_RULE; i++)
     if (stats[i]) break;
-  if (i <= DRAW_RULE)
-    vals[4] = 1;
+  vals[4] = (i <= DRAW_RULE) || (!threat_dc && stats[2]);
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[i]) break;
-  if (i <= MAX_PLY)
-    vals[3] = 1;
-  if (stats[512])
-    vals[2] = 1;
+  vals[3] = (i <= MAX_PLY) || (!threat_dc && (stats[509] + stats[510] != 0));
+  vals[2] = (stats[512] != 0) || (!threat_dc && stats[514] != 0);
   // FIXME: probably should scan the table for non-CAPT_CLOSS cursed losses
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[1023 - i]) break;
-  if (i <= MAX_PLY)
-    vals[1] = 1;
+  vals[1] = (i <= MAX_PLY);
   for (i = MIN_PLY_LOSS; i <= DRAW_RULE; i++)
     if (stats[1023 - i]) break;
-  if (i <= DRAW_RULE)
-    vals[0] = 1;
+  vals[0] = (i <= DRAW_RULE);
 #endif
 
   for (i = 0; i < 4; i++)
@@ -267,9 +270,10 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   dc[0] = tc_capt_closs;
 #else
   dc[3] = 1;
-  dc[2] = (stats[509] != 0); // THREAT_CWIN
-  dc[1] = (stats[514] != 0); // THREAT_DRAW
-  dc[0] = (stats[515] != 0); // THREAT_CLOSS
+  dc[2] = threat_dc && (stats[509] + stats[510] != 0); // THREAT_CWIN
+  dc[1] = threat_dc && (stats[514] != 0); // THREAT_DRAW
+//  dc[0] = (stats[515] != 0); // THREAT_CLOSS
+  dc[0] = 0;
 #endif
 
   for (i = 0; i < 4; i++)
@@ -310,13 +314,13 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   v[BROKEN] = 8;
   v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = 8;
   v[CAPT_CLOSS] = v[CAPT_LOSS] = 8;
-  v[THREAT_WIN] = 8;
-  v[THREAT_DRAW] = 6;
+  v[THREAT_WIN] = wdl_threat_win;
+  v[THREAT_DRAW] = wdl_threat_draw;
   v[UNKNOWN] = 2;
   if (num_saves == 0) {
     for (i = 3; i <= DRAW_RULE; i++)
       v[BASE_WIN + i] = 4;
-    v[THREAT_CWIN1] = v[THREAT_CWIN2] = 7;
+    v[THREAT_CWIN1] = v[THREAT_CWIN2] = wdl_threat_cwin;
     v[BASE_WIN + DRAW_RULE + 1] = 3;
     for (i = DRAW_RULE + 2; i <= REDUCE_PLY + 1; i++)
       v[BASE_WIN + i + 2] = 3;
@@ -326,7 +330,7 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
       v[BASE_LOSS - i] = 0;
   } else {
     v[BASE_WIN + 3] = 4;
-    v[BASE_WIN + 4] = 7;
+    v[BASE_WIN + 4] = wdl_threat_cwin;
     v[BASE_WIN + 5] = 3;
     v[BASE_LOSS - 2] = 0;
     v[BASE_LOSS - 3] = 1;
@@ -688,6 +692,18 @@ int main(int argc, char **argv)
     }
     switched = 1;
   }
+
+  if (numpcs < 6) {
+    threat_dc = 0;
+    wdl_threat_win = 4;
+    wdl_threat_cwin = 3;
+    wdl_threat_draw = 2;
+  } else {
+    threat_dc = 1;
+    wdl_threat_win = 8;
+    wdl_threat_cwin = 7;
+    wdl_threat_draw = 6;
+  }
 #endif
 
   for (i = 0; i < numpcs; i++)
@@ -734,12 +750,12 @@ int main(int argc, char **argv)
     cursed_capt[i] = 0;
   has_cursed_capts = 0;
 
-  long64 alloc_size;
+  long64 alloc_size = 0ULL;
   if (numpcs == 3)
     alloc_size = 31332 + 1;
   else if (numpcs == 4)
     alloc_size = 31332 * 61 + 1;
-  else
+  if (alloc_size < size)
     alloc_size = size;
 
   table_w = alloc_huge(alloc_size);
@@ -748,7 +764,9 @@ int main(int argc, char **argv)
   init_threads(0);
   init_tables();
 
+#ifndef SUICIDE
   LOCK_INIT(tc_mutex);
+#endif
   LOCK_INIT(stats_mutex);
 
   gettimeofday(&start_time, NULL);
@@ -825,7 +843,9 @@ int main(int argc, char **argv)
   ubyte best_b[MAX_PIECES];
   int bestp_w, bestp_b;
 
+#ifndef SUICIDE
   reset_captures();
+#endif
 
   tb_table = NULL;
   if (save_to_disk || symmetric || !generate_wdl)
@@ -837,7 +857,9 @@ int main(int argc, char **argv)
   }
 
   if (generate_wdl) {
+#ifndef SUICIDE
     test_closs(total_stats_w, table_w, to_fix_w);
+#endif
     prepare_wdl_map(total_stats_w, v, ply_accurate_w, ply_accurate_b);
     struct tb_handle *G = create_tb(tablename, 1, 6);
     printf("find optimal permutation for wtm / wdl\n");
@@ -850,7 +872,9 @@ int main(int argc, char **argv)
 	load_table(table_b, 'b');
 	tb_table = table_w;
       }
+#ifndef SUICIDE
       test_closs(total_stats_b, table_b, to_fix_b);
+#endif
       prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
       printf("find optimal permutation for btm / wdl\n");
       permute_piece_wdl(tb_table, pcs, pt, table_b, best_b, v);

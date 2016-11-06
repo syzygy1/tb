@@ -1404,8 +1404,8 @@ struct tb_handle {
   int default_blocksize;
   int blocksize[8];
   int idxbits[8];
-  int real_num_blocks[8];
-  int num_blocks[8];
+  long64 real_num_blocks[8];
+  long64 num_blocks[8];
   int num_indices[8];
   int num_syms[8];
   int num_values[8];
