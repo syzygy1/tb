@@ -1,0 +1,13 @@
+GENTBNAME = gtbgen
+GENTBPNAME = gtbgenp
+VERTBNAME = gtbver
+VERTBPNAME = gtbverp
+CLEAN = gclean
+
+DEPDIR = .depsg
+OBJDIR = objsg
+
+FLAGS += -DGIVEAWAY
+
+include Makefile.general
+

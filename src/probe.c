@@ -26,14 +26,14 @@
 // 6-piece:
 #define TBMAX_PIECE 3570
 #define TBMAX_PAWN 4830
-#define HSHMAX 16
+#define HSHMAX 12
 #elif defined(LOSER)
 #define TBMAX 400
 #define HSHMAX 4
 #elif defined(GIVEAWAY)
 #define TBMAX_PIECE 1260
 #define TBMAX_PAWN 1386
-#define HSHMAX 16
+#define HSHMAX 12
 #elif defined(ATOMIC)
 #define TBMAX_PIECE 254
 #define TBMAX_PAWN 256
@@ -230,7 +230,7 @@ void init_tablebases(void)
   char str[16], *dirptr;
   int i, j, k, l;
 #ifdef SUICIDE
-  int m;
+  int m, n;
 #endif
 
   LOCK_INIT(TB_mutex);
@@ -281,6 +281,16 @@ void init_tablebases(void)
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = 0; m < 6; m++) {
+	    sprintf(str, "%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
+					pchr[l], pchr[m]);
+	    init_tb(str);
+	  }
+
+  for (i = 0; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
 	for (l = 0; l < 6; l++)
 	  for (m = l; m < 6; m++) {
 	    sprintf(str, "%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
@@ -292,11 +302,34 @@ void init_tablebases(void)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
         for (l = k; l < 6; l++)
-          for (m = 0; m < 6; m++) {
-	    sprintf(str, "%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
-					pchr[l], pchr[m]);
-	    init_tb(str);
-	  }
+	  for (m = l; m < 6; m++)
+	    for (n = 0; n < 6; n++) {
+	      sprintf(str, "%c%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
+					    pchr[l], pchr[m], pchr[n]);
+	      init_tb(str);
+	    }
+
+  for (i = 0; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+	  for (m = 0; m < 6; m++)
+	    for (n = m; n < 6; n++) {
+	      sprintf(str, "%c%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
+					    pchr[l], pchr[m], pchr[n]);
+	      init_tb(str);
+	    }
+
+  for (i = 0; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = i; l < 6; l++)
+	  for (m = (i == l) ? j : l; m < 6; m++)
+	    for (n = (i == l && m == j) ? k : m; n < 6; n++) {
+	      sprintf(str, "%c%c%cv%c%c%c", pchr[i], pchr[j], pchr[k],
+					    pchr[l], pchr[m], pchr[n]);
+	      init_tb(str);
+	    }
 #else
   for (i = 1; i < 6; i++) {
     sprintf(str, "K%cvK", pchr[i]);
@@ -2134,10 +2167,20 @@ static void init_table(struct TBEntry *entry, long64 key)
   long64 dummy;
   entry->data = map_file(file, 1, &dummy);
   ubyte *data = (ubyte *)entry->data;
+
+#if !defined(SUICIDE)
   if (((uint32 *)data)[0] != WDL_MAGIC) {
     fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
+#else
+  // Allow SUICIDE and GIVEAWAY to use the pawnless tables of the other.
+  if (((uint32 *)data)[0] != WDL_MAGIC
+      && (entry->has_pawns || ((uint32 *)data)[0] != OTHER_MAGIC)) {
+    fprintf(stderr, "Corrupted table.\n");
+    exit(1);
+  }
+#endif
 
   int split = data[4] & 0x01;
   int files = data[4] & 0x02 ? 4 : 1;

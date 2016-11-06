@@ -19,7 +19,6 @@ CC = gcc -pthread
 #CC = x86_64-w64-mingw32-gcc
 
 # Compilation flags
-# Remove or replace -march=corei7 and -msse4.2 if necessary.
 # For Haswell add -mbmi2 and select -DBMI2 above.
 #CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c99 -Wno-array-boungs -flto
 CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c99 -Wno-array-bounds -flto
@@ -40,11 +39,16 @@ atbgen atbgenp atbver atbverp aclean:
 stbgen stbgenp sclean:
 	@$(MAKE) -f Makefile.suicide $@
 
+gtbgen gtbgenp gclean:
+	@$(MAKE) -f Makefile.giveaway $@
+
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
 suicide: stbgen stbgenp tbcheck
 
+giveaway: gtbgen gtbgenp tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
-	stbgen stbgenp sclean
-
+	stbgen stbgenp sclean \
+	gtbgen gtbgenp gclean

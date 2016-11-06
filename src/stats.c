@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -11,20 +11,19 @@ static void print_fen(FILE *F, long64 idx, int wtm, int switched)
   long64 idx2 = idx;
   int i, j;
   int n = numpcs;
-  int p[MAX_PIECES];
   ubyte bd[64];
 
   memset(bd, 0, 64);
 
 #ifndef SMALL
   for (i = n - 1; i > 0; i--, idx2 >>= 6)
-    bd[p[i] = idx2 & 0x3f] = i + 1;
-  bd[p[0] = inv_tri0x40[idx2]] = 1;
+    bd[idx2 & 0x3f] = i + 1;
+  bd[inv_tri0x40[idx2]] = 1;
 #else
   for (i = n - 1; i > 1; i--, idx2 >>= 6)
-    bd[p[i] = idx2 & 0x3f] = i + 1;
-  bd[p[0] = KK_inv[idx2][0]] = 1;
-  bd[p[1] = KK_inv[idx2][1]] = 2;
+    bd[idx2 & 0x3f] = i + 1;
+  bd[KK_inv[idx2][0]] = 1;
+  bd[KK_inv[idx2][1]] = 2;
 #endif
 
   for (i = 56; i >= 0; i -= 8) {
@@ -43,6 +42,7 @@ static void print_fen(FILE *F, long64 idx, int wtm, int switched)
       fprintf(F, "%c", '0' + cnt);
     if (i) fprintf(F, "/");
   }
+  if (switched) wtm ^= 1;
   fprintf(F, " %c - -\n", wtm ? 'w' : 'b');
 }
 
@@ -172,14 +172,14 @@ static void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int 
       total_stats[515] += stats[CAPT_CLOSS];
       for (j = 3; j <= DRAW_RULE + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j];
-      for (; j < REDUCE_PLY; j++)
+      for (; j < n + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j + 2];
-      for (j = 2; j < REDUCE_PLY; j++)
+      for (j = 2; j < n + 2; j++)
 	total_stats[1023 - j] += stats[BASE_LOSS - j];
     } else {
-      for (j = 0; j < REDUCE_PLY_RED; j++) {
-	total_stats[stats_val + j] += stats[BASE_WIN + j + 6];
-	total_stats[1023 - stats_val - j] += stats[BASE_LOSS - j - 4];
+      for (j = 0; j < n; j++) {
+	total_stats[1 + stats_val + j] += stats[BASE_WIN + j + 6];
+	total_stats[1021 - stats_val - j] += stats[BASE_LOSS - j - 4];
       }
     }
   }
@@ -244,7 +244,7 @@ static void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int 
     if (num_saves == 0)
       j = (i == DRAW_RULE + 1) ? BASE_WIN + i : BASE_WIN + i + 2;
     else
-      j = BASE_WIN + i + 6 - stats_val;
+      j = BASE_WIN + i + 5 - stats_val;
 #endif
     if (wtm) {
       if (i > lcw_ply) {
@@ -267,7 +267,7 @@ static void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int 
 #ifndef SUICIDE
     j = MATE - i + stats_val;
 #else
-    j = BASE_LOSS - i + stats_val;
+    j = (num_saves == 0) ? BASE_LOSS - i : BASE_LOSS - i - 2 + stats_val;
 #endif
     if (wtm) {
       if (i > lcb_ply) {
@@ -422,7 +422,6 @@ void print_longest(FILE *F, int switched)
       fprintf(F, "Longest win for black: %d ply; ", lb_ply);
       print_fen(F, lb_idx, lb_clr, 0);
     }
-    fprintf(F, "\n");
   } else {
     if (lcb_ply >= 0) {
       fprintf(F, "Longest cursed win for white: %d ply; ", lcb_ply);
@@ -440,7 +439,7 @@ void print_longest(FILE *F, int switched)
       fprintf(F, "Longest cursed win for black: %d ply; ", lcw_ply);
       print_fen(F, lcw_idx, lcw_clr, 8);
     }
-    fprintf(F, "\n");
   }
+  fprintf(F, "\n");
 }
 

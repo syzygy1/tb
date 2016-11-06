@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -9,6 +9,11 @@
 
 #ifdef REGULAR
 #define SMALL
+#endif
+
+// GIVEAWAY is a variation on SUICIDE
+#ifdef GIVEAWAY
+#define SUICIDE
 #endif
 
 typedef unsigned long long bitboard;

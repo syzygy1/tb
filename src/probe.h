@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -8,6 +8,7 @@
 #define PROBE_H
 
 #if defined(SUICIDE)
+#if !defined(GIVEAWAY)
 #define WDLSUFFIX ".stbw"
 #define DTZSUFFIX ".stbz"
 #define WDLDIR "STBWDIR"
@@ -15,6 +16,15 @@
 #define TBPIECES 6
 #define STATSDIR "STBSTATSDIR"
 #define LOGFILE "stblog.txt"
+#else
+#define WDLSUFFIX ".gtbw"
+#define DTZSUFFIX ".gtbz"
+#define WDLDIR "GTBWDIR"
+#define DTZDIR "GTBZDIR"
+#define TBPIECES 6
+#define STATSDIR "GTBSTATSDIR"
+#define LOGFILE "gtblog.txt"
+#endif
 #elif defined(LOSER)
 #define WDLSUFFIX ".ltbw"
 #define DTZSUFFIX ".ltbz"
@@ -51,18 +61,27 @@
 
 #define MAX_TBPIECES 8
 
-#ifdef REGULAR
+#if defined(REGULAR)
 #define WDL_MAGIC 0x5d23e871
 #define DTZ_MAGIC 0xa50c66d7
-#elif ATOMIC
+#elif defined(ATOMIC)
 #define WDL_MAGIC 0x49a48d55
 #define DTZ_MAGIC 0xeb5ea991
-#elif SUICIDE
+#elif defined(SUICIDE) && !defined(GIVEAWAY)
 #define WDL_MAGIC 0x1593f67b
 #define DTZ_MAGIC 0x23e7cfe4
+#define OTHER_MAGIC 0x21bc55bc
+#elif defined(GIVEAWAY)
+#define WDL_MAGIC 0x21bc55bc
+#define DTZ_MAGIC 0x501bf5d6
+#define OTHER_MAGIC 0x1593f67b
 #endif
 
+#ifdef SUICIDE
+#define TBHASHBITS 12
+#else
 #define TBHASHBITS 10
+#endif
 
 struct TBHashEntry;
 struct PairsData;

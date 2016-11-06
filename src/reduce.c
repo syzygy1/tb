@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -59,7 +59,7 @@ void save_table(ubyte *table, char color)
       v[BASE_WIN + i] = 1 + (i - 3);
     v[BASE_WIN + DRAW_RULE + 1] = DRAW_RULE - 1;
     // should we save THREAT_CWIN1/2 (separately) ?
-    for (i = DRAW_RULE + 2; i < REDUCE_PLY; i++)
+    for (i = DRAW_RULE + 2; i < REDUCE_PLY - 1; i++)
       v[BASE_WIN + i + 2] = DRAW_RULE - 1 + (i - DRAW_RULE - 1) / 2;
     for (i = 2; i <= DRAW_RULE; i++)
       v[BASE_LOSS - i] = 255 - (i - 2);
@@ -68,7 +68,7 @@ void save_table(ubyte *table, char color)
   } else {
     for (i = 0; i < REDUCE_PLY_RED; i++) {
       v[BASE_WIN + i + 6] = 1 + ((reduce_cnt & 1) + i) / 2;
-      v[BASE_LOSS - i - 4] = 255 - ((reduce_cnt & 1) + i) / 2;
+      v[BASE_LOSS - i - 4] = 255 - ((reduce_cnt & 1) + i + 1) / 2;
     }
   }
 #endif
@@ -177,18 +177,16 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   int verify_ok = 1;
   for (i = 0; i < 256; i++)
     if (stats[i] != stats2[i] && i != map->max_num) {
-      printf("stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
+      fprintf(stderr, "stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
 		    i, stats[i], i, stats2[i]);
       int j;
       for (j = 0; j < 4; j++)
-	printf("map[%d][%d]=%d\n", j, i, map->map[j][i]);
+	fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
       verify_ok = 0;
     }
 
-  if (!verify_ok) {
-    fprintf(stderr, "Verification of reconstructed table failed.\n");
+  if (!verify_ok)
     exit(1);
-  }
 }
 
 void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
@@ -221,8 +219,9 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
   v[THREAT_WIN] = v[BASE_WIN + 4] = v[THREAT_DRAW] = num;
   for (i = 0; i <= REDUCE_PLY_RED; i++) {
     v[BASE_WIN + i + 6] = inv_map[2][(reduce_cnt + i) / 2];
-    v[BASE_LOSS - i - 4] = inv_map[3][(reduce_cnt + i) / 2];
+    v[BASE_LOSS - i - 4] = inv_map[3][(reduce_cnt + i + 1) / 2];
   }
+  v[BASE_WIN + i + 6] = inv_map[2][(reduce_cnt + i) / 2];
 #endif
 
   transform_v = v;
@@ -276,7 +275,7 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
       else
 	for (i = 2; i <= DRAW_RULE; i++)
 	  v[255 - (i - 2)] = inv_map[1][(i - 1) / 2];
-      for (i = DRAW_RULE + 1; i < REDUCE_PLY; i++) {
+      for (i = DRAW_RULE + 1; i < REDUCE_PLY; i += 2) {
 	v[DRAW_RULE - 1 + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
 	v[254 - (DRAW_RULE - 2) - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
       }
@@ -284,7 +283,7 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
     } else {
       for (i = 0; i < REDUCE_PLY_RED; i += 2) {
 	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i) / 2] = inv_map[3][(red_cnt + i) / 2];
+	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -373,14 +372,15 @@ void reduce_tables(void)
     v[THREAT_CWIN1] = BASE_WIN + 4;
     v[THREAT_CWIN2] = BASE_WIN + 4;
     v[BASE_WIN + DRAW_RULE + 1] = BASE_WIN + 5;
-    for (i = DRAW_RULE + 2; i < REDUCE_PLY; i++)
+    for (i = DRAW_RULE + 2; i < REDUCE_PLY - 1; i++)
       v[BASE_WIN + i + 2] = BASE_WIN + 5;
     for (i = 2; i <= DRAW_RULE; i++)
       v[BASE_LOSS - i] = BASE_LOSS - 2;
     for (; i < REDUCE_PLY; i++)
       v[BASE_LOSS - i] = BASE_LOSS - 3;
-    v[BASE_WIN + REDUCE_PLY + 2] = BASE_WIN + 6;
-    v[BASE_WIN + REDUCE_PLY + 3] = BASE_WIN + 7;
+    v[BASE_WIN + REDUCE_PLY + 1] = BASE_WIN + 6;
+    v[BASE_WIN + REDUCE_PLY + 2] = BASE_WIN + 7;
+    v[BASE_WIN + REDUCE_PLY + 3] = BASE_WIN + 8;
     v[BASE_LOSS - REDUCE_PLY] = BASE_LOSS - 4;
   } else {
     v[BASE_WIN + 3] = BASE_WIN + 3;
@@ -394,6 +394,7 @@ void reduce_tables(void)
     }
     v[BASE_WIN + REDUCE_PLY_RED + 6] = BASE_WIN + 6;
     v[BASE_WIN + REDUCE_PLY_RED + 7] = BASE_WIN + 7;
+    v[BASE_WIN + REDUCE_PLY_RED + 8] = BASE_WIN + 8;
     v[BASE_LOSS - REDUCE_PLY_RED - 4] = BASE_LOSS - 4;
   }
 #endif

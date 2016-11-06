@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -155,7 +155,7 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
     } else {
       for (j = 0; j < n; j++) {
 	total_stats[1 + sval + j] += stats[CAPT_CWIN_RED + j + 2];
-	total_stats[STAT_MATE - 1 - sval - j - 1] += stats[LOSS_IN_ONE - j - 1];
+	total_stats[STAT_MATE - sval - j - 2] += stats[LOSS_IN_ONE - j - 1];
       }
     }
   }
@@ -167,9 +167,9 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       total_stats[1] += stats[STALE_WIN + 1];
       for (j = 2; j <= DRAW_RULE + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j];
-      for (; j < REDUCE_PLY; j++)
+      for (; j < n + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j + 2];
-      for (j = 0; j < REDUCE_PLY; j++)
+      for (j = 0; j < n + 2; j++)
 	total_stats[STAT_MATE - j] += stats[BASE_LOSS - j];
       total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
       total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN];
@@ -182,8 +182,8 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       total_stats[STAT_THREAT_CWIN1] += stats[THREAT_CWIN1];
     } else {
       for (j = 0; j < n; j++) {
-	total_stats[sval + j] += stats[BASE_CWIN_RED + 1 + j];
-	total_stats[STAT_MATE - sval - j] += stats[BASE_CLOSS_RED -1 - j];
+	total_stats[1 + sval + j] += stats[BASE_CWIN_RED + 1 + j];
+	total_stats[STAT_MATE - sval - j - 2] += stats[BASE_CLOSS_RED - 1 - j];
       }
     }
   }
@@ -248,7 +248,7 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
     if (local == 0)
       j = (i == DRAW_RULE + 1) ? BASE_WIN + i : BASE_WIN + i + 2;
     else
-      j = BASE_CWIN_RED + i + 1 - sval;
+      j = BASE_CWIN_RED + i - sval;
 #endif
     if (wtm) {
       if (i > lcw_ply) {
@@ -274,7 +274,7 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
     if (local == 0)
       j = BASE_LOSS - i;
     else
-      j = BASE_CLOSS_RED - 1 - i + sval;
+      j = BASE_CLOSS_RED - i + 1 + sval;
 #endif
     if (wtm) {
       if (i > lcb_ply) {

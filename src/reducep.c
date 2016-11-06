@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -76,14 +76,14 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
     for (i = 0; i <= DRAW_RULE; i++)
       v[BASE_LOSS - i] = 255 - i;
     v[BASE_WIN + DRAW_RULE + 1] = 1 + DRAW_RULE + 1;
-    for (i = DRAW_RULE + 2; i < REDUCE_PLY; i++)
+    for (i = DRAW_RULE + 2; i < REDUCE_PLY - 1; i++)
       v[BASE_WIN + i + 2] = 2 + DRAW_RULE + (i - DRAW_RULE - 1) / 2;
     for (i = DRAW_RULE + 1; i < REDUCE_PLY; i++)
       v[BASE_LOSS - i] = 255 - DRAW_RULE - 1 - (i - DRAW_RULE - 1) / 2;
   } else {
     for (i = 0; i < REDUCE_PLY_RED; i++) {
       v[BASE_CWIN_RED + i + 1] = 1 + ((reduce_cnt[local - 1] & 1) + i) / 2;
-      v[BASE_CLOSS_RED - i - 1] = 255 - ((reduce_cnt[local - 1] & 1) + i) / 2;
+      v[BASE_CLOSS_RED - i - 1] = 255 - ((reduce_cnt[local - 1] & 1) + i + 1) / 2;
     }
   }
 #endif
@@ -176,18 +176,16 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   int verify_ok = 1;
   for (i = 0; i < 256; i++)
     if (stats[i] != stats2[i] && i != map->max_num) {
-      printf("stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
+      fprintf(stderr, "stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
 		    i, stats[i], i, stats2[i]);
       int j;
       for (j = 0; j < 4; j++)
-	printf("map[%d][%d]=%d\n", j, i, map->map[j][i]);
+	fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
       verify_ok = 0;
     }
 
-  if (!verify_ok) {
-    fprintf(stderr, "Verification of reconstructed table failed.\n");
+  if (!verify_ok)
     exit(1);
-  }
 }
 
 void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
@@ -222,8 +220,9 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
 // FIXME: add THREAT_CLOSS
   for (i = 0; i <= REDUCE_PLY_RED; i++) {
     v[BASE_CWIN_RED + i + 1] = inv_map[2][(reduce_cnt[num_saves - 1] + i) / 2];
-    v[BASE_CLOSS_RED - i - 1] = inv_map[3][(reduce_cnt[num_saves - 1] + i) / 2];
+    v[BASE_CLOSS_RED - i - 1] = inv_map[3][(reduce_cnt[num_saves - 1] + i + 1) / 2];
   }
+  v[BASE_CWIN_RED + i + 1] = inv_map[2][(reduce_cnt[num_saves -1] + i) / 2];
 #endif
 
   begin = 0;
@@ -281,15 +280,15 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
       else
 	for (i = 1; i <= DRAW_RULE; i++)
 	  v[255 - i] = inv_map[1][(i - 1) / 2];
-      for (i = DRAW_RULE + 1; i < REDUCE_PLY; i++) {
+      for (i = DRAW_RULE + 1; i < REDUCE_PLY; i += 2) {
 	v[2 + DRAW_RULE + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
-	v[255 - DRAW_RULE - 1 - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
+	v[254 - DRAW_RULE - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
       }
       red_cnt = REDUCE_PLY - 1 - DRAW_RULE;
     } else {
       for (i = 0; i < REDUCE_PLY_RED; i += 2) {
 	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i) / 2] = inv_map[3][(red_cnt + i) / 2];
+	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -396,14 +395,15 @@ void reduce_tables(int local)
     v[THREAT_CWIN1] = THREAT_CWIN_RED;
     v[THREAT_CWIN2] = THREAT_CWIN_RED;
     v[BASE_WIN + DRAW_RULE + 1] = BASE_CWIN_RED;
-    for (i = DRAW_RULE + 2; i < REDUCE_PLY; i++)
+    for (i = DRAW_RULE + 2; i < REDUCE_PLY - 1; i++)
       v[BASE_WIN + i + 2] = BASE_CWIN_RED;
     for (i = 0; i <= DRAW_RULE; i++)
       v[BASE_LOSS - i] = BASE_LOSS_RED;
     for (; i < REDUCE_PLY; i++)
       v[BASE_LOSS - i] = BASE_CLOSS_RED;
-    v[BASE_WIN + REDUCE_PLY + 2] = BASE_CWIN_RED + 1;
-    v[BASE_WIN + REDUCE_PLY + 3] = BASE_CWIN_RED + 2;
+    v[BASE_WIN + REDUCE_PLY + 1] = BASE_CWIN_RED + 1;
+    v[BASE_WIN + REDUCE_PLY + 2] = BASE_CWIN_RED + 2;
+    v[BASE_WIN + REDUCE_PLY + 3] = BASE_CWIN_RED + 3;
     v[BASE_LOSS - REDUCE_PLY] = BASE_CLOSS_RED - 1;
   } else {
     v[THREAT_WIN_RED] = THREAT_WIN_RED;
@@ -418,6 +418,7 @@ void reduce_tables(int local)
     }
     v[BASE_CWIN_RED + REDUCE_PLY_RED + 1] = BASE_CWIN_RED + 1;
     v[BASE_CWIN_RED + REDUCE_PLY_RED + 2] = BASE_CWIN_RED + 2;
+    v[BASE_CWIN_RED + REDUCE_PLY_RED + 3] = BASE_CWIN_RED + 3;
     v[BASE_CLOSS_RED - REDUCE_PLY_RED - 1] = BASE_CLOSS_RED - 1;
   }
 #endif

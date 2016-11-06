@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2016 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -873,6 +873,8 @@ int main(int argc, char **argv)
     if (pt[i] == BKING)
       black_king = i;
 #else
+#ifndef GIVEAWAY
+  // FICS rules (if stalemate, the player with less material wins)
   int stalemate = 0;
   for (i = 0; i < numpcs; i++)
     stalemate += (pt[i] & 0x08) ? 1 : -1;
@@ -884,6 +886,10 @@ int main(int argc, char **argv)
     stalemate_b = STALE_WIN;
   } else
     stalemate_w = stalemate_b = UNKNOWN; // should be OK
+#else
+  // international rules (stalemated player wins)
+  stalemate_w = stalemate_b = STALE_WIN;
+#endif
 
   last_w = -1;
   j = 0;
