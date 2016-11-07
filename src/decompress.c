@@ -140,9 +140,9 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64
   fread(data + 2, 1, 10, F);
   int blocksize = data[1];
   int idxbits = data[2];
-  int real_num_blocks = data[4] | (data[5] << 8)
+  uint32 real_num_blocks = data[4] | (data[5] << 8)
 			  | (data[6] << 16) | (data[7] << 24);
-  int num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
@@ -456,7 +456,7 @@ static void decompress_worker(struct thread_data *thread)
   long64 idx2 = (1ULL << (d->idxbits - 1)) + (((long64)mainidx) << d->idxbits);
   if (litidx > 0) {
     idx += d->sizetable[block++] + 1 - litidx;
-    if (idx >= idx2) {
+    while (idx >= idx2) {
       idx2 += 1ULL << d->idxbits;
       mainidx++;
     }
