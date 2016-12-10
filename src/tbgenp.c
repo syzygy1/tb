@@ -614,8 +614,8 @@ void prepare_dtz_map(ubyte *v, struct dtz_map *map)
     v[BASE_WIN + DRAW_RULE + 1] = inv_map[2][0];
     v[BASE_LOSS - DRAW_RULE - 1] = inv_map[3][0];
     for (i = DRAW_RULE + 2; i <= REDUCE_PLY; i++) {
-      v[BASE_WIN + i + 2] = inv_map[2][(i - 1) / 2];
-      v[BASE_LOSS - i] = inv_map[3][(i - 1) / 2];
+      v[BASE_WIN + i + 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
+      v[BASE_LOSS - i] = inv_map[3][(i - DRAW_RULE - 1) / 2];
     }
 #endif
   } else {
