@@ -366,7 +366,7 @@ void init_tablebases(char *path)
   printf("Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
 }
 
-static const char offdiag[] = {
+static const signed char offdiag[] = {
   0,-1,-1,-1,-1,-1,-1,-1,
   1, 0,-1,-1,-1,-1,-1,-1,
   1, 1, 0,-1,-1,-1,-1,-1,

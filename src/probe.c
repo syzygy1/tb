@@ -392,7 +392,7 @@ void init_tablebases(void)
   init_indices();
 }
 
-static const char offdiag[] = {
+static const signed char offdiag[] = {
   0,-1,-1,-1,-1,-1,-1,-1,
   1, 0,-1,-1,-1,-1,-1,-1,
   1, 1, 0,-1,-1,-1,-1,-1,
