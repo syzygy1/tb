@@ -141,7 +141,7 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats[j] += thread_data[i].stats[j];
 
   stats2[inv_map[0][0]] = tot_stats[0];
-  stats2[inv_map[1][0]] = tot_stats[1023];
+  stats2[inv_map[1][0]] = tot_stats[STAT_MATE];
 #ifndef SUICIDE
   if (map->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
@@ -151,10 +151,10 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
   if (map->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i]] += tot_stats[STAT_MATE - 1 - i];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i / 2]] += tot_stats[STAT_MATE - 1 - i];
 #else
   if (map->ply_accurate_win)
     for (i = 2; i < DRAW_RULE; i++)
@@ -164,14 +164,14 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
   if (map->ply_accurate_loss)
     for (i = 1; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i]] += tot_stats[STAT_MATE - 1 - i];
   else
     for (i = 1; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i / 2]] += tot_stats[STAT_MATE - 1 - i];
 #endif
   for (i = DRAW_RULE + 1; i < MAX_PLY; i++) {
     stats2[inv_map[2][(i - DRAW_RULE - 1) / 2]] += tot_stats[i];
-    stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[1023 - i];
+    stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[STAT_MATE - i];
   }
 
   int verify_ok = 1;

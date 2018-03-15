@@ -20,7 +20,7 @@
 
 #define MAX_PIECES 8
 
-#define MAX_STATS 1536
+#define MAX_STATS 4096
 
 extern int total_work;
 extern struct thread_data thread_data[];
@@ -477,7 +477,7 @@ int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
   int num;
 
   num = 0;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < (MAX_PLY - DRAW_RULE) / 2; i++)
     if (freq[i])
       map[num++] = i;
 
@@ -497,7 +497,7 @@ int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
 void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int pa_l)
 {
   int i, j;
-  long64 freq[4][256];
+  long64 freq[4][(MAX_PLY - DRAW_RULE) / 2];
   ubyte (*map)[256] = dtzmap->map;
   ubyte (*inv_map)[256] = dtzmap->inv_map;
 
@@ -506,7 +506,7 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
   dtzmap->ply_accurate_loss = pa_l;
 
   for (j = 0; j < 4; j++)
-    for (i = 0; i < 256; i++)
+    for (i = 0; i < (MAX_PLY - DRAW_RULE) / 2; i++)
       freq[j][i] = 0;
 
   freq[0][0] = stats[0];
@@ -850,7 +850,7 @@ int main(int argc, char **argv)
     pw[i] = (pt[i] == WPAWN) ? 0x38 : 0x00;
   pw_mask = 0;
   for (i = 1; i < numpcs; i++)
-    pw_mask |= pw[i] << (6 * (numpcs - i - 1));
+    pw_mask |= ((long64)pw[i]) << (6 * (numpcs - i - 1));
   pw_pawnmask = pw_mask >> (6 * (numpcs - numpawns));
 
   idx_mask1[numpcs - 1] = 0xffffffffffffffc0ULL;
