@@ -8,7 +8,13 @@
 #define REDUCE_PLY 122
 #define REDUCE_PLY_RED 119
 
-#define MAX_PLY 509
+#define STAT_DRAW (MAX_STATS/2)
+#define STAT_CAPT_CWIN (STAT_DRAW - 2)
+#define STAT_CAPT_WIN (STAT_DRAW - 1)
+#define STAT_CAPT_DRAW (STAT_DRAW + 1)
+#define STAT_MATE (MAX_STATS - 1)
+
+#define MAX_PLY (STAT_DRAW - 3)
 #define MIN_PLY_WIN 1
 #define MIN_PLY_LOSS 0
 
@@ -175,7 +181,7 @@ static void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -200,7 +206,7 @@ static void calc_mates(struct thread_data *thread)
   bitboard occ, bb;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   int p[MAX_PIECES];
   long64 end = thread->end;
 

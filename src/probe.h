@@ -54,7 +54,7 @@
 #define DTZSUFFIX ".rtbz"
 #define WDLDIR "RTBWDIR"
 #define DTZDIR "RTBZDIR"
-#define TBPIECES 6
+#define TBPIECES 7
 #define STATSDIR "RTBSTATSDIR"
 #define LOGFILE "rtblog.txt"
 #endif
@@ -104,7 +104,7 @@ struct TBEntry_piece {
   ubyte has_pawns;
   ubyte enc_type;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  long64 factor[2][TBPIECES];
   ubyte pieces[2][TBPIECES];
   ubyte norm[2][TBPIECES];
   ubyte order[2];
@@ -120,7 +120,7 @@ struct TBEntry_pawn {
   ubyte pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    long64 factor[2][TBPIECES];
     ubyte pieces[2][TBPIECES];
     ubyte norm[2][TBPIECES];
     ubyte order[2];

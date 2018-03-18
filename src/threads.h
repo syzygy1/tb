@@ -26,7 +26,7 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-#define MAX_THREADS 12
+#define MAX_THREADS 128
 
 struct thread_data {
   long64 begin;

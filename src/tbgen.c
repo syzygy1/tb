@@ -19,6 +19,8 @@
 
 #define MAX_PIECES 8
 
+#define MAX_STATS 4096
+
 void transform_table(struct thread_data *thread);
 
 extern int total_work;
@@ -67,8 +69,8 @@ static int to_fix_w, to_fix_b;
 int threat_dc, wdl_threat_win, wdl_threat_cwin, wdl_threat_draw;
 #endif
 
-static long64 total_stats_w[1024];
-static long64 total_stats_b[1024];
+static long64 total_stats_w[MAX_STATS];
+static long64 total_stats_b[MAX_STATS];
 
 ubyte *transform_v;
 ubyte *transform_tbl;
@@ -211,7 +213,7 @@ void test_closs(long64 *stats, ubyte *table, int to_fix)
     run_threaded(tc_loop, work_g, 0);
   } else {
     for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
-      if (stats[1023 - i]) break;
+      if (stats[STAT_MATE - i]) break;
     if (i <= MAX_PLY)
       tc_closs = 1;
   }
@@ -236,28 +238,28 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
     if (stats[i]) break;
   if (i <= MAX_PLY)
     vals[3] = 1;
-  if (stats[512])
+  if (stats[STAT_DRAW])
     vals[2] = 1;
   if (tc_closs)
     vals[1] = 1;
   for (i = 0; i <= DRAW_RULE; i++)
-    if (stats[1023 - i]) break;
+    if (stats[STAT_MATE - i]) break;
   if (i <= DRAW_RULE)
     vals[0] = 1;
 #else
   for (i = MIN_PLY_WIN; i <= DRAW_RULE; i++)
     if (stats[i]) break;
-  vals[4] = (i <= DRAW_RULE) || (!threat_dc && stats[2]);
+  vals[4] = (i <= DRAW_RULE) || (!threat_dc && stats[STAT_THREAT_WIN]);
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[i]) break;
-  vals[3] = (i <= MAX_PLY) || (!threat_dc && (stats[509] + stats[510] != 0));
-  vals[2] = (stats[512] != 0) || (!threat_dc && stats[514] != 0);
+  vals[3] = (i <= MAX_PLY) || (!threat_dc && (stats[STAT_THREAT_CWIN1] + stats[STAT_THREAT_CWIN2] != 0));
+  vals[2] = (stats[STAT_DRAW] != 0) || (!threat_dc && stats[STAT_THREAT_DRAW] != 0);
   // FIXME: probably should scan the table for non-CAPT_CLOSS cursed losses
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
-    if (stats[1023 - i]) break;
+    if (stats[STAT_MATE - i]) break;
   vals[1] = (i <= MAX_PLY);
   for (i = MIN_PLY_LOSS; i <= DRAW_RULE; i++)
-    if (stats[1023 - i]) break;
+    if (stats[STAT_MATE - i]) break;
   vals[0] = (i <= DRAW_RULE);
 #endif
 
@@ -265,13 +267,13 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
     dc[i] = 0;
 #ifndef SUICIDE
   dc[3] = 1;
-  dc[2] = (stats[510] != 0); // CAPT_CWIN
-  dc[1] = (stats[513] != 0); // CAPT_DRAW
+  dc[2] = (stats[STAT_CAPT_CWIN] != 0); // CAPT_CWIN
+  dc[1] = (stats[STAT_CAPT_DRAW] != 0); // CAPT_DRAW
   dc[0] = tc_capt_closs;
 #else
   dc[3] = 1;
-  dc[2] = threat_dc && (stats[509] + stats[510] != 0); // THREAT_CWIN
-  dc[1] = threat_dc && (stats[514] != 0); // THREAT_DRAW
+  dc[2] = threat_dc && (stats[STAT_THREAT_CWIN2] + stats[STAT_THREAT_CWIN1] != 0); // THREAT_CWIN
+  dc[1] = threat_dc && (stats[STAT_THREAT_DRAW] != 0); // THREAT_DRAW
 //  dc[0] = (stats[515] != 0); // THREAT_CLOSS
   dc[0] = 0;
 #endif
@@ -355,7 +357,7 @@ int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
   int num;
 
   num = 0;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < (MAX_PLY - DRAW_RULE) / 2; i++)
     if (freq[i])
       map[num++] = i;
 
@@ -375,7 +377,7 @@ int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
 void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int pa_l)
 {
   int i, j;
-  long64 freq[4][256];
+  long64 freq[4][(MAX_PLY - DRAW_RULE) / 2];
   ubyte (*map)[256] = dtzmap->map;
   ubyte (*inv_map)[256] = dtzmap->inv_map;
 
@@ -384,7 +386,7 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
   dtzmap->ply_accurate_loss = pa_l;
 
   for (j = 0; j < 4; j++)
-    for (i = 0; i < 256; i++)
+    for (i = 0; i < (MAX_PLY - DRAW_RULE) / 2; i++)
       freq[j][i] = 0;
 
   freq[0][0] = stats[0];
@@ -405,21 +407,21 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
 #endif
   dtzmap->num[0] = sort_list(freq[0], map[0], inv_map[0]);
 
-  freq[1][0] = stats[1023];
+  freq[1][0] = stats[STAT_MATE];
 #ifndef SUICIDE
   if (dtzmap->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      freq[1][i] += stats[1023 - i - 1];
+      freq[1][i] += stats[STAT_MATE - i - 1];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      freq[1][i / 2] += stats[1023 - i - 1];
+      freq[1][i / 2] += stats[STAT_MATE - i - 1];
 #else
   if (dtzmap->ply_accurate_loss)
     for (i = 1; i < DRAW_RULE; i++)
-      freq[1][i] += stats[1023 - i - 1];
+      freq[1][i] += stats[STAT_MATE - i - 1];
   else
     for (i = 1; i < DRAW_RULE; i++)
-      freq[1][i / 2] += stats[1023 - i - 1];
+      freq[1][i / 2] += stats[STAT_MATE - i - 1];
 #endif
   dtzmap->num[1] = sort_list(freq[1], map[1], inv_map[1]);
 
@@ -428,7 +430,7 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
   dtzmap->num[2] = sort_list(freq[2], map[2], inv_map[2]);
 
   for (i = DRAW_RULE; i < MAX_PLY; i++)
-    freq[3][(i - DRAW_RULE) / 2] += stats[1023 - i - 1];
+    freq[3][(i - DRAW_RULE) / 2] += stats[STAT_MATE - i - 1];
   dtzmap->num[3] = sort_list(freq[3], map[3], inv_map[3]);
 
   int num = 1;
@@ -831,11 +833,11 @@ int main(int argc, char **argv)
     exit(0);
 
   ply_accurate_w = 0;
-  if (total_stats_w[DRAW_RULE] || total_stats_b[1023 - DRAW_RULE])
+  if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
     ply_accurate_w = 1;
 
   ply_accurate_b = 0;
-  if (total_stats_b[DRAW_RULE] || total_stats_w[1023 - DRAW_RULE])
+  if (total_stats_b[DRAW_RULE] || total_stats_w[STAT_MATE - DRAW_RULE])
     ply_accurate_b = 1;
 
   ubyte *tb_table;

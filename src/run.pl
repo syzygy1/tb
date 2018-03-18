@@ -4,12 +4,12 @@ $ENV{'RTBWDIR'} = '.';
 
 use Getopt::Long;
 
-$threads = 1;
+$threads = 128;
 $generate = '';
 $verify = '';
 $disk = '';
-$min = 3;
-$max = 4;
+$min = 7;
+$max = 7;
 GetOptions('threads=i' => \$threads,
 	   'generate' => \$generate,
 	   'verify' => \$verify,
@@ -22,23 +22,23 @@ sub Process {
   my $len = length($tb) - 1;
   if ($len < $min || $len > $max) { return; }
   $dopt = "";
-  if ($disk && $len == 6) {
+  if ($disk && $len == 7) {
     $dopt = "-d ";
   }
   if ($generate && !-e $tb.".rtbz") {
     print "Generating $tb\n";
     if ($tb !~ /.*P.*/) {
-      system "rtbgen $dopt-t $threads --stats $tb";
+      system "./rtbgen $dopt-t $threads --stats $tb";
     } else {
-      system "rtbgenp $dopt-t $threads --stats $tb";
+      system "./rtbgenp $dopt-t $threads --stats $tb";
     }
   }
-  if ($verify) {
+  if ($verify && -e $tb.".rtbz") {
     printf "Verifying $tb\n";
     if ($tb !~ /.*P.*/) {
-      system "rtbver -t $threads --log $tb";
+      system "./rtbver -t $threads --log $tb";
     } else {
-      system "rtbverp -t $threads --log $tb";
+      system "./rtbverp -t $threads --log $tb";
     }
   }
 }
@@ -138,3 +138,56 @@ for ($i = 0; $i < 5; ++$i) {
   }
 }
 
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = $k; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = $l; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c.$d.$e."v"."K";
+          Process($tb);
+        }
+      }
+    }
+  }
+}
+
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = $k; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = 0; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c.$d."v"."K".$e;
+          Process($tb);
+        }
+      }
+    }
+  }
+}
+
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = 0; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = $l; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c."v"."K".$d.$e;
+          Process($tb);
+        }
+      }
+    }
+  }
+}

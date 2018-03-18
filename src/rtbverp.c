@@ -688,7 +688,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -712,7 +712,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -771,7 +771,7 @@ void calc_broken_pp(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ, bb;
   long64 end = thread->end;
 //  int p[MAX_PIECES];
@@ -853,7 +853,7 @@ void calc_broken_pp(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -926,7 +926,7 @@ void calc_mates(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   bitboard occ;
   int *p = thread->p;
   long64 end = thread->end;
@@ -1221,7 +1221,7 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitbo
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
-  assume(numpcs >= 3 && numpcs <= 6);
+  assume(numpcs >= 3 && numpcs <= 7);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -1316,14 +1316,14 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->file[file].norm[load_bside];
-  int *factor = load_entry->file[file].factor[load_bside];
+  long64 *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   v1_p = 0; // suppress bogus warning
@@ -1365,14 +1365,14 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->file[file].norm[load_bside];
-  int *factor = load_entry->file[file].factor[load_bside];
+  long64 *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {
@@ -1395,14 +1395,14 @@ void load_dtz(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->file[file].norm[load_bside];
-  int *factor = load_entry->file[file].factor[load_bside];
+  long64 *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {
@@ -1427,14 +1427,14 @@ void load_dtz_mapped(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->file[file].norm[load_bside];
-  int *factor = load_entry->file[file].factor[load_bside];
+  long64 *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
   ubyte (*map)[256] = load_map;
 
@@ -1565,7 +1565,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bit
   int i, m, v;
   int pcs[MAX_PIECES];
   int pt2[MAX_PIECES];
-  assume(numpcs >= 3 && numpcs <= 6);
+  assume(numpcs >= 3 && numpcs <= 7);
 
   occ ^= bit[sq] ^ bit[ep] ^ bit[p[k]];
   p[l] = ep;
@@ -1591,7 +1591,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1670,7 +1670,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1828,14 +1828,14 @@ void wdl_load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= 7);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->file[file].norm[load_bside];
-  int *factor = load_entry->file[file].factor[load_bside];
+  long64 *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {

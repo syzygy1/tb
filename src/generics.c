@@ -204,7 +204,7 @@ static long64 __inline__ MakeMove1(long64 idx, int bk)
 
 static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
 {
-  return idx | (sq << shift[k]);
+  return idx | (((long64)sq) << shift[k]);
 }
 
 #define CHECK_DIAG int flag = idx < diagonal
@@ -351,7 +351,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= 7); \
   long64 end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
@@ -364,7 +364,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= 7); \
   long64 end = thread->end >> 6
 
 #define LOOP_CAPTS \
@@ -372,22 +372,22 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 
 #define LOOP_WHITE_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | (p[0] << shift[i]); \
+    long64 idx3 = idx2 | (((long64)p[0]) << shift[i]); \
     func##_pivot0(table_w, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | (((long64)p[k]) << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 
 #define LOOP_BLACK_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | (p[1] << shift[i]); \
+    long64 idx3 = idx2 | (((long64)p[1]) << shift[i]); \
     func##_pivot1(table_b, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | (((long64)p[k]) << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -398,7 +398,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= 7); \
   long64 end = thread->end
 
 #define LOOP_CAPTS_PIVOT1 \
@@ -471,7 +471,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   bitboard occ; \
   int i; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= 7); \
   int p[MAX_PIECES]; \
   long64 end = thread->end;
 

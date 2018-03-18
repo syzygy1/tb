@@ -39,9 +39,9 @@
 #define TBMAX_PAWN 256
 #define HSHMAX 8
 #else
-#define TBMAX_PIECE 254
-#define TBMAX_PAWN 256
-#define HSHMAX 8
+#define TBMAX_PIECE 650
+#define TBMAX_PAWN 861
+#define HSHMAX 12
 #endif
 
 #if defined(SUICIDE) || defined(GIVEAWAY) || defined(ATOMIC)
@@ -228,9 +228,9 @@ static void init_tb(char *str)
 void init_tablebases(void)
 {
   char str[16], *dirptr;
-  int i, j, k, l;
+  int i, j, k, l, m;
 #ifdef SUICIDE
-  int m, n;
+  int n;
 #endif
 
   LOCK_INIT(TB_mutex);
@@ -385,6 +385,32 @@ void init_tablebases(void)
 	  sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
 	  init_tb(str);
 	}
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = l; m < 6; m++) {
+          sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+          init_tb(str);
+        }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = 1; m < 6; m++) {
+          sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+          init_tb(str);
+        }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = 1; l < 6; l++)
+          for (m = l; m < 6; m++) {
+          sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+          init_tb(str);
+        }
 #endif
 
   printf("Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
@@ -706,10 +732,10 @@ ubyte invmtwist[64];
 
 static int binomial[5][64];
 static int pawnidx[5][24];
-static int pfactor[5][4];
+static long64 pfactor[5][4];
 #ifdef CONNECTED_KINGS
 static int multidx[5][10];
-static int mfactor[5];
+static long64 mfactor[5];
 #endif
 
 void init_indices(void)
@@ -794,7 +820,7 @@ void init_indices(void)
 
 #ifndef CONNECTED_KINGS
 long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor)
+	int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -877,7 +903,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 }
 #else
 long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor)
+	int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -997,7 +1023,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 #endif
 
 #if 0
-long64 encode_piece(struct TBEntry *ptr, int *pos, int *factor)
+long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -1124,7 +1150,7 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, int *factor)
 
 #if 0
 // KKpiece, not pieceKK
-long64 encode_K3(struct TBEntry *ptr, int *pos, int *factor)
+long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -1258,11 +1284,11 @@ void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm)
 }
 
 void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor, int *restrict order,
+	int *restrict pos, long64 *restrict factor, int *restrict order,
 	long64 idx)
 {
   int i, j, k;
-  int p, q;
+  long64 p, q;
   int sub[TBPIECES];
   int sort[TBPIECES];
   int n = ptr->num;
@@ -1518,7 +1544,7 @@ int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
+long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1577,7 +1603,7 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
 }
 
 #ifdef VERIFICATION
-long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
+long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1641,11 +1667,11 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
 #endif
 
 void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
-      int *restrict pos, int *restrict factor, int *restrict order,
+      int *restrict pos, long64 *restrict factor, int *restrict order,
       long64 idx, int file)
 {
-  int i, j, k;
-  int p, q, t;
+  int i, j, k, t;
+  long64 p, q;
   int sub[TBPIECES];
   int sort[TBPIECES];
   int n = ptr->num;
@@ -1771,7 +1797,7 @@ int subfactor(int k, int n)
   return f / l;
 }
 
-long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type)
+long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type)
 {
   int i, k, n;
   long64 f;
@@ -1806,7 +1832,7 @@ long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte en
   return f;
 }
 
-long64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file)
+long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file)
 {
   int i, k, n;
   long64 f;
