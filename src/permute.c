@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2017, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -17,13 +17,13 @@
 #include "threads.h"
 #include "probe.h"
 
-long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type);
-long64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file);
+long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type);
+long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file);
 void calc_order_piece(int num, int ord, int *order, ubyte *norm);
 void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm);
 
-static long64 *restrict work_convert = NULL;
-static long64 *restrict work_est = NULL;
+long64 *restrict work_convert = NULL;
+long64 *restrict work_est = NULL;
 
 extern int total_work;
 extern int numthreads;
@@ -40,33 +40,38 @@ extern int shift[];
 char name[64];
 long64 tb_size;
 
-static struct TBEntry_piece entry_piece;
-static struct TBEntry_pawn entry_pawn;
+struct TBEntry_piece entry_piece;
+struct TBEntry_pawn entry_pawn;
 
-static ubyte order_list[720];
-static ubyte order2_list[720];
-
-static ubyte piece_perm_list[720][TBPIECES];
-static ubyte pidx_list[720][TBPIECES];
-
-static int num_types, num_type_perms;
-static ubyte type[TBPIECES];
-static ubyte type_perm_list[720][TBPIECES];
-
-static long64 compest[720];
-
+#if TBPIECES <= 6
+#define MAX_PERMS 720
 #define MAX_CANDS 30
-static int trylist[MAX_CANDS];
+#elif TBPIECES == 7
+#define MAX_PERMS 5040
+#define MAX_CANDS 42
+#else
+#error unsupported
+#endif
 
-extern int numpawns;
-extern int numpcs;
+ubyte order_list[MAX_PERMS];
+ubyte order2_list[MAX_PERMS];
+
+ubyte piece_perm_list[MAX_PERMS][TBPIECES];
+ubyte pidx_list[MAX_PERMS][TBPIECES];
+
+int num_types, num_type_perms;
+ubyte type[TBPIECES];
+ubyte type_perm_list[MAX_PERMS][TBPIECES];
+
+long64 compest[MAX_PERMS];
+
+int trylist[MAX_CANDS];
+
+int numpawns;
+int numpcs;
 
 static int pw[TBPIECES];
-static int cmp[16];
-
-#if TBPIECES > 6
-#error number of allocated permutations too small
-#endif
+int cmp[16];
 
 void setup_pieces(struct TBEntry_piece *ptr, unsigned char *data);
 
@@ -185,7 +190,7 @@ void generate_test_list(long64 size, int n)
   }
 }
 
-static long64 mask_a1h1, mask_a1h8;
+long64 mask_a1h1, mask_a1h8;
 
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
@@ -219,10 +224,10 @@ static long64 flip0x40[] = {
   0, 0, 1, 2, 3, 4, 5, 0
 };
 
-long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor);
-void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor, int *restrict order, long64 idx);
-long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor);
-void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor, int *restrict order, long64 idx, int file);
+long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor);
+void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor, int *restrict order, long64 idx);
+long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor);
+void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor, int *restrict order, long64 idx, int file);
 
 ubyte *restrict permute_v;
 
@@ -296,10 +301,10 @@ void convert_data_piece(struct thread_data *thread)
   int sq2;
 #endif
   int n = entry_piece.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   ubyte norm[TBPIECES];
   ubyte *restrict src = convert_data.src;
   ubyte *restrict dst = convert_data.dst;
@@ -335,7 +340,7 @@ void convert_data_piece(struct thread_data *thread)
   else {
     if (mirror[sq][sq2] < 0)
       idx3 = MIRROR_A1H8(idx3);
-    idx3 |= ((long64)KK_map[sq][sq2]) << shift[1];
+    idx3 |= (long64)KK_map[sq][sq2] << shift[1];
   }
 #endif
   __builtin_prefetch(&src[idx3], 0, 3);
@@ -363,7 +368,7 @@ void convert_data_piece(struct thread_data *thread)
     else {
       if (mirror[sq][sq2] < 0)
 	idx2 = MIRROR_A1H8(idx2);
-      idx2 |= ((long64)KK_map[sq][sq2]) << shift[1];
+      idx2 |= (long64)KK_map[sq][sq2] << shift[1];
     }
 #endif
     __builtin_prefetch(&src[idx2], 0, 3);
@@ -379,10 +384,10 @@ void convert_data_pawn(struct thread_data *thread)
   long64 idx1, idx2, idx3;
   int i;
   int n = entry_pawn.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   ubyte norm[TBPIECES];
   ubyte *restrict src = convert_data.src;
   ubyte *restrict dst = convert_data.dst;
@@ -465,13 +470,13 @@ void convert_est_data_piece(struct thread_data *thread)
   ubyte *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int sq;
 #ifdef SMALL
   int sq2;
 #endif
   int pos[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   int order[TBPIECES];
   ubyte norm[TBPIECES];
 
@@ -513,7 +518,7 @@ void convert_est_data_piece(struct thread_data *thread)
 	else {
 	  if (mirror[sq][sq2] < 0)
 	    idx = MIRROR_A1H8(idx);
-	  idx |= ((long64)KK_map[sq][sq2]) << shift[1];
+	  idx |= (long64)KK_map[sq][sq2] << shift[1];
 	}
 #endif
 	__builtin_prefetch(&table[idx], 0, 3);
@@ -545,7 +550,7 @@ void convert_est_data_piece(struct thread_data *thread)
 	  else {
 	    if (mirror[sq][sq2] < 0)
 	      idx = MIRROR_A1H8(idx);
-	    idx |= ((long64)KK_map[sq][sq2]) << shift[1];
+	    idx |= (long64)KK_map[sq][sq2] << shift[1];
 	  }
 #endif
 	  __builtin_prefetch(&table[idx], 0, 3);
@@ -571,10 +576,10 @@ void convert_est_data_piece(struct thread_data *thread)
   char *restrict v = permute_v;
   long64 idx;
   int n = entry_piece.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int sq;
   int pos[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   int order[TBPIECES];
   ubyte norm[TBPIECES];
   
@@ -623,9 +628,9 @@ void convert_est_data_pawn(struct thread_data *thread)
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   int order[TBPIECES];
   ubyte norm[TBPIECES];
 
@@ -685,9 +690,9 @@ void convert_est_data_pawn(struct thread_data *thread)
   int file = est_data.file;
   long64 idx;
   int n = entry_pawn.num;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   int order[TBPIECES];
   ubyte norm[TBPIECES];
   
@@ -870,7 +875,7 @@ long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
 ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
 {
   int i, j, k, m, l;
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   int tidx[16];
 
   for (i = 0, k = 0; i < 16; i++)
@@ -1182,7 +1187,7 @@ void init_permute_pawn(int *pcs, int *pt)
 
 ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
 {
-  int factor[TBPIECES];
+  long64 factor[TBPIECES];
   ubyte norm[TBPIECES];
   int order[TBPIECES];
   set_norm_pawn(pcs, type_perm_list[0], norm, order_list[0], order2_list[0]);

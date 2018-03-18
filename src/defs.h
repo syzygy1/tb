@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -10,6 +10,16 @@
 #ifdef REGULAR
 #define SMALL
 #endif
+
+#define DRAW_RULE (2 * 50)
+
+#if TBPIECES < 7
+#define MAX_STATS 1536
+#else
+#define MAX_STATS 2560
+#endif
+
+#define MAX_VALS (((MAX_STATS / 2) - DRAW_RULE) / 2)
 
 // GIVEAWAY is a variation on SUICIDE
 #ifdef GIVEAWAY

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -124,10 +124,10 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
 
 void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
 {
-  long64 stats[256];
-  long64 stats2[256];
+  long64 stats[MAX_VALS];
+  long64 stats2[MAX_VALS];
   int i, j;
-  ubyte (*inv_map)[256] = map->inv_map;
+  ushort (*inv_map)[MAX_VALS] = map->inv_map;
 
   for (i = 0; i < 256; i++)
     stats[i] = stats2[i] = 0;
@@ -141,7 +141,7 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats[j] += thread_data[i].stats[j];
 
   stats2[inv_map[0][0]] = tot_stats[0];
-  stats2[inv_map[1][0]] = tot_stats[1023];
+  stats2[inv_map[1][0]] = tot_stats[STAT_MATE];
 #ifndef SUICIDE
   if (map->ply_accurate_win)
     for (i = 0; i < DRAW_RULE; i++)
@@ -151,10 +151,10 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
       stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
   if (map->ply_accurate_loss)
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i]] += tot_stats[STAT_MATE - 1 - i];
   else
     for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[1022 - i];
+      stats2[inv_map[1][i / 2]] += tot_stats[STAT_MATE - 1 - i];
 #else
   if (map->ply_accurate_win)
     for (i = 2; i < DRAW_RULE; i++)
@@ -171,7 +171,7 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
 #endif
   for (i = DRAW_RULE + 1; i < MAX_PLY; i++) {
     stats2[inv_map[2][(i - DRAW_RULE - 1) / 2]] += tot_stats[i];
-    stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[1023 - i];
+    stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[STAT_MATE - i];
   }
 
   int verify_ok = 1;
@@ -193,7 +193,7 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
 {
   int i, k;
   int num = map->max_num;
-  ubyte (*inv_map)[256] = map->inv_map;
+  ushort (*inv_map)[MAX_VALS] = map->inv_map;
   ubyte v[256];
 
   for (i = 0; i < 256; i++)
@@ -471,4 +471,3 @@ void load_table(ubyte *table, char color)
   fclose(F);
   unlink(name);
 }
-

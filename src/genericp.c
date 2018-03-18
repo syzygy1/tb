@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -29,7 +29,7 @@ void init_tables(void)
 
 static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 {
-  return idx | (sq << shift[k]);
+  return idx | ((long64)sq << shift[k]);
 }
 
 #define PAWN_MASK 0xff000000000000ffULL
@@ -269,7 +269,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   long64 end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
@@ -282,7 +282,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   long64 end = thread->end >> 6
 
 #ifndef SUICIDE
@@ -294,7 +294,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= TBPIECES); \
   assume(numpawns > 0); \
   int king, wtm; \
   ubyte *restrict table; \
@@ -322,7 +322,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= TBPIECES); \
   int king, opp_king, wtm; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -348,7 +348,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= 6); \
+  assume(n >= 3 && n <= TBPIECES); \
   int king; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -370,7 +370,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   int wtm; \
   ubyte *restrict table; \
   int *restrict pcs; \
@@ -394,7 +394,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   ubyte *restrict table; \
   int *restrict pcs; \
   long64 end = thread->end; \
@@ -443,7 +443,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { for (j = 0; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
-    long64 idx3 = idx2 | (p[k] << shift[i]); \
+    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -454,7 +454,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -465,7 +465,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
-    long64 idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]); \
+    long64 idx3 = idx2 | ((long64)(p[k] ^ pw[i]) << shift[i]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -476,7 +476,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]); \
+      long64 idx3 = idx2 | ((long64)(p[k] ^ pw[i]) << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
@@ -493,7 +493,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   long64 idx, idx2; \
   int i; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   bitboard occ, bb = thread->occ; \
   int *p = thread->p; \
   long64 end = begin + thread->end
@@ -505,7 +505,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   long64 idx, idx2; \
   int i; \
   int n = numpcs; \
-  assume(n >= 2 && n <= 6); \
+  assume(n >= 2 && n <= TBPIECES); \
   bitboard occ; \
   int p[MAX_PIECES]; \
   long64 end = thread->end

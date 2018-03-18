@@ -7,13 +7,14 @@
 #ifndef PROBE_H
 #define PROBE_H
 
+#define TBPIECES 7
+
 #if defined(SUICIDE)
 #if !defined(GIVEAWAY)
 #define WDLSUFFIX ".stbw"
 #define DTZSUFFIX ".stbz"
 #define WDLDIR "STBWDIR"
 #define DTZDIR "STBZDIR"
-#define TBPIECES 6
 #define STATSDIR "STBSTATSDIR"
 #define LOGFILE "stblog.txt"
 #else
@@ -21,7 +22,6 @@
 #define DTZSUFFIX ".gtbz"
 #define WDLDIR "GTBWDIR"
 #define DTZDIR "GTBZDIR"
-#define TBPIECES 6
 #define STATSDIR "GTBSTATSDIR"
 #define LOGFILE "gtblog.txt"
 #endif
@@ -30,7 +30,6 @@
 #define DTZSUFFIX ".ltbz"
 #define WDLDIR "LTBWDIR"
 #define DTZDIR "LTBZDIR"
-#define TBPIECES 6
 #define STATSDIR "LTBSTATSDIR"
 #define LOGFILE "ltblog.txt"
 #elif defined(GIVEAWAY)
@@ -38,7 +37,6 @@
 #define DTZSUFFIX ".gtbz"
 #define WDLDIR "GTBWDIR"
 #define DTZDIR "GTBZDIR"
-#define TBPIECES 6
 #define STATSDIR "GTBSTATSDIR"
 #define LOGFILE "gtblog.txt"
 #elif defined(ATOMIC)
@@ -46,7 +44,6 @@
 #define DTZSUFFIX ".atbz"
 #define WDLDIR "ATBWDIR"
 #define DTZDIR "ATBZDIR"
-#define TBPIECES 6
 #define STATSDIR "ATBSTATSDIR"
 #define LOGFILE "atblog.txt"
 #else
@@ -54,7 +51,6 @@
 #define DTZSUFFIX ".rtbz"
 #define WDLDIR "RTBWDIR"
 #define DTZDIR "RTBZDIR"
-#define TBPIECES 6
 #define STATSDIR "RTBSTATSDIR"
 #define LOGFILE "rtblog.txt"
 #endif
@@ -104,7 +100,7 @@ struct TBEntry_piece {
   ubyte has_pawns;
   ubyte enc_type;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  long64 factor[2][TBPIECES];
   ubyte pieces[2][TBPIECES];
   ubyte norm[2][TBPIECES];
   ubyte order[2];
@@ -120,7 +116,7 @@ struct TBEntry_pawn {
   ubyte pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    long64 factor[2][TBPIECES];
     ubyte pieces[2][TBPIECES];
     ubyte norm[2][TBPIECES];
     ubyte order[2];

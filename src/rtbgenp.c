@@ -4,7 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#define DRAW_RULE (2 * 50)
 #define REDUCE_PLY 121 // checked
 #define REDUCE_PLY_RED 119 // checked
 
@@ -175,7 +174,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -199,7 +198,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
   long64 end = thread->end;
   int p[MAX_PIECES];
@@ -249,7 +248,7 @@ void calc_mates(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb = thread->occ;
   int *p = thread->p;
   long64 end = begin + thread->end;
@@ -784,7 +783,7 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
-  assume(numpcs >= 3 && numpcs <= 6);
+  assume(numpcs >= 3 && numpcs <= TBPIECES);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -895,7 +894,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
   int i, m, v;
   int pcs[MAX_PIECES];
   int pt2[MAX_PIECES];
-  assume(numpcs >= 3 && numpcs <= 6);
+  assume(numpcs >= 3 && numpcs <= TBPIECES);
 
   occ ^= bit[sq] | bit[ep] | bit[p[k]];
   p[l] = ep;
@@ -942,7 +941,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1023,7 +1022,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   long64 idx, idx2;
   int i, k;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int best;
   int sq;
   bitboard occ, bb = thread->occ;
@@ -1223,7 +1222,7 @@ int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
   int pos[MAX_PIECES];
   int pcs[MAX_PIECES];
   bitboard bits;
-  assume(numpcs >= 3 && numpcs <= 6);
+  assume(numpcs >= 3 && numpcs <= TBPIECES);
 
   if (sq >= 0x08 && sq < 0x38) {
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {

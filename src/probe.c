@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -34,14 +34,16 @@
 #define TBMAX_PIECE 1260
 #define TBMAX_PAWN 1386
 #define HSHMAX 12
-#elif defined(ATOMIC)
+#else
+#if TBPIECES <= 6
 #define TBMAX_PIECE 254
 #define TBMAX_PAWN 256
 #define HSHMAX 8
 #else
-#define TBMAX_PIECE 254
-#define TBMAX_PAWN 256
-#define HSHMAX 8
+#define TBMAX_PIECE 650
+#define TBMAX_PAWN 861
+#define HSHMAX 12
+#endif
 #endif
 
 #if defined(SUICIDE) || defined(GIVEAWAY) || defined(ATOMIC)
@@ -231,6 +233,10 @@ void init_tablebases(void)
   int i, j, k, l;
 #ifdef SUICIDE
   int m, n;
+#else
+#if TBPIECES == 7
+  int m;
+#endif
 #endif
 
   LOCK_INIT(TB_mutex);
@@ -385,6 +391,41 @@ void init_tablebases(void)
 	  sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
 	  init_tb(str);
 	}
+
+#if TBPIECES == 7
+
+  for (i = 1; i < 6; i ++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = l; m < 6; m++) {
+	    sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k],
+                                          pchr[l], pchr[m]);
+	    init_tb(str);
+          }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = 1; m < 6; m++) {
+	    sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k],
+                                          pchr[l], pchr[m]);
+	    init_tb(str);
+          }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = 1; l < 6; l++)
+          for (m = l; m < 6; m++) {
+	    sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k],
+                                          pchr[l], pchr[m]);
+	    init_tb(str);
+          }
+
+#endif
+
 #endif
 
   printf("Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
@@ -740,7 +781,7 @@ void init_indices(void)
     invmtwist[mtwist[i]] = i;
 #endif
 
-// binomial[k-1][n] = Bin(n. k)
+// binomial[k-1][n] = Bin(n, k)
   for (i = 0; i < 5; i++)
     for (j = 0; j < 64; j++) {
       int f = j;
@@ -794,7 +835,7 @@ void init_indices(void)
 
 #ifndef CONNECTED_KINGS
 long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor)
+	int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -869,7 +910,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 	j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -877,7 +918,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 }
 #else
 long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor)
+	int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -988,7 +1029,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 	j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -997,7 +1038,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 #endif
 
 #if 0
-long64 encode_piece(struct TBEntry *ptr, int *pos, int *factor)
+long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -1114,7 +1155,7 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, int *factor)
       sort[j] = p;
       s += binomial[m - i][p - j + m - i];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -1124,7 +1165,7 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, int *factor)
 
 #if 0
 // KKpiece, not pieceKK
-long64 encode_K3(struct TBEntry *ptr, int *pos, int *factor)
+long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
 {
   long64 idx;
   int i, j, k, m, l, p;
@@ -1208,7 +1249,7 @@ long64 encode_K3(struct TBEntry *ptr, int *pos, int *factor)
       }
       s += l / f;
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -1258,7 +1299,7 @@ void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm)
 }
 
 void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, int *restrict factor, int *restrict order,
+	int *restrict pos, long64 *restrict factor, int *restrict order,
 	long64 idx)
 {
   int i, j, k;
@@ -1269,7 +1310,7 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 
   for (i = 0; factor[order[i]] != 1; i++) {
     q = idx / factor[order[i]];
-    idx -= ((long64)q) * factor[order[i]];
+    idx -= (long64)q * factor[order[i]];
     sub[order[i]] = q;
   }
   sub[order[i]] = idx;
@@ -1518,7 +1559,7 @@ int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
+long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1553,7 +1594,7 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
 	j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i = t;
   }
 
@@ -1569,7 +1610,7 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
 	j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -1577,7 +1618,7 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
 }
 
 #ifdef VERIFICATION
-long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, int *restrict factor)
+long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
 {
   long64 idx;
   int i, j, k, m, s, t;
@@ -1616,7 +1657,7 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
 	j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i = t;
   }
 
@@ -1632,7 +1673,7 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
 	j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += ((long64)s) * ((long64)factor[i]);
+    idx += (long64)s * factor[i];
     i += t;
   }
 
@@ -1641,7 +1682,7 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
 #endif
 
 void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
-      int *restrict pos, int *restrict factor, int *restrict order,
+      int *restrict pos, long64 *restrict factor, int *restrict order,
       long64 idx, int file)
 {
   int i, j, k;
@@ -1652,13 +1693,13 @@ void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
 
   for (i = 0; factor[order[i]] != 1; i++) {
     q = idx / factor[order[i]];
-    idx -= ((long64)q) * factor[order[i]];
+    idx -= (long64)q * factor[order[i]];
     sub[order[i]] = q;
   }
   sub[order[i]] = idx;
 
   q = sub[0];
-assume(ptr->pawns[0] <= 6);
+assume(ptr->pawns[0] <= TBPIECES);
   t = ptr->pawns[0] - 1;
   for (i = 0; i < 5; i++)
     if (pawnidx[t][6 * file + i + 1] > q) break;
@@ -1771,7 +1812,7 @@ int subfactor(int k, int n)
   return f / l;
 }
 
-long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type)
+long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type)
 {
   int i, k, n;
   long64 f;
@@ -1806,7 +1847,7 @@ long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte en
   return f;
 }
 
-long64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file)
+long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file)
 {
   int i, k, n;
   long64 f;
@@ -2320,11 +2361,11 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
+      code |= (long64)(__builtin_bswap32(*ptr++)) << bitcnt;
     }
   }
 #else
-  long64 code = __builtin_bswap64(*((long64 *)ptr));
+  long64 code = __builtin_bswap64(*(long64 *)ptr);
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2354,7 +2395,7 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
+      code |= (long64)(__builtin_bswap32(*ptr++)) << bitcnt;
     }
   }
 #endif

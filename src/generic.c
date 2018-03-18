@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -58,7 +58,7 @@ void init_tables(void)
       sq ^= 0x38;
     if ((sq >> 3) > (sq & 7))
       sq = ((sq & 7) << 3) | (sq >> 3);
-    tri0x40[i] = ((long64)tri0x40_init[sq]) << shift[0];
+    tri0x40[i] = (long64)tri0x40_init[sq] << shift[0];
   }
 
   for (sq = 0; sq < 64; sq++) {
@@ -84,12 +84,12 @@ static long64 __inline__ MakeMove0(long64 idx, int sq)
 
 static long64 __inline__ MakeMove1(long64 idx, int k, int sq)
 {
-  return idx | (sq << shift[k]);
+  return idx | ((long64)sq << shift[k]);
 }
 
 static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 {
-  if (k) return idx | (sq << shift[k]);
+  if (k) return idx | ((long64)sq << shift[k]);
   idx ^= sq_mask[sq];
   if (mirror[sq] < 0) idx = MIRROR_A1H8(idx);
   return idx | tri0x40[sq];
@@ -296,11 +296,11 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #ifndef ATOMIC
 #define LOOP_WHITE_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | (p[0] << shift[i]); \
+    long64 idx3 = idx2 | ((long64)p[0] << shift[i]); \
     func##_pivot(table_w, idx3 & ~mask[0], occ, p, ##__VA_ARGS__); \
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -311,7 +311,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -321,7 +321,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #define LOOP_WHITE_PIECES(func, ...) \
   do { for (j = 0; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
-    long64 idx3 = idx2 | (p[k] << shift[i]); \
+    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
@@ -330,7 +330,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #define LOOP_BLACK_PIECES(func, ...) \
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
-    long64 idx3 = idx2 | (p[k] << shift[i]); \
+    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -340,7 +340,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | (p[k] << shift[i]); \
+      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif

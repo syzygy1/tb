@@ -11,6 +11,12 @@ FLAGS = -DMAGIC
 # does not seem to matter.
 FLAGS += -DUSE_POPCNT
 
+# Specify maximum number of threads
+FLAGS += -DMAX_THREADS=12
+
+# Specify maximum number of pieces. More than 7  won't work.
+FLAGS += -DTBPIECES=7
+
 # Specify the compiler
 # regular linux
 #CC = /usr/bin/gcc -pthread

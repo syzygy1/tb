@@ -141,7 +141,7 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   long64 stats[256];
   long64 stats2[256];
   int i, j;
-  ubyte (*inv_map)[256] = map->inv_map;
+  ushort (*inv_map)[MAX_VALS] = map->inv_map;
 
   for (i = 0; i < 256; i++)
     stats[i] = stats2[i] = 0;
@@ -192,7 +192,7 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
 {
   int i, k;
   int num = map->max_num;
-  ubyte (*inv_map)[256] = map->inv_map;
+  ushort (*inv_map)[MAX_VALS] = map->inv_map;
   ubyte v[256];
 
   for (i = 0; i < 256; i++)

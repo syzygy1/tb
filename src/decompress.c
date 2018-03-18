@@ -19,15 +19,15 @@
 #define TBPIECES 6
 
 // FIXME: move to probe.h
-long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor);
-void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx);
-long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor);
-void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor, int *order, long64 idx, int file);
+long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor);
+void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor, int *order, long64 idx);
+long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, long64 *factor);
+void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, long64 *factor, int *order, long64 idx, int file);
 
 void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces, int order);
 void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces, int order, int order2);
-long64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type);
-long64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file);
+long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type);
+long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file);
 
 struct tb_handle {
   FILE *F;

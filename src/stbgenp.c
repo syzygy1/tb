@@ -1,7 +1,5 @@
-#define DRAW_RULE (2 * 50)
 #define REDUCE_PLY 108
 #define REDUCE_PLY_RED 116
-//#define DRAW_RULE (2*10)
 //#define REDUCE_PLY 30
 //#define REDUCE_PLY_RED 20
 

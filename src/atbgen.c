@@ -4,7 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#define DRAW_RULE (2 * 50)
 #define REDUCE_PLY 122
 #define REDUCE_PLY_RED 119
 

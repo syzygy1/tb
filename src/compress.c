@@ -32,10 +32,10 @@ struct HuffCode {
 };
 
 static struct dtz_map {
-  ubyte map[4][256];
-  ubyte inv_map[4][256];
-  ubyte num[4];
-  ubyte max_num;
+  ushort map[4][MAX_VALS];
+  ushort inv_map[4][MAX_VALS];
+  ushort num[4];
+  ushort max_num;
   ubyte side;
   ubyte ply_accurate_win;
   ubyte ply_accurate_loss;

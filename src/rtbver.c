@@ -4,8 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#define DRAW_RULE (2 * 50)
-
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 
 #define SET_CAPT_VALUE(x,v) \
@@ -507,7 +505,7 @@ void calc_broken(struct thread_data *thread)
   long64 idx, idx2;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
   long64 end = thread->end;
 
@@ -528,7 +526,7 @@ void calc_mates(struct thread_data *thread)
   bitboard occ, bb;
   int i;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   int p[MAX_PIECES];
   long64 end = thread->end;
 
@@ -787,14 +785,14 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->norm[load_bside];
-  int *factor = load_entry->factor[load_bside];
+  long64 *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
   v1_p = 0; // suppress bogus warning
@@ -842,14 +840,14 @@ void load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->norm[load_bside];
-  int *factor = load_entry->factor[load_bside];
+  long64 *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {
@@ -874,14 +872,14 @@ void load_dtz(struct thread_data *thread)
   long64 idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->norm[load_bside];
-  int *factor = load_entry->factor[load_bside];
+  long64 *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
   v1_p = 0; // suppress bogus warning
@@ -932,14 +930,14 @@ void load_dtz_mapped(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   ubyte *table = load_table;
   ubyte *src = tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->norm[load_bside];
-  int *factor = load_entry->factor[load_bside];
+  long64 *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
   ubyte (*map)[256] = load_map;
 
@@ -1071,14 +1069,14 @@ void wdl_load_wdl(struct thread_data *thread)
   long64 idx, idx2;
   int i, v1, v2;
   int n = numpcs;
-  assume(n >= 3 && n <= 6);
+  assume(n >= 3 && n <= TBPIECES);
   ubyte *table = load_table;
   ubyte *src = (ubyte *)tb_table;
   int *perm = tb_perm;
   long64 end = thread->end;
   int pos[MAX_PIECES];
   ubyte *norm = load_entry->norm[load_bside];
-  int *factor = load_entry->factor[load_bside];
+  long64 *factor = load_entry->factor[load_bside];
   struct TBEntry_piece *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {

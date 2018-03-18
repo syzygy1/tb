@@ -1,5 +1,3 @@
-#define DRAW_RULE (2 * 50)
-
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 
 #define SET_CAPT_VALUE(x,v) \

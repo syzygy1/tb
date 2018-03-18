@@ -1,4 +1,3 @@
-#define DRAW_RULE (2 * 50)
 #define REDUCE_PLY 121 // checked
 #define REDUCE_PLY_RED 119 // checked
 

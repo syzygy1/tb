@@ -20,8 +20,6 @@
 
 #define MAX_PIECES 8
 
-#define MAX_STATS 1536
-
 extern int total_work;
 extern struct thread_data thread_data[];
 extern int numthreads;
@@ -98,10 +96,10 @@ ubyte *restrict copybuf = NULL;
 struct tb_handle;
 
 struct dtz_map {
-  ubyte map[4][256];
-  ubyte inv_map[4][256];
-  ubyte num[4];
-  ubyte max_num;
+  ushort map[4][MAX_VALS];
+  ushort inv_map[4][MAX_VALS];
+  ushort num[4];
+  ushort max_num;
   ubyte side;
   ubyte ply_accurate_win;
   ubyte ply_accurate_loss;
@@ -471,20 +469,20 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 struct dtz_map map_w[4];
 struct dtz_map map_b[4];
 
-int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
+int sort_list(long64 *freq, ushort *map, ushort *inv_map)
 {
   int i, j;
   int num;
 
   num = 0;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < MAX_VALS; i++)
     if (freq[i])
       map[num++] = i;
 
   for (i = 0; i < num; i++)
     for (j = i + 1; j < num; j++)
       if (freq[map[i]] < freq[map[j]]) {
-	ubyte tmp = map[i];
+	ushort tmp = map[i];
 	map[i] = map[j];
 	map[j] = tmp;
       }
@@ -497,16 +495,16 @@ int sort_list(long64 *freq, ubyte *map, ubyte *inv_map)
 void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int pa_l)
 {
   int i, j;
-  long64 freq[4][256];
-  ubyte (*map)[256] = dtzmap->map;
-  ubyte (*inv_map)[256] = dtzmap->inv_map;
+  long64 freq[4][MAX_VALS];
+  ushort (*map)[MAX_VALS] = dtzmap->map;
+  ushort (*inv_map)[MAX_VALS] = dtzmap->inv_map;
 
   dtzmap->side = side;
   dtzmap->ply_accurate_win = pa_w;
   dtzmap->ply_accurate_loss = pa_l;
 
   for (j = 0; j < 4; j++)
-    for (i = 0; i < 256; i++)
+    for (i = 0; i < MAX_VALS; i++)
       freq[j][i] = 0;
 
   freq[0][0] = stats[0];
@@ -561,7 +559,7 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
 void prepare_dtz_map(ubyte *v, struct dtz_map *map)
 {
   int i;
-  ubyte (*inv_map)[256] = map->inv_map;
+  ushort (*inv_map)[MAX_VALS] = map->inv_map;
   int num = map->max_num;
 
   if (num_saves == 0) {
@@ -1199,4 +1197,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-
