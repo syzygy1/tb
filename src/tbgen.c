@@ -888,6 +888,11 @@ int main(int argc, char **argv)
   }
 
   if (generate_dtz) {
+    if (!save_to_disk && (lcw_ply >= 290 || lcb_ply >= 290)) {
+      store_table(table_w, 'w');
+      store_table(table_b, 'b');
+      exit(0);
+    }
     if (tb_table == table_w)
       load_table(table_w, 'w');
 
