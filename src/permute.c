@@ -55,7 +55,7 @@ static ubyte type_perm_list[5040][TBPIECES];
 
 static long64 compest[5040];
 
-#define MAX_CANDS 30
+#define MAX_CANDS 42
 static int trylist[MAX_CANDS];
 
 extern int numpawns;

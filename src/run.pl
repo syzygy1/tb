@@ -8,7 +8,7 @@ $threads = 128;
 $generate = '';
 $verify = '';
 $disk = '';
-$min = 3;
+$min = 7;
 $max = 7;
 GetOptions('threads=i' => \$threads,
 	   'generate' => \$generate,
@@ -33,12 +33,12 @@ sub Process {
       system "./rtbgenp $dopt-t $threads --stats $tb";
     }
   }
-  if ($verify) {
+  if ($verify && -e $tb.".rtbz") {
     printf "Verifying $tb\n";
     if ($tb !~ /.*P.*/) {
-      system "rtbver -t $threads --log $tb";
+      system "./rtbver -t $threads --log $tb";
     } else {
-      #system "rtbverp -t $threads --log $tb";
+      system "./rtbverp -t $threads --log $tb";
     }
   }
 }
