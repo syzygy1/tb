@@ -163,23 +163,23 @@ static void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int 
   for (i = 0; i < numthreads; i++) {
     long64 *stats = thread_data[i].stats;
     if (num_saves == 0) {
-      total_stats[1] += stats[CAPT_WIN];
-      total_stats[2] += stats[THREAT_WIN];
-      total_stats[511] += stats[CAPT_CWIN];
-      total_stats[510] += stats[THREAT_CWIN1];
-      total_stats[509] += stats[THREAT_CWIN2];
-      total_stats[1022] += stats[CAPT_LOSS];
-      total_stats[515] += stats[CAPT_CLOSS];
+      total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
+      total_stats[STAT_THREAT_WIN] += stats[THREAT_WIN];
+      total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN];
+      total_stats[STAT_THREAT_CWIN1] += stats[THREAT_CWIN1];
+      total_stats[STAT_THREAT_CWIN2] += stats[THREAT_CWIN2];
+      total_stats[STAT_CAPT_LOSS] += stats[CAPT_LOSS];
+      total_stats[STAT_CAPT_CLOSS] += stats[CAPT_CLOSS];
       for (j = 3; j <= DRAW_RULE + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j];
       for (; j < n + 1; j++)
 	total_stats[j] += stats[BASE_WIN + j + 2];
       for (j = 2; j < n + 2; j++)
-	total_stats[1023 - j] += stats[BASE_LOSS - j];
+	total_stats[STAT_MATE - j] += stats[BASE_LOSS - j];
     } else {
       for (j = 0; j < n; j++) {
 	total_stats[1 + stats_val + j] += stats[BASE_WIN + j + 6];
-	total_stats[1021 - stats_val - j] += stats[BASE_LOSS - j - 4];
+	total_stats[STAT_MATE - 2 - stats_val - j] += stats[BASE_LOSS - j - 4];
       }
     }
   }
@@ -289,7 +289,7 @@ static void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int 
       total_stats[STAT_DRAW] += thread_data[i].stats[UNKNOWN];
       total_stats[STAT_CAPT_DRAW] += thread_data[i].stats[CAPT_DRAW];
 #ifdef SUICIDE
-      total_stats[514] += thread_data[i].stats[THREAT_DRAW];
+      total_stats[STAT_THREAT_DRAW] += thread_data[i].stats[THREAT_DRAW];
 #endif
     }
 }
@@ -330,7 +330,7 @@ void print_stats(FILE *F, long64 *stats, int wtm)
     fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[1] + stats[STAT_CAPT_WIN]) >> 1, 1);
 #else
   if (stats[1])
-    fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[1] >> 1, 1);
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[STAT_CAPT_WIN] >> 1, 1);
 #endif
   for (i = 2; i <= DRAW_RULE; i++)
     if (stats[i])
@@ -340,11 +340,11 @@ void print_stats(FILE *F, long64 *stats, int wtm)
     fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[STAT_CAPT_CWIN]) >> 1, i);
   i++;
 #else
-  if (stats[i] + stats[511] + stats[510])
-    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[511] + stats[510]) >> 1, i);
+  if (stats[i] + stats[STAT_CAPT_CWIN] + stats[STAT_THREAT_CWIN1])
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[STAT_CAPT_CWIN] + stats[STAT_THREAT_CWIN1]) >> 1, i);
   i++;
-  if (stats[i] + stats[509])
-    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[509]) >> 1, i);
+  if (stats[i] + stats[STAT_THREAT_CWIN2])
+    fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[STAT_THREAT_CWIN2]) >> 1, i);
   i++;
 #endif
   for (; i <= MAX_PLY; i++)
@@ -363,7 +363,7 @@ void print_stats(FILE *F, long64 *stats, int wtm)
 #ifndef SUICIDE
   sum = stats[STAT_CAPT_CWIN];
 #else
-  sum = stats[511] + stats[510] + stats[509];
+  sum = stats[STAT_CAPT_CWIN] + stats[STAT_THREAT_CWIN1] + stats[STAT_THREAT_CWIN2];
 #endif
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     sum += stats[i];
@@ -372,13 +372,13 @@ void print_stats(FILE *F, long64 *stats, int wtm)
 #ifndef SUICIDE
   fprintf(F, "%"PRIu64" positions are draws.\n", (stats[STAT_DRAW] + stats[STAT_CAPT_DRAW]) >> 1);
 #else
-  fprintf(F, "%"PRIu64" positions are draws.\n", (stats[512] + stats[513] + stats[514]) >> 1);
+  fprintf(F, "%"PRIu64" positions are draws.\n", (stats[STAT_DRAW] + stats[STAT_CAPT_DRAW] + stats[STAT_THREAT_DRAW]) >> 1);
 #endif
 
 #ifndef SUICIDE
   sum = 0;
 #else
-  sum = stats[515];
+  sum = stats[STAT_CAPT_CLOSS];
 #endif
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     sum += stats[STAT_MATE - i];
@@ -393,8 +393,8 @@ void print_stats(FILE *F, long64 *stats, int wtm)
     if (stats[STAT_MATE - i])
       fprintf(F, "%"PRIu64" positions lose in %d ply.\n", stats[STAT_MATE - i] >> 1, i);
 #ifdef SUICIDE
-  if (stats[1023 - i] + stats[515])
-    fprintf(F, "%"PRIu64" positions lose in %d ply.\n", (stats[1023 - i] + stats[515]) >> 1, i);
+  if (stats[STAT_MATE - i] + stats[STAT_CAPT_CLOSS])
+    fprintf(F, "%"PRIu64" positions lose in %d ply.\n", (stats[STAT_MATE - i] + stats[STAT_CAPT_CLOSS]) >> 1, i);
   i++;
 #endif
   for (; i <= MAX_PLY; i++)
@@ -442,4 +442,3 @@ void print_longest(FILE *F, int switched)
   }
   fprintf(F, "\n");
 }
-

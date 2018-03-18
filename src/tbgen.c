@@ -252,14 +252,14 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   vals[4] = (i <= DRAW_RULE) || (!threat_dc && stats[2]);
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
     if (stats[i]) break;
-  vals[3] = (i <= MAX_PLY) || (!threat_dc && (stats[509] + stats[510] != 0));
-  vals[2] = (stats[512] != 0) || (!threat_dc && stats[514] != 0);
+  vals[3] = (i <= MAX_PLY) || (!threat_dc && (stats[STAT_THREAT_CWIN1] + stats[STAT_THREAT_CWIN2] != 0));
+  vals[2] = (stats[STAT_DRAW] != 0) || (!threat_dc && stats[STAT_THREAT_DRAW] != 0);
   // FIXME: probably should scan the table for non-CAPT_CLOSS cursed losses
   for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
-    if (stats[1023 - i]) break;
+    if (stats[STAT_MATE - i]) break;
   vals[1] = (i <= MAX_PLY);
   for (i = MIN_PLY_LOSS; i <= DRAW_RULE; i++)
-    if (stats[1023 - i]) break;
+    if (stats[STAT_MATE - i]) break;
   vals[0] = (i <= DRAW_RULE);
 #endif
 
@@ -272,8 +272,8 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
   dc[0] = tc_capt_closs;
 #else
   dc[3] = 1;
-  dc[2] = threat_dc && (stats[509] + stats[510] != 0); // THREAT_CWIN
-  dc[1] = threat_dc && (stats[514] != 0); // THREAT_DRAW
+  dc[2] = threat_dc && (stats[STAT_THREAT_CWIN1] + stats[STAT_THREAT_CWIN2] != 0); // THREAT_CWIN
+  dc[1] = threat_dc && (stats[STAT_THREAT_DRAW] != 0); // THREAT_DRAW
 //  dc[0] = (stats[515] != 0); // THREAT_CLOSS
   dc[0] = 0;
 #endif
@@ -421,10 +421,10 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
 #else
   if (dtzmap->ply_accurate_loss)
     for (i = 1; i < DRAW_RULE; i++)
-      freq[1][i] += stats[1023 - i - 1];
+      freq[1][i] += stats[STAT_MATE - i - 1];
   else
     for (i = 1; i < DRAW_RULE; i++)
-      freq[1][i / 2] += stats[1023 - i - 1];
+      freq[1][i / 2] += stats[STAT_MATE - i - 1];
 #endif
   dtzmap->num[1] = sort_list(freq[1], map[1], inv_map[1]);
 

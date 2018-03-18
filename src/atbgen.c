@@ -7,7 +7,13 @@
 #define REDUCE_PLY 122
 #define REDUCE_PLY_RED 119
 
-#define MAX_PLY 509
+#define STAT_DRAW (MAX_STATS/2)
+#define STAT_CAPT_CWIN (STAT_DRAW - 2)
+#define STAT_CAPT_WIN (STAT_DRAW - 1)
+#define STAT_CAPT_DRAW (STAT_DRAW + 1)
+#define STAT_MATE (MAX_STATS - 1)
+
+#define MAX_PLY (STAT_DRAW - 3)
 #define MIN_PLY_WIN 1
 #define MIN_PLY_LOSS 0
 

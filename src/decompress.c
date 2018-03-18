@@ -16,8 +16,6 @@
 #include "threads.h"
 #include "util.h"
 
-#define TBPIECES 6
-
 // FIXME: move to probe.h
 long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor);
 void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor, int *order, long64 idx);

@@ -14,7 +14,7 @@ FLAGS += -DUSE_POPCNT
 # Specify maximum number of threads
 FLAGS += -DMAX_THREADS=12
 
-# Specify maximum number of pieces. More than 7  won't work.
+# Specify maximum number of pieces. More than 7 won't work.
 FLAGS += -DTBPIECES=7
 
 # Specify the compiler

@@ -3,6 +3,18 @@
 //#define REDUCE_PLY 30
 //#define REDUCE_PLY_RED 20
 
+#define STAT_DRAW (MAX_STATS/2)            // 512
+#define STAT_CAPT_WIN 1
+#define STAT_THREAT_WIN 2
+#define STAT_CAPT_CWIN (STAT_DRAW - 1)     // 511
+#define STAT_THREAT_CWIN1 (STAT_DRAW - 2)  // 510
+#define STAT_THREAT_CWIN2 (STAT_DRAW - 3)  // 509
+#define STAT_CAPT_DRAW (STAT_DRAW + 1)     // 513
+#define STAT_THREAT_DRAW (STAT_DRAW + 2)   // 514
+#define STAT_CAPT_CLOSS (STAT_DRAW + 3)    // 515
+#define STAT_CAPT_LOSS (MAX_STATS - 2)     // 1022
+#define STAT_MATE (MAX_STATS - 1)          // 1023
+
 #define MAX_PLY 507
 #define MIN_PLY_WIN 3
 #define MIN_PLY_LOSS 2

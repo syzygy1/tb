@@ -22,7 +22,7 @@ sub Process {
   my $len = length($tb) - 1;
   if ($len < $min || $len > $max) { return; }
   $dopt = "";
-  if ($disk && $len == 6) {
+  if ($disk && $len == $max) {
     $dopt = "-d ";
   }
   if ($generate && !-e $tb.".rtbz") {
@@ -138,3 +138,56 @@ for ($i = 0; $i < 5; ++$i) {
   }
 }
 
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = $k; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = $l; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c.$d.$e."v"."K";
+          Process($tb);
+        }
+      }
+    }
+  }
+}
+
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = $k; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = 0; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c.$d."v"."K".$e;
+          Process($tb);
+        }
+      }
+    }
+  }
+}
+
+for ($i = 0; $i < 5; ++$i) {
+  $a = @Pieces[$i];
+  for ($j = $i; $j < 5; ++$j) {
+    $b = @Pieces[$j];
+    for ($k = $j; $k < 5; ++$k) {
+      $c = @Pieces[$k];
+      for ($l = 0; $l < 5; ++$l) {
+        $d = @Pieces[$l];
+        for ($m = $l; $m < 5; ++$m) {
+          $e = @Pieces[$m];
+          $tb = "K".$a.$b.$c."v"."K".$d.$e;
+          Process($tb);
+        }
+      }
+    }
+  }
+}
