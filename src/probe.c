@@ -51,7 +51,7 @@
 #endif
 
 #if defined(REGULAR) || defined(ATOMIC) || defined(LOSER)
-long64 tb_piece_key[] = {
+uint64_t tb_piece_key[] = {
   0ULL,
   0x5ced000000000001ULL,
   0xe173000000000010ULL,
@@ -73,7 +73,7 @@ long64 tb_piece_key[] = {
 #define WHITEMATMASK 0x00000000000fffff
 #define BLACKMATMASK 0x000000fffff00000
 #else
-long64 tb_piece_key[] = {
+uint64_t tb_piece_key[] = {
   0ULL,
   0x5ced000000000001ULL,
   0xe173000000000010ULL,
@@ -109,7 +109,7 @@ static struct TBHashEntry TB_hash[1 << TBHASHBITS][HSHMAX];
 
 void init_indices(void);
 
-void add_to_hash(struct TBEntry *ptr, long64 key)
+void add_to_hash(struct TBEntry *ptr, uint64_t key)
 {
   int i, hshidx;
 
@@ -134,7 +134,7 @@ static void init_tb(char *str)
   int fd;
   struct TBEntry *entry;
   int i, j, pcs[16];
-  long64 key, key2;
+  uint64_t key, key2;
   int color;
 
   strcpy(file, WDLdir);
@@ -193,7 +193,7 @@ static void init_tb(char *str)
     }
     entry = (struct TBEntry *)&TB_pawn[TBnum_pawn++];
   }
-  entry->key = (uint32)key;
+  entry->key = (uint32_t)key;
   entry->ready = 0;
   entry->num = 0;
   for (i = 0; i < 16; i++)
@@ -218,8 +218,8 @@ static void init_tb(char *str)
     else { /* only for suicide */
       j = 16;
       for (i = 0; i < 16; i++) {
-	if (pcs[i] < j && pcs[i] > 1) j = pcs[i];
-	ptr->enc_type = 1 + j;
+        if (pcs[i] < j && pcs[i] > 1) j = pcs[i];
+        ptr->enc_type = 1 + j;
       }
     }
   }
@@ -264,78 +264,78 @@ void init_tablebases(void)
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = 0; k < 6; k++) {
-	sprintf(str, "%c%cv%c", pchr[i], pchr[j], pchr[k]);
-	init_tb(str);
+        sprintf(str, "%c%cv%c", pchr[i], pchr[j], pchr[k]);
+        init_tb(str);
       }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
         for (l = 0; l < 6; l++) {
-	  sprintf(str, "%c%c%cv%c", pchr[i], pchr[j], pchr[k], pchr[l]);
-	  init_tb(str);
-	}
+          sprintf(str, "%c%c%cv%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+          init_tb(str);
+        }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = i; k < 6; k++)
-	for (l = (i == k) ? j : k; l < 6; l++) {
-	  sprintf(str, "%c%cv%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
-	  init_tb(str);
-	}
+        for (l = (i == k) ? j : k; l < 6; l++) {
+          sprintf(str, "%c%cv%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+          init_tb(str);
+        }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
         for (l = k; l < 6; l++)
           for (m = 0; m < 6; m++) {
-	    sprintf(str, "%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
-					pchr[l], pchr[m]);
-	    init_tb(str);
-	  }
+            sprintf(str, "%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
+                                        pchr[l], pchr[m]);
+            init_tb(str);
+          }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
-	for (l = 0; l < 6; l++)
-	  for (m = l; m < 6; m++) {
-	    sprintf(str, "%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
-					pchr[l], pchr[m]);
-	    init_tb(str);
-	  }
-
-  for (i = 0; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++)
-	  for (m = l; m < 6; m++)
-	    for (n = 0; n < 6; n++) {
-	      sprintf(str, "%c%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
-					    pchr[l], pchr[m], pchr[n]);
-	      init_tb(str);
-	    }
+        for (l = 0; l < 6; l++)
+          for (m = l; m < 6; m++) {
+            sprintf(str, "%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
+                                        pchr[l], pchr[m]);
+            init_tb(str);
+          }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
         for (l = k; l < 6; l++)
-	  for (m = 0; m < 6; m++)
-	    for (n = m; n < 6; n++) {
-	      sprintf(str, "%c%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
-					    pchr[l], pchr[m], pchr[n]);
-	      init_tb(str);
-	    }
+          for (m = l; m < 6; m++)
+            for (n = 0; n < 6; n++) {
+              sprintf(str, "%c%c%c%c%cv%c", pchr[i], pchr[j], pchr[k],
+                                            pchr[l], pchr[m], pchr[n]);
+              init_tb(str);
+            }
+
+  for (i = 0; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = 0; m < 6; m++)
+            for (n = m; n < 6; n++) {
+              sprintf(str, "%c%c%c%cv%c%c", pchr[i], pchr[j], pchr[k],
+                                            pchr[l], pchr[m], pchr[n]);
+              init_tb(str);
+            }
 
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
         for (l = i; l < 6; l++)
-	  for (m = (i == l) ? j : l; m < 6; m++)
-	    for (n = (i == l && m == j) ? k : m; n < 6; n++) {
-	      sprintf(str, "%c%c%cv%c%c%c", pchr[i], pchr[j], pchr[k],
-					    pchr[l], pchr[m], pchr[n]);
-	      init_tb(str);
-	    }
+          for (m = (i == l) ? j : l; m < 6; m++)
+            for (n = (i == l && m == j) ? k : m; n < 6; n++) {
+              sprintf(str, "%c%c%cv%c%c%c", pchr[i], pchr[j], pchr[k],
+                                            pchr[l], pchr[m], pchr[n]);
+              init_tb(str);
+            }
 #else
   for (i = 1; i < 6; i++) {
     sprintf(str, "K%cvK", pchr[i]);
@@ -357,40 +357,40 @@ void init_tablebases(void)
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++) {
-	sprintf(str, "K%c%c%cvK", pchr[i], pchr[j], pchr[k]);
-	init_tb(str);
+        sprintf(str, "K%c%c%cvK", pchr[i], pchr[j], pchr[k]);
+        init_tb(str);
       }
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = 1; k < 6; k++) {
-	sprintf(str, "K%c%cvK%c", pchr[i], pchr[j], pchr[k]);
-	init_tb(str);
+        sprintf(str, "K%c%cvK%c", pchr[i], pchr[j], pchr[k]);
+        init_tb(str);
       }
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
-	for (l = k; l < 6; l++) {
-	  sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
-	  init_tb(str);
-	}
+        for (l = k; l < 6; l++) {
+          sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
+          init_tb(str);
+        }
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
-	for (l = 0; l < 6; l++) {
-	  sprintf(str, "K%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l]);
-	  init_tb(str);
-	}
+        for (l = 0; l < 6; l++) {
+          sprintf(str, "K%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+          init_tb(str);
+        }
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = i; k < 6; k++)
-	for (l = (i == k) ? j : k; l < 6; l++) {
-	  sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
-	  init_tb(str);
-	}
+        for (l = (i == k) ? j : k; l < 6; l++) {
+          sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+          init_tb(str);
+        }
 
 #if TBPIECES == 7
 
@@ -399,9 +399,9 @@ void init_tablebases(void)
       for (k = j; k < 6; k++)
         for (l = k; l < 6; l++)
           for (m = l; m < 6; m++) {
-	    sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k],
+            sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
-	    init_tb(str);
+            init_tb(str);
           }
 
   for (i = 1; i < 6; i++)
@@ -409,9 +409,9 @@ void init_tablebases(void)
       for (k = j; k < 6; k++)
         for (l = k; l < 6; l++)
           for (m = 1; m < 6; m++) {
-	    sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k],
+            sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
-	    init_tb(str);
+            init_tb(str);
           }
 
   for (i = 1; i < 6; i++)
@@ -419,9 +419,9 @@ void init_tablebases(void)
       for (k = j; k < 6; k++)
         for (l = 1; l < 6; l++)
           for (m = l; m < 6; m++) {
-	    sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k],
+            sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
-	    init_tb(str);
+            init_tb(str);
           }
 
 #endif
@@ -444,7 +444,7 @@ static const signed char offdiag[] = {
   1, 1, 1, 1, 1, 1, 1, 0
 };
 
-static const ubyte triangle[] = {
+static const uint8_t triangle[] = {
   6, 0, 1, 2, 2, 1, 0, 6,
   0, 7, 3, 4, 4, 3, 7, 0,
   1, 3, 8, 5, 5, 8, 3, 1,
@@ -455,16 +455,16 @@ static const ubyte triangle[] = {
   6, 0, 1, 2, 2, 1, 0, 6
 };
 
-static const ubyte invtriangle[] = {
+static const uint8_t invtriangle[] = {
   1, 2, 3, 10, 11, 19, 0, 9, 18, 27
 };
 
-const ubyte invdiag[] = {
+const uint8_t invdiag[] = {
   0, 9, 18, 27, 36, 45, 54, 63,
   7, 14, 21, 28, 35, 42, 49, 56
 };
 
-static const ubyte flipdiag[] = {
+static const uint8_t flipdiag[] = {
    0,  8, 16, 24, 32, 40, 48, 56,
    1,  9, 17, 25, 33, 41, 49, 57,
    2, 10, 18, 26, 34, 42, 50, 58,
@@ -475,7 +475,7 @@ static const ubyte flipdiag[] = {
    7, 15, 23, 31, 39, 47, 55, 63
 };
 
-static const ubyte lower[] = {
+static const uint8_t lower[] = {
   28,  0,  1,  2,  3,  4,  5,  6,
    0, 29,  7,  8,  9, 10, 11, 12,
    1,  7, 30, 13, 14, 15, 16, 17,
@@ -486,7 +486,7 @@ static const ubyte lower[] = {
    6, 12, 17, 21, 24, 26, 27, 35
 };
 
-const ubyte diag[] = {
+const uint8_t diag[] = {
    0,  0,  0,  0,  0,  0,  0,  8,
    0,  1,  0,  0,  0,  0,  9,  0,
    0,  0,  2,  0,  0, 10,  0,  0,
@@ -497,7 +497,7 @@ const ubyte diag[] = {
   15,  0,  0,  0,  0,  0,  0,  7
 };
 
-static const ubyte invlower[] = {
+static const uint8_t invlower[] = {
   1, 2, 3, 4, 5, 6, 7,
   10, 11, 12, 13, 14, 15,
   19, 20, 21, 22, 23,
@@ -508,7 +508,7 @@ static const ubyte invlower[] = {
   0, 9, 18, 27, 36, 45, 54, 63
 };
 
-static const ubyte flap[] = {
+static const uint8_t flap[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 6, 12, 18, 18, 12, 6, 0,
   1, 7, 13, 19, 19, 13, 7, 1,
@@ -519,7 +519,7 @@ static const ubyte flap[] = {
   0, 0, 0, 0, 0, 0, 0, 0
 };
 
-static const ubyte ptwist[] = {
+static const uint8_t ptwist[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   47, 35, 23, 11, 10, 22, 34, 46,
   45, 33, 21, 9, 8, 20, 32, 44,
@@ -530,21 +530,21 @@ static const ubyte ptwist[] = {
   0, 0, 0, 0, 0, 0, 0, 0
 };
 
-static const ubyte invflap[] = {
+static const uint8_t invflap[] = {
   8, 16, 24, 32, 40, 48,
   9, 17, 25, 33, 41, 49,
   10, 18, 26, 34, 42, 50,
   11, 19, 27, 35, 43, 51
 };
 
-static const ubyte invptwist[] = {
+static const uint8_t invptwist[] = {
   52, 51, 44, 43, 36, 35, 28, 27, 20, 19, 12, 11,
   53, 50, 45, 42, 37, 34, 29, 26, 21, 18, 13, 10,
   54, 49, 46, 41, 38, 33, 30, 25, 22, 17, 14, 9,
   55, 48, 47, 40, 39, 32, 31, 24, 23, 16, 15, 8
 };
 
-static const ubyte file_to_file[] = {
+static const uint8_t file_to_file[] = {
   0, 1, 2, 3, 3, 2, 1, 0
 };
 
@@ -715,7 +715,7 @@ static const short PP_idx[10][64] = {
     -1, -1, -1, -1, -1, -1, -1, -1 }
 };
 
-const ubyte test45[] = {
+const uint8_t test45[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
@@ -726,7 +726,7 @@ const ubyte test45[] = {
   0, 0, 0, 0, 0, 0, 0, 0
 };
 
-const ubyte mtwist[] = {
+const uint8_t mtwist[] = {
   15, 63, 55, 47, 40, 48, 56, 12,
   62, 11, 39, 31, 24, 32,  8, 57,
   54, 38,  7, 23, 16,  4, 33, 49,
@@ -739,10 +739,10 @@ const ubyte mtwist[] = {
 #endif
 
 #ifndef CONNECTED_KINGS
-ubyte KK_sq[462][2];
+uint8_t KK_sq[462][2];
 #else
-ubyte PP_sq[278][2];
-ubyte invmtwist[64];
+uint8_t PP_sq[278][2];
+uint8_t invmtwist[64];
 #endif
 
 static int binomial[5][64];
@@ -761,20 +761,20 @@ void init_indices(void)
   for (i = 0; i < 10; i++)
     for (j = 0; j < 64; j++)
       if (KK_idx[i][j] >= 0) {
-	KK_sq[KK_idx[i][j]][0] = invtriangle[i];
-	KK_sq[KK_idx[i][j]][1] = j;
+        KK_sq[KK_idx[i][j]][0] = invtriangle[i];
+        KK_sq[KK_idx[i][j]][1] = j;
       }
 #else
   for (i = 0; i < 10; i++)
     for (j = 0; j < 64; j++)
       if (PP_idx[i][j] >= 0) {
-	if (invtriangle[i] < j) {
-	  PP_sq[PP_idx[i][j]][0] = invtriangle[i];
-	  PP_sq[PP_idx[i][j]][1] = j;
-	} else {
-	  PP_sq[PP_idx[i][j]][0] = j;
-	  PP_sq[PP_idx[i][j]][1] = invtriangle[i];
-	}
+        if (invtriangle[i] < j) {
+          PP_sq[PP_idx[i][j]][0] = invtriangle[i];
+          PP_sq[PP_idx[i][j]][1] = j;
+        } else {
+          PP_sq[PP_idx[i][j]][0] = j;
+          PP_sq[PP_idx[i][j]][1] = invtriangle[i];
+        }
       }
 
   for (i = 0; i < 64; i++)
@@ -787,8 +787,8 @@ void init_indices(void)
       int f = j;
       int l = 1;
       for (k = 1; k <= i; k++) {
-	f *= (j - k);
-	l *= (k + 1);
+        f *= (j - k);
+        l *= (k + 1);
       }
       binomial[i][j] = f / l;
     }
@@ -834,10 +834,11 @@ void init_indices(void)
 }
 
 #ifndef CONNECTED_KINGS
-long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, long64 *restrict factor)
+uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
+                      uint8_t *restrict norm, int *restrict pos,
+                      uint64_t *restrict factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, l, p;
   int n = ptr->num;
 
@@ -882,7 +883,7 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     else {
       idx = 441*62 + (idx - 441) + 21 * lower[pos[2]];
       if (!offdiag[pos[2]])
-	idx -= j * 21;
+        idx -= j * 21;
     }
     i = 3;
     break;
@@ -902,43 +903,44 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     int t = norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     int s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
-	j += (p > pos[l]);
+        j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
   return idx;
 }
 #else
-long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, long64 *restrict factor)
+uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
+                      uint8_t *restrict norm, int *restrict pos,
+                      uint64_t *restrict factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, l, p;
   int n = ptr->num;
 
   if (ptr->enc_type < 3) {
     if (pos[0] & 0x04) {
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x07;
+        pos[i] ^= 0x07;
     }
     if (pos[0] & 0x20) {
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x38;
+        pos[i] ^= 0x38;
     }
 
     for (i = 0; i < n; i++)
       if (offdiag[pos[i]]) break;
     if (i < (ptr->enc_type == 0 ? 3 : 2) && offdiag[pos[i]] > 0)
       for (i = 0; i < n; i++)
-	pos[i] = flipdiag[pos[i]];
+        pos[i] = flipdiag[pos[i]];
 
     switch (ptr->enc_type) {
 
@@ -947,13 +949,13 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       j = (pos[2] > pos[0]) + (pos[2] > pos[1]);
 
       if (offdiag[pos[0]])
-	idx = triangle[pos[0]] * 63*62 + (pos[1] - i) * 62 + (pos[2] - j);
+        idx = triangle[pos[0]] * 63*62 + (pos[1] - i) * 62 + (pos[2] - j);
       else if (offdiag[pos[1]])
-	idx = 6*63*62 + diag[pos[0]] * 28*62 + lower[pos[1]] * 62 + pos[2] - j;
+        idx = 6*63*62 + diag[pos[0]] * 28*62 + lower[pos[1]] * 62 + pos[2] - j;
       else if (offdiag[pos[2]])
-	idx = 6*63*62 + 4*28*62 + (diag[pos[0]]) * 7*28 + (diag[pos[1]] - i) * 28 + lower[pos[2]];
+        idx = 6*63*62 + 4*28*62 + (diag[pos[0]]) * 7*28 + (diag[pos[1]] - i) * 28 + lower[pos[2]];
       else
-	idx = 6*63*62 + 4*28*62 + 4*7*28 + (diag[pos[0]] * 7*6) + (diag[pos[1]] - i) * 6 + (diag[pos[2]] - j);
+        idx = 6*63*62 + 4*28*62 + 4*7*28 + (diag[pos[0]] * 7*6) + (diag[pos[1]] - i) * 6 + (diag[pos[2]] - j);
       i = 3;
       break;
 
@@ -961,11 +963,11 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       i = (pos[1] > pos[0]);
 
       if (offdiag[pos[0]])
-	idx = triangle[pos[0]] * 63 + (pos[1] - i);
+        idx = triangle[pos[0]] * 63 + (pos[1] - i);
       else if (offdiag[pos[1]])
-	idx = 6*63 + diag[pos[0]] * 28 + lower[pos[1]];
+        idx = 6*63 + diag[pos[0]] * 28 + lower[pos[1]];
       else
-	idx = 6*63 + 4*28 + (diag[pos[0]]) * 7 + (diag[pos[1]] - i);
+        idx = 6*63 + 4*28 + (diag[pos[0]]) * 7 + (diag[pos[1]] - i);
       i = 2;
       break;
 
@@ -979,13 +981,13 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       Swap(pos[0], pos[1]);
     if (pos[0] & 0x04)
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x07;
+        pos[i] ^= 0x07;
     if (pos[0] & 0x20)
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x38;
+        pos[i] ^= 0x38;
     if (offdiag[pos[0]] > 0 || (offdiag[pos[0]] == 0 && offdiag[pos[1]] > 0))
       for (i = 0; i < n; i++)
-	pos[i] = flipdiag[pos[i]];
+        pos[i] = flipdiag[pos[i]];
     if (test45[pos[1]] && triangle[pos[0]] == triangle[pos[1]]) {
       Swap(pos[0], pos[1]);
       for (i = 0; i < n; i++)
@@ -996,20 +998,20 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
   } else { /* 3 and higher, e.g. KKKvK and KKKKvK */
     for (i = 1; i < norm[0]; i++)
       if (triangle[pos[0]] > triangle[pos[i]])
-	Swap(pos[0], pos[i]);
+        Swap(pos[0], pos[i]);
     if (pos[0] & 0x04)
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x07;
+        pos[i] ^= 0x07;
     if (pos[0] & 0x20)
       for (i = 0; i < n; i++)
-	pos[i] ^= 0x38;
+        pos[i] ^= 0x38;
     if (offdiag[pos[0]] > 0)
       for (i = 0; i < n; i++)
-	pos[i] = flipdiag[pos[i]];
+        pos[i] = flipdiag[pos[i]];
     for (i = 1; i < norm[0]; i++)
       for (j = i + 1; j < norm[0]; j++)
         if (mtwist[pos[i]] > mtwist[pos[j]])
-	  Swap(pos[i], pos[j]);
+          Swap(pos[i], pos[j]);
 
     idx = multidx[norm[0] - 1][triangle[pos[0]]];
     for (i = 1; i < norm[0]; i++)
@@ -1021,15 +1023,15 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     int t = norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     int s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
-	j += (p > pos[l]);
+        j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
@@ -1038,9 +1040,9 @@ long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 #endif
 
 #if 0
-long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
+uint64_t encode_piece(struct TBEntry *ptr, int *pos, uint64_t *factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, l, p;
   int n = ptr->num;
   int sort[TBPIECES];
@@ -1109,7 +1111,7 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
     else {
       idx = 441*62 + (idx - 441) + 21 * lower[pos[2]];
       if (!offdiag[pos[2]])
-	idx -= j * 21;
+        idx -= j * 21;
     }
     i = 3;
     break;
@@ -1123,7 +1125,7 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
       sort[1] = pos[0];
     }
 
-    idx = (long64)KK_idx[triangle[pos[0]]][pos[1]];
+    idx = (uint64_t)KK_idx[triangle[pos[0]]][pos[1]];
     i = 2;
     break;
 
@@ -1144,18 +1146,18 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
     int t = ptr->norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     int s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (j = m; j > 0; j--)
-	if (sort[j - 1] < p) break;
+        if (sort[j - 1] < p) break;
       for (l = m; l > j; l--)
-	sort[l] = sort[l - 1];
+        sort[l] = sort[l - 1];
       sort[j] = p;
       s += binomial[m - i][p - j + m - i];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
@@ -1165,9 +1167,9 @@ long64 encode_piece(struct TBEntry *ptr, int *pos, long64 *factor)
 
 #if 0
 // KKpiece, not pieceKK
-long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
+uint64_t encode_K3(struct TBEntry *ptr, int *pos, uint64_t *factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, l, p;
   int n = ptr->num;
   int sort[TBPIECES];
@@ -1182,9 +1184,9 @@ long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
   }
 
   if (offdiag[pos[0]] > 0 ||
-	(offdiag[pos[0]] == 0 &&
-		(offdiag[pos[1]] > 0 ||
-			(offdiag[pos[1]] == 0 && offdiag[pos[2]] > 0)))) {
+        (offdiag[pos[0]] == 0 &&
+                (offdiag[pos[1]] > 0 ||
+                        (offdiag[pos[1]] == 0 && offdiag[pos[2]] > 0)))) {
     for (i = 0; i < n; i++)
       pos[i] = flipdiag[pos[i]];
   }
@@ -1195,7 +1197,7 @@ long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
     int t = ptr->norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     i = j;
   }
 
@@ -1236,20 +1238,20 @@ long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (j = m; j > 0; j--)
-	if (sort[j - 1] < p) break;
+        if (sort[j - 1] < p) break;
       for (l = m; l > j; l--)
-	sort[l] = sort[l - 1];
+        sort[l] = sort[l - 1];
       sort[j] = p;
       p = p - j + m - i;
       int l = p;
       int f = 1;
       for (j = 1; j <= m - i; j++) {
-	l *= (p - j);
-	f *= j + 1;
+        l *= (p - j);
+        f *= j + 1;
       }
       s += l / f;
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
@@ -1259,7 +1261,7 @@ long64 encode_K3(struct TBEntry *ptr, int *pos, long64 *factor)
 
 //static int fac[] = {1, 1, 2, 6, 24, 120, 720, 5040, 40320};
 
-void calc_order_piece(int num, int ord, int *order, ubyte *norm)
+void calc_order_piece(int num, int ord, int *order, uint8_t *norm)
 {
   int i, k;
   int tmp[TBPIECES];
@@ -1276,7 +1278,7 @@ void calc_order_piece(int num, int ord, int *order, ubyte *norm)
     order[k - i - 1] = tmp[i];
 }
 
-void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm)
+void calc_order_pawn(int num, int ord, int ord2, int *order, uint8_t *norm)
 {
   int i, k;
   int tmp[TBPIECES];
@@ -1298,9 +1300,9 @@ void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm)
     order[k - i - 1] = tmp[i];
 }
 
-void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
-	int *restrict pos, long64 *restrict factor, int *restrict order,
-	long64 idx)
+void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm,
+                  int *restrict pos, uint64_t *restrict factor,
+                  int *restrict order, uint64_t idx)
 {
   int i, j, k;
   int p, q;
@@ -1310,7 +1312,7 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
 
   for (i = 0; factor[order[i]] != 1; i++) {
     q = idx / factor[order[i]];
-    idx -= (long64)q * factor[order[i]];
+    idx -= (uint64_t)q * factor[order[i]];
     sub[order[i]] = q;
   }
   sub[order[i]] = idx;
@@ -1326,11 +1328,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       p = q / 62;
       q -= p * 62;
       if (p >= pos[0]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1] = p + 1; 
+        sort[0] = pos[0];
+        sort[1] = pos[1] = p + 1; 
       } else {
-	sort[0] = pos[1] = p;
-	sort[1] = pos[0];
+        sort[0] = pos[1] = p;
+        sort[1] = pos[0];
       }
       if (q >= sort[0]) q++;
       if (q >= sort[1]) q++;
@@ -1343,11 +1345,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       q -= p * 62;
       pos[1] = invlower[p];
       if (pos[0] < pos[1]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1];
+        sort[0] = pos[0];
+        sort[1] = pos[1];
       } else {
-	sort[0] = pos[1];
-	sort[1] = pos[0];
+        sort[0] = pos[1];
+        sort[1] = pos[0];
       }
       if (q >= sort[0]) q++;
       if (q >= sort[1]) q++;
@@ -1359,11 +1361,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       p = q / 28;
       q -= p * 28;
       if (invdiag[p] >= pos[0]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1] = invdiag[p + 1];
+        sort[0] = pos[0];
+        sort[1] = pos[1] = invdiag[p + 1];
       } else {
-	sort[0] = pos[1] = invdiag[p];
-	sort[1] = pos[0];
+        sort[0] = pos[1] = invdiag[p];
+        sort[1] = pos[0];
       }
       q = invlower[q];
     } else {
@@ -1374,11 +1376,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       p = q / 6;
       q -= p * 6;
       if (invdiag[p] >= pos[0]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1] = invdiag[p + 1];
+        sort[0] = pos[0];
+        sort[1] = pos[1] = invdiag[p + 1];
       } else {
-	sort[0] = pos[1] = invdiag[p];
-	sort[1] = pos[0];
+        sort[0] = pos[1] = invdiag[p];
+        sort[1] = pos[0];
       }
       q = invdiag[q];
       if (q >= sort[0]) q += 9;
@@ -1398,11 +1400,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       pos[0] = KK_sq[q][0];
       pos[1] = KK_sq[q][1];
       if (pos[0] < pos[1]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1];
+        sort[0] = pos[0];
+        sort[1] = pos[1];
       } else {
-	sort[0] = pos[1];
-	sort[1] = pos[0];
+        sort[0] = pos[1];
+        sort[1] = pos[0];
       }
       if (p >= sort[0]) p++;
       if (p >= sort[1]) p++;
@@ -1413,15 +1415,15 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       pos[0] = KK_sq[q + 441][0];
       pos[1] = KK_sq[q + 441][1];
       if (pos[0] < pos[1]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1];
+        sort[0] = pos[0];
+        sort[1] = pos[1];
       } else {
-	sort[0] = pos[1];
-	sort[1] = pos[0];
+        sort[0] = pos[1];
+        sort[1] = pos[0];
       }
       if (p >= 28) {
-	if (invlower[p] >= sort[0]) p++;
-	if (invlower[p] >= sort[1]) p++;
+        if (invlower[p] >= sort[0]) p++;
+        if (invlower[p] >= sort[1]) p++;
       }
       p = invlower[p];
     }
@@ -1452,11 +1454,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       q -= p * 63;
       pos[0] = invtriangle[p];
       if (q >= pos[0]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1] = q + 1;
+        sort[0] = pos[0];
+        sort[1] = pos[1] = q + 1;
       } else {
-	sort[1] = pos[0];
-	sort[0] = pos[1] = q;
+        sort[1] = pos[0];
+        sort[0] = pos[1] = q;
       }
     } else if (q < 6*63 + 4*28) {
       q -= 6*63;
@@ -1465,11 +1467,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       pos[0] = invdiag[p];
       pos[1] = invlower[q];
       if (pos[0] < pos[1]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1];
+        sort[0] = pos[0];
+        sort[1] = pos[1];
       } else {
-	sort[0] = pos[1];
-	sort[1] = pos[0];
+        sort[0] = pos[1];
+        sort[1] = pos[0];
       }
     } else {
       q -= 6*63 + 4*28;
@@ -1477,11 +1479,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       q -= p * 7;
       pos[0] = invdiag[p];
       if (invdiag[q] >= pos[0]) {
-	sort[0] = pos[0];
-	sort[1] = pos[1] = invdiag[q + 1];
+        sort[0] = pos[0];
+        sort[1] = pos[1] = invdiag[q + 1];
       } else {
-	sort[0] = pos[1] = invdiag[q];
-	sort[1] = pos[0];
+        sort[0] = pos[1] = invdiag[q];
+        sort[1] = pos[0];
       }
     }
     i = 2;
@@ -1503,16 +1505,16 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
       p = i - 1;
       while (1) {
         int f = binomial[i - 2][p];
-	if (f > q) break;
-	q -= f;
-	p++;
+        if (f > q) break;
+        q -= f;
+        p++;
       }
       pos[i] = sort[i] = invmtwist[p];
     }
     pos[i] = sort[i] = invmtwist[q];
     for (i = 0; i < norm[0]; i++)
       for (j = i + 1; j < norm[0]; j++)
-	if (sort[i] > sort[j]) Swap(sort[i], sort[j]);
+        if (sort[i] > sort[j]) Swap(sort[i], sort[j]);
     break;
 
 #endif
@@ -1523,13 +1525,13 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     for (j = norm[i] - 1; j > 0; j--) {
       p = j;
       while (1) {
-	int f = binomial[j - 1][p];
-	if (f > q) break;
-	q -= f;
-	p++;
+        int f = binomial[j - 1][p];
+        if (f > q) break;
+        q -= f;
+        p++;
       }
       for (k = 0; k < i; k++)
-	if (sort[k] <= p) p++;
+        if (sort[k] <= p) p++;
       pos[i + j] = sort[i + j] = p;
     }
     for (k = 0; k < i; k++)
@@ -1537,11 +1539,11 @@ void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm,
     pos[i] = sort[i] = q;
     for (j = 0, k = i; j < k && k < i + norm[i]; j++)
       if (sort[j] > sort[k]) {
-	int m, tmp = sort[k];
-	for (m = k; m > j; m--)
-	  sort[m] = sort[m - 1];
-	sort[j] = tmp;
-	k++;
+        int m, tmp = sort[k];
+        for (m = k; m > j; m--)
+          sort[m] = sort[m - 1];
+        sort[j] = tmp;
+        k++;
       }
     i += norm[i];
   }
@@ -1559,9 +1561,10 @@ int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
+uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
+                     int *restrict pos, uint64_t *restrict factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, s, t;
   int n = ptr->num;
 
@@ -1572,7 +1575,7 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
   for (i = 1; i < ptr->pawns[0]; i++)
     for (j = i + 1; j < ptr->pawns[0]; j++)
       if (ptwist[pos[i]] < ptwist[pos[j]])
-	Swap(pos[i], pos[j]);
+        Swap(pos[i], pos[j]);
 
   t = ptr->pawns[0] - 1;
   idx = pawnidx[t][flap[pos[0]]];
@@ -1586,15 +1589,15 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
   if (t > i) {
     for (j = i; j < t; j++)
       for (k = j + 1; k < t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i = t;
   }
 
@@ -1602,15 +1605,15 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
     t = norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < i + t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
@@ -1618,9 +1621,11 @@ long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int 
 }
 
 #ifdef VERIFICATION
-long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor)
+uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
+                         uint8_t *restrict norm, int *restrict pos,
+                         uint64_t *restrict factor)
 {
-  long64 idx;
+  uint64_t idx;
   int i, j, k, m, s, t;
   int n = ptr->num;
 
@@ -1635,7 +1640,7 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
   for (i = 1; i < ptr->pawns[0]; i++)
     for (j = i + 1; j < ptr->pawns[0]; j++)
       if (ptwist[pos[i]] < ptwist[pos[j]])
-	Swap(pos[i], pos[j]);
+        Swap(pos[i], pos[j]);
 
   t = ptr->pawns[0] - 1;
   idx = pawnidx[t][flap[pos[0]]];
@@ -1649,15 +1654,15 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
   if (t > i) {
     for (j = i; j < t; j++)
       for (k = j + 1; k < t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i = t;
   }
 
@@ -1665,15 +1670,15 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
     t = norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < i + t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += (long64)s * factor[i];
+    idx += (uint64_t)s * factor[i];
     i += t;
   }
 
@@ -1681,9 +1686,9 @@ long64 encode_pawn_ver(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, 
 }
 #endif
 
-void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
-      int *restrict pos, long64 *restrict factor, int *restrict order,
-      long64 idx, int file)
+void decode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
+                 int *restrict pos, uint64_t *restrict factor,
+                 int *restrict order, uint64_t idx, int file)
 {
   int i, j, k;
   int p, q, t;
@@ -1693,7 +1698,7 @@ void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm,
 
   for (i = 0; factor[order[i]] != 1; i++) {
     q = idx / factor[order[i]];
-    idx -= (long64)q * factor[order[i]];
+    idx -= (uint64_t)q * factor[order[i]];
     sub[order[i]] = q;
   }
   sub[order[i]] = idx;
@@ -1710,17 +1715,17 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = t; j > 1; j--) {
       p = j - 1;
       while (1) {
-	int f = binomial[j - 2][p];
-	if (f > q) break;
-	q -= f;
-	p++;
+        int f = binomial[j - 2][p];
+        if (f > q) break;
+        q -= f;
+        p++;
       }
       pos[j] = sort[j] = invptwist[p];
     }
     pos[1] = sort[1] = invptwist[q];
     for (j = 0; j < t; j++)
       for (k = j + 1; k <= t; k++)
-	if (sort[j] > sort[k]) Swap(sort[j], sort[k]);
+        if (sort[j] > sort[k]) Swap(sort[j], sort[k]);
   }
 
   i = ptr->pawns[0];
@@ -1730,14 +1735,14 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = ptr->pawns[1] - 1; j > 0; j--) {
       p = j;
       while (1) {
-	int f = binomial[j - 1][p];
-	if (f > q) break;
-	q -= f;
-	p++;
+        int f = binomial[j - 1][p];
+        if (f > q) break;
+        q -= f;
+        p++;
       }
       p += 8;
       for (k = 0; k < i; k++)
-	if (sort[k] <= p) p++;
+        if (sort[k] <= p) p++;
       pos[i + j] = sort[i + j] = p;
     }
     q += 8;
@@ -1746,11 +1751,11 @@ assume(ptr->pawns[0] <= TBPIECES);
     pos[i] = sort[i] = q;
     for (j = 0, k = i; j < k && k < i + ptr->pawns[1]; j++)
       if (sort[j] > sort[k]) {
-	int m, tmp = sort[k];
-	for (m = k; m > j; m--)
-	  sort[m] = sort[m - 1];
-	sort[j] = tmp;
-	k++;
+        int m, tmp = sort[k];
+        for (m = k; m > j; m--)
+          sort[m] = sort[m - 1];
+        sort[j] = tmp;
+        k++;
       }
     i += ptr->pawns[1];
   }
@@ -1769,13 +1774,13 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = norm[i] - 1; j > 0; j--) {
       p = j;
       while (1) {
-	int f = binomial[j - 1][p];
-	if (f > q) break;
-	q -= f;
-	p++;
+        int f = binomial[j - 1][p];
+        if (f > q) break;
+        q -= f;
+        p++;
       }
       for (k = 0; k < i; k++)
-	if (sort[k] <= p) p++;
+        if (sort[k] <= p) p++;
       pos[i + j] = sort[i + j] = p;
     }
     for (k = 0; k < i; k++)
@@ -1783,11 +1788,11 @@ assume(ptr->pawns[0] <= TBPIECES);
     pos[i] = sort[i] = q;
     for (j = 0, k = i; j < k && k < i + norm[i]; j++)
       if (sort[j] > sort[k]) {
-	int m, tmp = sort[k];
-	for (m = k; m > j; m--)
-	  sort[m] = sort[m - 1];
-	sort[j] = tmp;
-	k++;
+        int m, tmp = sort[k];
+        for (m = k; m > j; m--)
+          sort[m] = sort[m - 1];
+        sort[j] = tmp;
+        k++;
       }
     i += norm[i];
   }
@@ -1795,7 +1800,7 @@ assume(ptr->pawns[0] <= TBPIECES);
 
 /******* start of actual probing and decompression code *******/
 
-ubyte decompress_pairs(struct PairsData *d, long64 index);
+uint8_t decompress_pairs(struct PairsData *d, uint64_t index);
 
 // place k like pieces on n squares
 int subfactor(int k, int n)
@@ -1812,10 +1817,11 @@ int subfactor(int k, int n)
   return f / l;
 }
 
-long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type)
+uint64_t calc_factors_piece(uint64_t *factor, int num, int order,
+                            uint8_t *norm, uint8_t enc_type)
 {
   int i, k, n;
-  long64 f;
+  uint64_t f;
 #ifndef CONNECTED_KINGS
   static int pivfac[] = { 31332, 28056, 462 };
 #else
@@ -1832,9 +1838,9 @@ long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte
       f *= pivfac[enc_type];
 #else
       if (enc_type < 4)
-	f *= pivfac[enc_type];
+        f *= pivfac[enc_type];
       else
-	f *= mfactor[enc_type - 2];
+        f *= mfactor[enc_type - 2];
 #endif
     } else {
       factor[i] = f;
@@ -1847,10 +1853,11 @@ long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte
   return f;
 }
 
-long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file)
+uint64_t calc_factors_pawn(uint64_t *factor, int num, int order, int order2,
+                           uint8_t *norm, int file)
 {
   int i, k, n;
-  long64 f;
+  uint64_t f;
 
   i = norm[0];
   if (order2 < 0x0f) i += norm[i];
@@ -1875,7 +1882,8 @@ long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *
   return f;
 }
 
-void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces, int order)
+void set_norm_piece(struct TBEntry_piece *ptr, uint8_t *norm, uint8_t *pieces,
+                    int order)
 {
   int i, j;
 
@@ -1899,7 +1907,8 @@ void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces, int o
       norm[i]++;
 }
 
-void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces, int order, int order2)
+void set_norm_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, uint8_t *pieces,
+                   int order, int order2)
 {
   int i, j;
 
@@ -1914,7 +1923,7 @@ void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces, int ord
       norm[i]++;
 }
 
-void setup_pieces_piece(struct TBEntry_piece *ptr, unsigned char *data, long64 *tb_size)
+void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data, uint64_t *tb_size)
 {
   int i;
   int order;
@@ -1934,7 +1943,8 @@ void setup_pieces_piece(struct TBEntry_piece *ptr, unsigned char *data, long64 *
   tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
 }
 
-void setup_pieces_pawn(struct TBEntry_pawn *ptr, unsigned char *data, long64 *tb_size, int f)
+void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
+                       uint64_t *tb_size, int f)
 {
   int i, j;
   int order, order2;
@@ -1962,18 +1972,18 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, unsigned char *data, long64 *tb
 struct PairsData {
   char *indextable;
   ushort *sizetable;
-  ubyte *data;
+  uint8_t *data;
   ushort *offset;
-  ubyte *symlen;
-  ubyte *sympat;
+  uint8_t *symlen;
+  uint8_t *sympat;
 #ifdef LOOKUP
   ushort *lookup_len;
-  ubyte *lookup_bits;
+  uint8_t *lookup_bits;
 #endif
   int blocksize;
   int idxbits;
   int min_len;
-  long64 base[];
+  uint64_t base[];
 };
 
 static void calc_symlen(struct PairsData *d, int s, char *tmp)
@@ -1994,7 +2004,8 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
 }
 
 #ifdef LOOKUP
-static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, unsigned char **next)
+static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
+                                     uint64_t *size, uint8_t **next)
 {
   struct PairsData *d;
   int i;
@@ -2011,8 +2022,8 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
 
   int blocksize = data[1];
   int idxbits = data[2];
-  uint32 real_num_blocks = *(uint32 *)(&data[4]);
-  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32_t real_num_blocks = *(uint32_t *)(&data[4]);
+  uint32_t num_blocks = real_num_blocks + *(uint8_t *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
@@ -2023,7 +2034,7 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
   if (max_len < LUBITS)
     hh = LUBITS - min_len + 1;
 
-  long64 tmp_base[hh];
+  uint64_t tmp_base[hh];
   for (i = h - 1; i < hh; i++)
     tmp_base[i] = 0;
   for (i = h - 2; i >= 0; i--)
@@ -2035,15 +2046,15 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
   if (min_len <= LUBITS)
     num_lu = (1 << LUBITS) - (tmp_base[LUBITS - min_len] >> (64 - LUBITS));
 
-  d = malloc(sizeof(struct PairsData) + hh * sizeof(long64) + num_lu * 3 + num_syms);
+  d = malloc(sizeof(struct PairsData) + hh * sizeof(uint64_t) + num_lu * 3 + num_syms);
   for (i = 0; i < hh; i++)
     d->base[i] = tmp_base[i];
   d->offset = offset;
   d->blocksize = blocksize;
   d->idxbits = idxbits;
-  d->lookup_len = (ushort *)(((unsigned char *)d) + sizeof(struct PairsData) + hh * sizeof(long64));
-  d->lookup_bits = (ubyte *)(((unsigned char *)d) + sizeof(struct PairsData) + hh * sizeof(long64) + num_lu * 2);
-  d->symlen = ((unsigned char *)d) + sizeof(struct PairsData) + hh * sizeof(long64) + num_lu * 3;
+  d->lookup_len = (ushort *)((uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t));
+  d->lookup_bits = (uint8_t *)((uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t) + num_lu * 2);
+  d->symlen = (uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t) + num_lu * 3;
   d->sympat = &data[12 + 2 * h];
   d->min_len = min_len;
   *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -2061,7 +2072,7 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
       calc_symlen(d, i, tmp);
 
   for (i = 0; i < num_lu; i++) {
-    long64 code = tmp_base[LUBITS - min_len] + (((long64)i) << (64 - LUBITS));
+    uint64_t code = tmp_base[LUBITS - min_len] + (((uint64_t)i) << (64 - LUBITS));
     int bits = LUBITS;
     d->lookup_len[i] = 0;
     d->lookup_bits[i] = 0;
@@ -2082,7 +2093,8 @@ static struct PairsData *setup_pairs(ubyte *data, long64 tb_size, long64 *size, 
   return d;
 }
 #else
-static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64 *size, unsigned char **next)
+static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
+                                     uint64_t *size, uint8_t **next)
 {
   struct PairsData *d;
   int i;
@@ -2099,17 +2111,17 @@ static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64
 
   int blocksize = data[1];
   int idxbits = data[2];
-  uint32 real_num_blocks = *(uint32 *)(&data[4]);
-  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32_t real_num_blocks = *(uint32_t *)(&data[4]);
+  uint32_t num_blocks = real_num_blocks + *(uint8_t *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
   int num_syms = *(ushort *)(&data[10 + 2 * h]);
-  d = malloc(sizeof(struct PairsData) + h * sizeof(long64) + num_syms);
+  d = malloc(sizeof(struct PairsData) + h * sizeof(uint64_t) + num_syms);
   d->offset = (ushort *)(&data[10]);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
-  d->symlen = ((unsigned char *)d) + sizeof(struct PairsData) + h * sizeof(long64);
+  d->symlen = (uint8_t *)d + sizeof(struct PairsData) + h * sizeof(uint64_t);
   d->sympat = &data[12 + 2 * h];
   d->min_len = min_len;
   *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -2138,7 +2150,7 @@ static struct PairsData *setup_pairs(unsigned char *data, long64 tb_size, long64
 }
 #endif
 
-static char *prt_str(char *str, long64 key)
+static char *prt_str(char *str, uint64_t key)
 {
   int i, k;
   for (i = 0; i < 6; i++) {
@@ -2149,17 +2161,17 @@ static char *prt_str(char *str, long64 key)
   return str;
 }
 
-static void init_table(struct TBEntry *entry, long64 key)
+static void init_table(struct TBEntry *entry, uint64_t key)
 {
-  ubyte *next;
+  uint8_t *next;
   int f, s;
-  long64 tb_size[8];
-  long64 size[8 * 3];
+  uint64_t tb_size[8];
+  uint64_t size[8 * 3];
 
   // first mmap the table into memory
   char file[256];
   int i;
-  long64 k1, k2, key2;
+  uint64_t k1, k2, key2;
   key2 = 0ULL;
   k1 = key;
 #if defined(SUICIDE)
@@ -2183,8 +2195,8 @@ static void init_table(struct TBEntry *entry, long64 key)
 #else
   k2 >>= 4 * 5;
 #endif
-  if (entry->key != (uint32)key) {
-    long64 tmp = k1;
+  if (entry->key != (uint32_t)key) {
+    uint64_t tmp = k1;
     k1 = k2;
     k2 = tmp;
     tmp = key;
@@ -2205,19 +2217,19 @@ static void init_table(struct TBEntry *entry, long64 key)
 #endif
   *str++ = 0;
   strcat(file, WDLSUFFIX);
-  long64 dummy;
+  uint64_t dummy;
   entry->data = map_file(file, 1, &dummy);
-  ubyte *data = (ubyte *)entry->data;
+  uint8_t *data = (uint8_t *)entry->data;
 
 #if !defined(SUICIDE)
-  if (((uint32 *)data)[0] != WDL_MAGIC) {
+  if (((uint32_t *)data)[0] != WDL_MAGIC) {
     fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
 #else
   // Allow SUICIDE and GIVEAWAY to use the pawnless tables of the other.
-  if (((uint32 *)data)[0] != WDL_MAGIC
-      && (entry->has_pawns || ((uint32 *)data)[0] != OTHER_MAGIC)) {
+  if (((uint32_t *)data)[0] != WDL_MAGIC
+      && (entry->has_pawns || ((uint32_t *)data)[0] != OTHER_MAGIC)) {
     fprintf(stderr, "Corrupted table.\n");
     exit(1);
   }
@@ -2256,19 +2268,19 @@ static void init_table(struct TBEntry *entry, long64 key)
       data += size[4];
     }
 
-    data = (ubyte *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+    data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
     ptr->precomp[0]->data = data;
     data += size[2];
     if (split) {
-      data = (ubyte *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
       ptr->precomp[1]->data = data;
     }
 
-    long64 key = 0;
+    uint64_t key = 0;
     int i;
     for (i = 0; i < ptr->num; i++)
       key += tb_piece_key[ptr->pieces[0][i]];
-    ptr->key = (uint32)(key);
+    ptr->key = (uint32_t)(key);
   } else {
     struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
     s = 1 + (ptr->pawns[1] > 0);
@@ -2282,18 +2294,18 @@ static void init_table(struct TBEntry *entry, long64 key)
       ptr->file[f].precomp[0] = setup_pairs(data, tb_size[2 * f], &size[6 * f], &next);
       data = next;
       if (split) {
-	ptr->file[f].precomp[1] = setup_pairs(data, tb_size[2 * f + 1], &size[6 * f + 3], &next);
-	data = next;
+        ptr->file[f].precomp[1] = setup_pairs(data, tb_size[2 * f + 1], &size[6 * f + 3], &next);
+        data = next;
       } else
-	ptr->file[f].precomp[1] = NULL;
+        ptr->file[f].precomp[1] = NULL;
     }
 
     for (f = 0; f < files; f++) {
       ptr->file[f].precomp[0]->indextable = (char *)data;
       data += size[6 * f];
       if (split) {
-	ptr->file[f].precomp[1]->indextable = (char *)data;
-	data += size[6 * f + 3];
+        ptr->file[f].precomp[1]->indextable = (char *)data;
+        data += size[6 * f + 3];
       }
     }
 
@@ -2301,34 +2313,34 @@ static void init_table(struct TBEntry *entry, long64 key)
       ptr->file[f].precomp[0]->sizetable = (ushort *)data;
       data += size[6 * f + 1];
       if (split) {
-	ptr->file[f].precomp[1]->sizetable = (ushort *)data;
-	data += size[6 * f + 4];
+        ptr->file[f].precomp[1]->sizetable = (ushort *)data;
+        data += size[6 * f + 4];
       }
     }
 
     for (f = 0; f < files; f++) {
-      data = (ubyte *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
       ptr->file[f].precomp[0]->data = data;
       data += size[6 * f + 2];
       if (split) {
-	data = (ubyte *)((((uintptr_t)data) + 0x3f) & ~0x3f);
-	ptr->file[f].precomp[1]->data = data;
-	data += size[6 * f + 5];
+        data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+        ptr->file[f].precomp[1]->data = data;
+        data += size[6 * f + 5];
       }
     }
   }
 }
 
-ubyte decompress_pairs(struct PairsData *d, long64 idx)
+uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
 {
   int l;
 
   if (!d->idxbits)
     return d->min_len;
 
-  uint32 mainidx = idx >> d->idxbits;
+  uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
-  uint32 block = *(uint32 *)(d->indextable + 6 * mainidx);
+  uint32_t block = *(uint32_t *)(d->indextable + 6 * mainidx);
   litidx += *(ushort *)(d->indextable + 6 * mainidx + 4);
   if (litidx < 0) {
     do {
@@ -2339,16 +2351,16 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
       litidx -= d->sizetable[block++] + 1;
   }
 
-  uint32 *ptr = (uint32 *)(d->data + (block << d->blocksize));
+  uint32_t *ptr = (uint32_t *)(d->data + (block << d->blocksize));
 
   int m = d->min_len;
   ushort *offset = d->offset;
-  long64 *base = d->base - m;
-  ubyte *symlen = d->symlen;
+  uint64_t *base = d->base - m;
+  uint8_t *symlen = d->symlen;
   int sym, bitcnt;
 
 #ifndef LOOKUP
-  long64 code = __builtin_bswap64(*((long64 *)ptr));
+  uint64_t code = __builtin_bswap64(*((uint64_t *)ptr));
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
@@ -2361,26 +2373,26 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= (long64)(__builtin_bswap32(*ptr++)) << bitcnt;
+      code |= (uint64_t)(__builtin_bswap32(*ptr++)) << bitcnt;
     }
   }
 #else
-  long64 code = __builtin_bswap64(*(long64 *)ptr);
+  uint64_t code = __builtin_bswap64(*(uint64_t *)ptr);
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
     if (m <= LUBITS && code >= base[LUBITS]) {
       int lu = (code - base[LUBITS]) >> (64 - LUBITS);
       if (litidx < d->lookup_len[lu]) {
-	for (;;) {
-	  l = m;
-	  while (code < base[l]) l++;
-	  sym = offset[l] + ((code - base[l]) >> (64 - l));
-	  if (litidx < (int)symlen[sym] + 1) break;
-	  litidx -= (int)symlen[sym] + 1;
-	  code <<= l;
-	}
-	break;
+        for (;;) {
+          l = m;
+          while (code < base[l]) l++;
+          sym = offset[l] + ((code - base[l]) >> (64 - l));
+          if (litidx < (int)symlen[sym] + 1) break;
+          litidx -= (int)symlen[sym] + 1;
+          code <<= l;
+        }
+        break;
       }
       litidx -= d->lookup_len[lu];
       l = d->lookup_bits[lu];
@@ -2395,12 +2407,12 @@ ubyte decompress_pairs(struct PairsData *d, long64 idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      code |= (long64)(__builtin_bswap32(*ptr++)) << bitcnt;
+      code |= (uint64_t)(__builtin_bswap32(*ptr++)) << bitcnt;
     }
   }
 #endif
 
-  ubyte *sympat = d->sympat;
+  uint8_t *sympat = d->sympat;
   while (symlen[sym] != 0) {
     int w = *(int *)(sympat + 3 * sym);
     int s1 = w & 0x0fff;
@@ -2426,9 +2438,9 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
-  long64 idx, key;
+  uint64_t idx, key;
   int i;
-  ubyte res;
+  uint8_t res;
   int pos[TBPIECES];
 
   key = 0ULL;
@@ -2469,7 +2481,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 
   int bside, mirror, cmirror;
   if (!ptr->symmetric) {
-    if ((uint32)key != ptr->key) {
+    if ((uint32_t)key != ptr->key) {
       cmirror = 8;
       mirror = 0x38;
       bside = wtm;
@@ -2486,7 +2498,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
   int j;
   if (!ptr->has_pawns) {
     struct TBEntry_piece *entry = (struct TBEntry_piece *)ptr;
-    ubyte *pc = entry->pieces[bside];
+    uint8_t *pc = entry->pieces[bside];
     for (i = 0, j = 0; i < entry->num; i++) {
       for (; pieces[j] != (pc[i] ^ cmirror); j++);
       pos[i] = gpos[j++];
@@ -2500,7 +2512,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
     for (i = 0, j = 0; i < entry->pawns[0]; j++)
       if (pieces[j] == k) pos[i++] = gpos[j] ^ mirror;
     int f = pawn_file(entry, pos);
-    ubyte *pc = entry->file[f].pieces[bside];
+    uint8_t *pc = entry->file[f].pieces[bside];
     for (j = 0; i < ptr->num; i++) {
       for (; pieces[j] != (pc[i] ^ cmirror); j++);
       pos[i] = gpos[j++] ^ mirror;
@@ -2516,7 +2528,8 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 #if defined(REGULAR)
 static int white_king, black_king;
 
-int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ, int alpha, int beta)
+int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
+             int alpha, int beta)
 {
   int i, j, k, s, t;
   int sq, sq2;
@@ -2527,47 +2540,47 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ, in
       if (i == black_king) continue;
       s = pieces[i];
       if (!(s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!t || (t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
-	pieces[i] = 0;
-	int tmp = gpos[j];
-	gpos[j] = gpos[i];
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[white_king];
-	bb = occ & ~bit[sq2];
-	for (k = 0; k < numpcs; k++) {
-	  t = pieces[k];
-	  if (!(t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
-	}
-	if (k == numpcs) {
-	  if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
-	    int m;
-	    for (m = WQUEEN; m >= WKNIGHT; m--) {
-	      pieces[j] = m;
-	      int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
-	      if (v > alpha) {
-		alpha = v;
-		if (alpha >= beta) break;
-	      }
-	    }
-	    pieces[j] = WPAWN;
-	  } else {
-	    int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
-	    if (v > alpha)
-	      alpha = v;
-	  }
-	}
-	gpos[j] = tmp;
-	pieces[i] = s;
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[white_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!(t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
+            int m;
+            for (m = WQUEEN; m >= WKNIGHT; m--) {
+              pieces[j] = m;
+              int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+              if (v > alpha) {
+                alpha = v;
+                if (alpha >= beta) break;
+              }
+            }
+            pieces[j] = WPAWN;
+          } else {
+            int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+            if (v > alpha)
+              alpha = v;
+          }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   } else {
@@ -2575,47 +2588,47 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ, in
       if (i == white_king) continue;
       s = pieces[i];
       if (!s || (s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!(t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
-	pieces[i] = 0;
-	int tmp = gpos[j];
-	gpos[j] = gpos[i];
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[black_king];
-	bb = occ & ~bit[sq2];
-	for (k = 0; k < numpcs; k++) {
-	  t = pieces[k];
-	  if (!t || (t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
-	}
-	if (k == numpcs) {
-	  if (pieces[j] == BPAWN && gpos[j] < 0x08) {
-	    int m;
-	    for (m = BQUEEN; m >= BKNIGHT; m--) {
-	      pieces[j] = m;
-	      int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
-	      if (v > alpha) {
-		alpha = v;
-		if (alpha >= beta) break;
-	      }
-	    }
-	    pieces[j] = BPAWN;
-	  } else {
-	    int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
-	    if (v > alpha)
-	      alpha = v;
-	  }
-	}
-	gpos[j] = tmp;
-	pieces[i] = s;
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[black_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!t || (t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          if (pieces[j] == BPAWN && gpos[j] < 0x08) {
+            int m;
+            for (m = BQUEEN; m >= BKNIGHT; m--) {
+              pieces[j] = m;
+              int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+              if (v > alpha) {
+                alpha = v;
+                if (alpha >= beta) break;
+              }
+            }
+            pieces[j] = BPAWN;
+          } else {
+            int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+            if (v > alpha)
+              alpha = v;
+          }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   }
@@ -2641,73 +2654,73 @@ static int old_probe_tb_capts(int *pieces, int *pos, int wtm, bitboard occ, int 
     for (i = 0; i < numpcs; i++) {
       s = pieces[i];
       if (!(s & 0x08)) continue;
-      sq = pos[i];	/* square of piece to be captured */
+      sq = pos[i];      /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!t || (t & 0x08)) continue;
-	sq2 = pos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = pos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
-	pieces[i] = 0;
-	int tmp = pos[j];
-	pos[j] = pos[i];
-	if (pieces[j] == WPAWN && pos[j] >= 0x38) {
-	  int m;
-	  for (m = WKING; m >= WKNIGHT; m--) {
-	    pieces[j] = m;
-	    int v = -old_probe_tb(pieces, pos, 0, occ & ~bit[sq2], -beta, -alpha);
-	    if (v > alpha) {
-	      alpha = v;
-	      if (alpha >= beta) break;
-	    }
-	  }
-	  pieces[j] = WPAWN;
-	} else {
-	  int v = -old_probe_tb(pieces, pos, 0, occ & ~bit[sq2], -beta, -alpha);
-	  if (v > alpha)
-	    alpha = v;
-	}
-	pos[j] = tmp;
-	pieces[i] = s;
-	*capts = 1;
-	if (alpha >= beta)
-	  return alpha;
+        pieces[i] = 0;
+        int tmp = pos[j];
+        pos[j] = pos[i];
+        if (pieces[j] == WPAWN && pos[j] >= 0x38) {
+          int m;
+          for (m = WKING; m >= WKNIGHT; m--) {
+            pieces[j] = m;
+            int v = -old_probe_tb(pieces, pos, 0, occ & ~bit[sq2], -beta, -alpha);
+            if (v > alpha) {
+              alpha = v;
+              if (alpha >= beta) break;
+            }
+          }
+          pieces[j] = WPAWN;
+        } else {
+          int v = -old_probe_tb(pieces, pos, 0, occ & ~bit[sq2], -beta, -alpha);
+          if (v > alpha)
+            alpha = v;
+        }
+        pos[j] = tmp;
+        pieces[i] = s;
+        *capts = 1;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   } else {
     for (i = 0; i < numpcs; i++) {
       s = pieces[i];
       if (!s || (s & 0x08)) continue;
-      sq = pos[i];	/* square of piece to be captured */
+      sq = pos[i];      /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!(t & 0x08)) continue;
-	sq2 = pos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
-	pieces[i] = 0;
-	int tmp = pos[j];
-	pos[j] = pos[i];
-	if (pieces[j] == BPAWN && pos[j] < 0x08) {
-	  int m;
-	  for (m = BKING; m >= BKNIGHT; m--) {
-	    pieces[j] = m;
-	    int v = -old_probe_tb(pieces, pos, 1, occ & ~bit[sq2], -beta, -alpha);
-	    if (v > alpha) {
-	      alpha = v;
-	      if (alpha >= beta) break;
-	    }
-	  }
-	  pieces[j] = BPAWN;
-	} else {
-	  int v = -old_probe_tb(pieces, pos, 1, occ & ~bit[sq2], -beta, -alpha);
-	  if (v > alpha)
-	    alpha = v;
-	}
-	pos[j] = tmp;
-	pieces[i] = s;
-	*capts = 1;
-	if (alpha >= beta)
-	  return alpha;
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = pos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        pieces[i] = 0;
+        int tmp = pos[j];
+        pos[j] = pos[i];
+        if (pieces[j] == BPAWN && pos[j] < 0x08) {
+          int m;
+          for (m = BKING; m >= BKNIGHT; m--) {
+            pieces[j] = m;
+            int v = -old_probe_tb(pieces, pos, 1, occ & ~bit[sq2], -beta, -alpha);
+            if (v > alpha) {
+              alpha = v;
+              if (alpha >= beta) break;
+            }
+          }
+          pieces[j] = BPAWN;
+        } else {
+          int v = -old_probe_tb(pieces, pos, 1, occ & ~bit[sq2], -beta, -alpha);
+          if (v > alpha)
+            alpha = v;
+        }
+        pos[j] = tmp;
+        pieces[i] = s;
+        *capts = 1;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   }
@@ -2739,22 +2752,22 @@ int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta)
       occ2 = occ ^ bit[sq];
       v = -probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq + 8], -beta, -alpha, &capts);
       if (capts && v > alpha) {
-	alpha = v;
-	if (alpha >= beta) {
-	  pos[i] = sq;
-	  return alpha;
-	}
+        alpha = v;
+        if (alpha >= beta) {
+          pos[i] = sq;
+          return alpha;
+        }
       }
       if (sq < 0x10 && !(bit[sq + 16] & occ)) {
-	pos[i] = sq + 16;
-	v = -probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq + 16], -beta, -alpha, &capts);
-	if (capts && v > alpha) {
-	  alpha = v;
-	  if (alpha >= beta) {
-	    pos[i] = sq;
-	    return alpha;
-	  }
-	}
+        pos[i] = sq + 16;
+        v = -probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq + 16], -beta, -alpha, &capts);
+        if (capts && v > alpha) {
+          alpha = v;
+          if (alpha >= beta) {
+            pos[i] = sq;
+            return alpha;
+          }
+        }
       }
       pos[i] = sq;
     }
@@ -2766,19 +2779,19 @@ int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta)
       bb = PieceMoves(sq, s, occ);
       bitboard occ2 = occ ^ bit[sq];
       while (bb) {
-	int sq2 = FirstOne(bb);
-	pos[i] = sq2;
-	v = -probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq2], -beta, -alpha, &capts);
-	if (capts) {
-	  if (v > alpha) {
-	    alpha = v;
-	    if (alpha >= beta) {
-	      pos[i] = sq;
-	      return alpha;
-	    }
-	  }
-	}
-	ClearFirst(bb);
+        int sq2 = FirstOne(bb);
+        pos[i] = sq2;
+        v = -probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq2], -beta, -alpha, &capts);
+        if (capts) {
+          if (v > alpha) {
+            alpha = v;
+            if (alpha >= beta) {
+              pos[i] = sq;
+              return alpha;
+            }
+          }
+        }
+        ClearFirst(bb);
       }
       pos[i] = sq;
     }
@@ -2791,19 +2804,19 @@ int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta)
       bb = PieceMoves(sq, s, occ);
       bitboard occ2 = occ ^ bit[sq];
       while (bb) {
-	int sq2 = FirstOne(bb);
-	pos[i] = sq2;
-	v = -probe_tb_capts(pieces, pos, 1, occ2 ^ bit[sq2], -beta, -alpha, &capts);
-	if (capts) {
-	  if (v > alpha) {
-	    alpha = v;
-	    if (alpha >= beta) {
-	      pos[i] = sq;
-	      return alpha;
-	    }
-	  }
-	}
-	ClearFirst(bb);
+        int sq2 = FirstOne(bb);
+        pos[i] = sq2;
+        v = -probe_tb_capts(pieces, pos, 1, occ2 ^ bit[sq2], -beta, -alpha, &capts);
+        if (capts) {
+          if (v > alpha) {
+            alpha = v;
+            if (alpha >= beta) {
+              pos[i] = sq;
+              return alpha;
+            }
+          }
+        }
+        ClearFirst(bb);
       }
       pos[i] = sq;
     }
@@ -2832,7 +2845,7 @@ int old_probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int be
     bitboard atts = 0;
     for (i = 0; i < numpcs; i++)
       if (pieces[i] & 0x08)
-	atts |= PieceRange(pos[i], pieces[i], occ);
+        atts |= PieceRange(pos[i], pieces[i], occ);
     if (atts & (occ ^ black)) atts = ~occ;
     else atts &= ~occ;
     for (i = 0; i < numpcs; i++) {
@@ -2842,17 +2855,17 @@ int old_probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int be
       bb = PieceRange(sq, s, occ) & atts;
       bitboard occ2 = occ ^ bit[sq];
       while (bb) {
-	int sq2 = FirstOne(bb);
-	pos[i] = sq2;
-	v = -old_probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq2], -beta, -alpha, &capts);
-	if (capts && v > alpha) {
-	  alpha = v;
-	  if (alpha >= beta) {
-	    pos[i] = sq;
-	    return alpha;
-	  }
-	}
-	ClearFirst(bb);
+        int sq2 = FirstOne(bb);
+        pos[i] = sq2;
+        v = -old_probe_tb_capts(pieces, pos, 0, occ2 ^ bit[sq2], -beta, -alpha, &capts);
+        if (capts && v > alpha) {
+          alpha = v;
+          if (alpha >= beta) {
+            pos[i] = sq;
+            return alpha;
+          }
+        }
+        ClearFirst(bb);
       }
       pos[i] = sq;
     }
@@ -2860,7 +2873,7 @@ int old_probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int be
     bitboard atts = 0;
     for (i = 0; i < numpcs; i++)
       if (pieces[i] && !(pieces[i] & 0x08))
-	atts |= PieceRange(pos[i], pieces[i], occ);
+        atts |= PieceRange(pos[i], pieces[i], occ);
     if (atts & black) atts = ~occ;
     else atts &= ~occ;
     for (i = 0; i < numpcs; i++) {
@@ -2871,17 +2884,17 @@ int old_probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int be
       bb = PieceRange(sq, s, occ) & atts;
       bitboard occ2 = occ ^ bit[sq];
       while (bb) {
-	int sq2 = FirstOne(bb);
-	pos[i] = sq2;
-	v = -old_probe_tb_capts(pieces, pos, 1, occ2 ^ bit[sq2], -beta, -alpha, &capts);
-	if (capts && v > alpha) {
-	  alpha = v;
-	  if (alpha >= beta) {
-	    pos[i] = sq;
-	    return alpha;
-	  }
-	}
-	ClearFirst(bb);
+        int sq2 = FirstOne(bb);
+        pos[i] = sq2;
+        v = -old_probe_tb_capts(pieces, pos, 1, occ2 ^ bit[sq2], -beta, -alpha, &capts);
+        if (capts && v > alpha) {
+          alpha = v;
+          if (alpha >= beta) {
+            pos[i] = sq;
+            return alpha;
+          }
+        }
+        ClearFirst(bb);
       }
       pos[i] = sq;
     }
@@ -2908,40 +2921,40 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
       if (i == black_king) continue;
       s = pieces[i];
       if (!(s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       if (bit[sq] & KingRange(gpos[white_king])) continue;
       for (j = 0; j < numpcs; j++) {
-	if (j == white_king) continue;
-	t = pieces[j];
-	if (!t || (t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
-	if (bit[sq] & KingRange(gpos[black_king])) return 2;
+        if (j == white_king) continue;
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        if (bit[sq] & KingRange(gpos[black_king])) return 2;
 // perform capture
-	occ2 = occ;
-	for (k = 0; k < numpcs; k++)
-	  if (k != j && (!(bit[gpos[k]] & atom_mask[sq]) || ((pieces[k] & 0x07) == PAWN && k != i))) {
-	    pt[k] = pieces[k];
-	  } else {
-	    pt[k] = 0;
-	    occ2 &= ~bit[gpos[k]];
-	  }
+        occ2 = occ;
+        for (k = 0; k < numpcs; k++)
+          if (k != j && (!(bit[gpos[k]] & atom_mask[sq]) || ((pieces[k] & 0x07) == PAWN && k != i))) {
+            pt[k] = pieces[k];
+          } else {
+            pt[k] = 0;
+            occ2 &= ~bit[gpos[k]];
+          }
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[white_king];
-	if (bit[king_sq] & KingRange(gpos[black_king])) k = numpcs;
-	else for (k = 0; k < numpcs; k++) {
-	  t = pt[k];
-	  if (!(t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, occ2)) break;
-	}
-	if (k == numpcs) { // legal, so probe
-	  int v = -probe_tb(pt, gpos, 0, occ2, -beta, -alpha);
-	  if (v > alpha)
-	    alpha = v;
-	}
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[white_king];
+        if (bit[king_sq] & KingRange(gpos[black_king])) k = numpcs;
+        else for (k = 0; k < numpcs; k++) {
+          t = pt[k];
+          if (!(t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, occ2)) break;
+        }
+        if (k == numpcs) { // legal, so probe
+          int v = -probe_tb(pt, gpos, 0, occ2, -beta, -alpha);
+          if (v > alpha)
+            alpha = v;
+        }
+        if (alpha >= beta)
+          return alpha;
       }
     }
   } else {
@@ -2949,40 +2962,40 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
       if (i == white_king) continue;
       s = pieces[i];
       if (!s || (s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       if (bit[sq] & KingRange(gpos[black_king])) continue;
       for (j = 0; j < numpcs; j++) {
-	if (j == black_king) continue;
-	t = pieces[j];
-	if (!(t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
-	if (bit[sq] & KingRange(gpos[white_king])) return 2;
+        if (j == black_king) continue;
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        if (bit[sq] & KingRange(gpos[white_king])) return 2;
 // perform capture
-	occ2 = occ;
-	for (k = 0; k < numpcs; k++)
-	  if (k != j && (!(bit[gpos[k]] & atom_mask[sq]) || ((pieces[k] & 0x07) == PAWN && k != i))) {
-	    pt[k] = pieces[k];
-	  } else {
-	    pt[k] = 0;
-	    occ2 &= ~bit[gpos[k]];
-	  }
+        occ2 = occ;
+        for (k = 0; k < numpcs; k++)
+          if (k != j && (!(bit[gpos[k]] & atom_mask[sq]) || ((pieces[k] & 0x07) == PAWN && k != i))) {
+            pt[k] = pieces[k];
+          } else {
+            pt[k] = 0;
+            occ2 &= ~bit[gpos[k]];
+          }
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[black_king];
-	if (bit[king_sq] & KingRange(gpos[white_king])) k = numpcs;
-	else for (k = 0; k < numpcs; k++) {
-	  t = pt[k];
-	  if (!t || (t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, occ2)) break;
-	}
-	if (k == numpcs) { // legal, so probe
-	  int v = -probe_tb(pt, gpos, 1, occ2, -beta, -alpha);
-	  if (v > alpha)
-	    alpha = v;
-	}
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[black_king];
+        if (bit[king_sq] & KingRange(gpos[white_king])) k = numpcs;
+        else for (k = 0; k < numpcs; k++) {
+          t = pt[k];
+          if (!t || (t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, occ2)) break;
+        }
+        if (k == numpcs) { // legal, so probe
+          int v = -probe_tb(pt, gpos, 1, occ2, -beta, -alpha);
+          if (v > alpha)
+            alpha = v;
+        }
+        if (alpha >= beta)
+          return alpha;
       }
     }
   }
@@ -3006,48 +3019,48 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
       if (i == black_king) continue;
       s = pieces[i];
       if (!(s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!t || (t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
-	pieces[i] = 0;
-	int tmp = gpos[j];
-	gpos[j] = gpos[i];
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[white_king];
-	bb = occ & ~bit[sq2];
-	for (k = 0; k < numpcs; k++) {
-	  t = pieces[k];
-	  if (!(t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
-	}
-	if (k == numpcs) {
-	  capts = 1;
-	  if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
-	    int m;
-	    for (m = WQUEEN; m >= WKNIGHT; m--) {
-	      pieces[j] = m;
-	      int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
-	      if (v > alpha) {
-		alpha = v;
-		if (alpha >= beta) break;
-	      }
-	    }
-	    pieces[j] = WPAWN;
-	  } else {
-	    int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
-	    if (v > alpha)
-	      alpha = v;
-	  }
-	}
-	gpos[j] = tmp;
-	pieces[i] = s;
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[white_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!(t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          capts = 1;
+          if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
+            int m;
+            for (m = WQUEEN; m >= WKNIGHT; m--) {
+              pieces[j] = m;
+              int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+              if (v > alpha) {
+                alpha = v;
+                if (alpha >= beta) break;
+              }
+            }
+            pieces[j] = WPAWN;
+          } else {
+            int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+            if (v > alpha)
+              alpha = v;
+          }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   } else {
@@ -3055,48 +3068,48 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
       if (i == white_king) continue;
       s = pieces[i];
       if (!s || (s & 0x08)) continue;
-      sq = gpos[i];	/* square of piece to be captured */
+      sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
-	t = pieces[j];
-	if (!(t & 0x08)) continue;
-	sq2 = gpos[j];
-	if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
-	pieces[i] = 0;
-	int tmp = gpos[j];
-	gpos[j] = gpos[i];
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
 // now check whether move was legal, i.e. white king not in check
-	int king_sq = gpos[black_king];
-	bb = occ & ~bit[sq2];
-	for (k = 0; k < numpcs; k++) {
-	  t = pieces[k];
-	  if (!t || (t & 0x08)) continue;
-	  int sq3 = gpos[k];
-	  if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
-	}
-	if (k == numpcs) {
-	  capts = 1;
-	  if (pieces[j] == BPAWN && gpos[j] < 0x08) {
-	    int m;
-	    for (m = BQUEEN; m >= BKNIGHT; m--) {
-	      pieces[j] = m;
-	      int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
-	      if (v > alpha) {
-		alpha = v;
-		if (alpha >= beta) break;
-	      }
-	    }
-	    pieces[j] = BPAWN;
-	  } else {
-	    int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
-	    if (v > alpha)
-	      alpha = v;
-	  }
-	}
-	gpos[j] = tmp;
-	pieces[i] = s;
-	if (alpha >= beta)
-	  return alpha;
+        int king_sq = gpos[black_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!t || (t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          capts = 1;
+          if (pieces[j] == BPAWN && gpos[j] < 0x08) {
+            int m;
+            for (m = BQUEEN; m >= BKNIGHT; m--) {
+              pieces[j] = m;
+              int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+              if (v > alpha) {
+                alpha = v;
+                if (alpha >= beta) break;
+              }
+            }
+            pieces[j] = BPAWN;
+          } else {
+            int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+            if (v > alpha)
+              alpha = v;
+          }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
       }
     }
   }
@@ -3116,14 +3129,13 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
   for (i = 0; i < 6; i++)
     for (j = 0; j < numpcs; j++)
       if (pieces[j] ==  WKING - i)
-	str[k++] = pchr[i];
+        str[k++] = pchr[i];
   str[k++] = 'v';
   for (i = 0; i < 6; i++)
     for (j = 0; j < numpcs; j++)
       if (pieces[j] == BKING - i)
-	str[k++] = pchr[i];
+        str[k++] = pchr[i];
   str[k] = 0;
   fprintf(stderr, "Missing table: %s\n", str);
   exit(1);
 }
-

@@ -7,6 +7,7 @@
 #ifndef THREADS_H
 #define THREADS_H
 #include "defs.h"
+#include "types.h"
 
 #ifndef __WIN32__
 #include <pthread.h>
@@ -27,20 +28,25 @@
 #endif
 
 struct thread_data {
-  long64 begin;
-  long64 end;
+  uint64_t begin;
+  uint64_t end;
   bitboard occ;
-  long64 *stats;
+  uint64_t *stats;
   int *p;
   int thread;
-  char dummy[64 - 2*sizeof(long64) - 2*sizeof(void *) - sizeof(bitboard) - sizeof(int)];
+  uint8_t dummy[64 - 2*sizeof(uint64_t) - 2*sizeof(void *) - sizeof(bitboard) - sizeof(int)];
 };
 
 void init_threads(int pawns);
-void run_threaded(void (*func)(struct thread_data *), long64 *work, int report_time);
-void run_single(void (*func)(struct thread_data *), long64 *work, int report_time);
-void fill_work(int n, long64 size, long64 mask, long64 *w);
-long64 *alloc_work(int n);
-long64 *create_work(int n, long64 size, long64 mask);
+void run_threaded(void (*func)(struct thread_data *), uint64_t *work, int report_time);
+void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_time);
+void fill_work(int n, uint64_t size, uint64_t mask, uint64_t *w);
+uint64_t *alloc_work(int n);
+uint64_t *create_work(int n, uint64_t size, uint64_t mask);
+
+extern int numthreads;
+extern int total_work;
+extern struct thread_data thread_data[];
+extern struct timeval start_time, cur_time;
 
 #endif

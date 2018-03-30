@@ -22,9 +22,9 @@
 
 extern int total_work;
 
-static uint64 checksum1[2];
-static uint64 checksum2[2];
-static uint64 *results = NULL;
+static uint64_t checksum1[2];
+static uint64_t checksum2[2];
+static uint64_t *results = NULL;
 static char *data;
 static long64 size;
 static int checksum_found;
@@ -66,7 +66,7 @@ static void calc_checksum(char *name)
   }
 
   int chunks = (size + CHUNK - 1) / CHUNK;
-  results = (uint64 *)malloc(32 * chunks);
+  results = (uint64_t *)malloc(32 * chunks);
   fill_work(total_work, chunks, 0, work);
   run_threaded(checksum_worker, work, 0);
   CityHashCrc128((char *)results, 32 * chunks, checksum2);

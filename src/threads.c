@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -140,7 +140,7 @@ void init_threads(int pawns)
 
   for (i = 0; i < numthreads - 1; i++) {
     int rc = pthread_create(&threads[i], NULL, worker,
-				  (void *)&(thread_data[i]));
+                                  (void *)&(thread_data[i]));
     if (rc) {
       fprintf(stderr, "ERROR: pthread_create() returned %d\n", rc);
       exit(1);
@@ -157,7 +157,7 @@ void init_threads(int pawns)
   }
   for (i = 0; i < numthreads - 1; i++) {
     threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
-				  0, NULL);
+                                  0, NULL);
     if (threads[i] == NULL) {
       fprintf(stderr, "CreateThread() failed.\n");
       exit(1);
@@ -181,7 +181,7 @@ THREAD_FUNC worker(void *arg)
     else {
       int i;
       for (i = 0; i < numthreads - 1; i++)
-	SetEvent(start_event[i]);
+        SetEvent(start_event[i]);
     }
 #endif
 
@@ -253,4 +253,3 @@ void run_single(void (*func)(struct thread_data *), long64 *work, int report_tim
     printf("time taken = %3d:%02d.%03d\n", secs / 60, secs % 60, usecs/1000);
   cur_time = stop_time;
 }
-

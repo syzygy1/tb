@@ -1,13 +1,13 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-static long64 mask_a1h8;
-static long64 idx_mask1[8], idx_mask2[8];
+static uint64_t mask_a1h8;
+static uint64_t idx_mask1[8], idx_mask2[8];
 
-static const short KK_init[10][64] = {
+static const int16_t KK_init[10][64] = {
   { -1, -1, -1,  0,  1,  2,  3,  4,
     -1, -1, -1,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17,
@@ -91,11 +91,11 @@ static const short KK_init[10][64] = {
 };
 
 short KK_map[64][64];
-static ubyte KK_inv[462][2];
+static uint8_t KK_inv[462][2];
 
-char mirror[64][64];
+int8_t mirror[64][64];
 
-static const char in_triangle[64] = {
+static const uint8_t in_triangle[64] = {
   1, 1, 1, 1, 0, 0, 0, 0,
   0, 1, 1, 1, 0, 0, 0, 0,
   0, 0, 1, 1, 0, 0, 0, 0,
@@ -110,19 +110,19 @@ static const int inv_tri0x40[] = {
   1, 2, 3, 10, 11, 19, 0, 9, 18, 27
 };
 
-static long64 mask[MAX_PIECES];
+static uint64_t mask[MAX_PIECES];
 int shift[MAX_PIECES];
 
-long64 sq_mask[64];
+uint64_t sq_mask[64];
 
-static const ubyte tri0x40_init[32] = {
+static const uint8_t tri0x40_init[32] = {
   6, 0, 1, 2, 0, 0, 0, 0,
   0, 7, 3, 4, 0, 0, 0, 0,
   0, 0, 8, 5, 0, 0, 0, 0,
   0, 0, 0, 9, 0, 0, 0, 0
 };
 
-long64 diagonal;
+uint64_t diagonal;
 
 void init_tables(void)
 {
@@ -133,24 +133,24 @@ void init_tables(void)
       int sq1 = i;
       int sq2 = j;
       if (sq1 & 0x04) {
-	sq1 ^= 0x07;
-	sq2 ^= 0x07;
+        sq1 ^= 0x07;
+        sq2 ^= 0x07;
       }
       if (sq1 & 0x20) {
-	sq1 ^= 0x38;
-	sq2 ^= 0x38;
+        sq1 ^= 0x38;
+        sq2 ^= 0x38;
       }
       mirror[i][j] = 1;
       if ((sq1 >> 3) > (sq1 & 7)) {
-	sq1 = ((sq1 & 7) << 3) | (sq1 >> 3);
-	sq2 = ((sq2 & 7) << 3) | (sq2 >> 3);
-	mirror[i][j] = -1;
+        sq1 = ((sq1 & 7) << 3) | (sq1 >> 3);
+        sq2 = ((sq2 & 7) << 3) | (sq2 >> 3);
+        mirror[i][j] = -1;
       } else if ((sq1 >> 3) == (sq1 & 7)) {
-	if ((sq2 >> 3) > (sq2 & 7)) {
-	  sq2 = ((sq2 & 7) << 3) | (sq2 >> 3);
-	  mirror[i][j] = -1;
-	} else if ((sq2 >> 3) == (sq2 & 7))
-	  mirror[i][j] = 0;
+        if ((sq2 >> 3) > (sq2 & 7)) {
+          sq2 = ((sq2 & 7) << 3) | (sq2 >> 3);
+          mirror[i][j] = -1;
+        } else if ((sq2 >> 3) == (sq2 & 7))
+          mirror[i][j] = 0;
       }
       KK_map[i][j] = KK_init[tri0x40_init[sq1]][sq2];
     }
@@ -158,11 +158,11 @@ void init_tables(void)
   for (i = 0; i < 10; i++)
     for (j = 0; j < 64; j++)
       if (KK_init[i][j] >= 0) {
-	KK_inv[KK_init[i][j]][0] = inv_tri0x40[i];
-	KK_inv[KK_init[i][j]][1] = j;
+        KK_inv[KK_init[i][j]][0] = inv_tri0x40[i];
+        KK_inv[KK_init[i][j]][1] = j;
       }
 
-  long64 mask_a1h1, mask_a1a8;
+  uint64_t mask_a1h1, mask_a1a8;
   mask_a1h1 = mask_a1a8 = mask_a1h8 = 0;
   for (i = 2; i < numpcs; i++) {
     mask_a1h1 = (mask_a1h1 << 6) | 0x07;
@@ -171,7 +171,7 @@ void init_tables(void)
   }
 
   for (sq = 0; sq < 64; sq++) {
-    long64 mask = 0;
+    uint64_t mask = 0;
     if (sq & 0x04) mask ^= mask_a1h1;
     if (sq & 0x20) mask ^= mask_a1a8;
     sq_mask[sq] = mask;
@@ -184,45 +184,45 @@ void init_tables(void)
 
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
-static long64 __inline__ MakeMove0(long64 idx, int wk)
+static uint64_t __inline__ MakeMove0(uint64_t idx, int wk)
 {
-  long64 idx2 = idx >> shift[1];
+  uint64_t idx2 = idx >> shift[1];
   int bk = KK_inv[idx2][1];
   idx &= ~mask[0];
   idx ^= sq_mask[wk];
   if (mirror[wk][bk] < 0) idx = MIRROR_A1H8(idx);
-  return idx | ((long64)KK_map[wk][bk] << shift[1]);
+  return idx | ((uint64_t)KK_map[wk][bk] << shift[1]);
 }
 
-static long64 __inline__ MakeMove1(long64 idx, int bk)
+static uint64_t __inline__ MakeMove1(uint64_t idx, int bk)
 {
   int wk = KK_inv[idx >> shift[1]][0];
   idx &= ~mask[0];
   if (mirror[wk][bk] < 0) idx = MIRROR_A1H8(idx);
-  return idx | ((long64)KK_map[wk][bk] << shift[1]);
+  return idx | ((uint64_t)KK_map[wk][bk] << shift[1]);
 }
 
-static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
+static uint64_t __inline__ MakeMove2(uint64_t idx, int k, int sq)
 {
-  return idx | ((long64)sq << shift[k]);
+  return idx | ((uint64_t)sq << shift[k]);
 }
 
 #define CHECK_DIAG int flag = idx < diagonal
 #define PIVOT_ON_DIAG(idx2) (flag && idx2 >= diagonal)
 #define PIVOT_MIRROR(idx) (MIRROR_A1H8(idx) | (idx & mask[0]))
 
-#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
-#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define jump_bit_set(x,y,lab) \
-  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((uint64_t)(y)) : : lab);
 
 #define jump_bit_clear(x,y,lab) \
-  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((uint64_t)(y)) : : lab);
 
 #ifndef USE_POPCNT
 #define bit_set_test(x,y,v) \
-  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((uint64_t)(y)) :);
 #endif
 
 #ifdef USE_POPCNT
@@ -270,7 +270,7 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
 
 #ifdef USE_POPCNT
 #define FILL_OCC_CAPTS \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 1; k--) \
     if (k != i) { \
@@ -283,7 +283,7 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
 #else
 #define FILL_OCC_CAPTS \
   int c = 0; \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 1; k--) \
     if (k != i) { \
@@ -299,20 +299,20 @@ static long64 __inline__ MakeMove2(long64 idx, int k, int sq)
   idx2 = ((idx << 6) & idx_mask1[i]) | (idx & idx_mask2[i])
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT0(func, ...) \
-static void func##_pivot0(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func##_pivot0(uint8_t *restrict table, uint64_t idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_PIVOT1(func, ...) \
-static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func##_pivot1(uint8_t *restrict table, uint64_t idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define WhiteKingMoves (KingRange(p[0]) & ~(KingRange(p[1]) | occ))
 #define BlackKingMoves (KingRange(p[1]) & ~(KingRange(p[0]) | occ))
 
 #define MARK_BEGIN_PIVOT0 \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb; \
   CHECK_DIAG; \
   bb = WhiteKingMoves; \
@@ -322,7 +322,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 
 #define MARK_BEGIN_PIVOT1 \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb; \
   CHECK_DIAG; \
   bb = BlackKingMoves; \
@@ -332,7 +332,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 
 #define MARK_BEGIN \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb; \
   bb = PieceMoves2(p[k], pt[k], occ); \
   while (bb) { \
@@ -344,7 +344,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   }
 
 #define BEGIN_CAPTS \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int i = captured_piece; \
   int j, k; \
@@ -352,61 +352,61 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   int pt2[MAX_PIECES]; \
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
-  long64 end = thread->end >> 6; \
+  uint64_t end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[i] = 0
 
 #define BEGIN_CAPTS_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
-  long64 end = thread->end >> 6
+  uint64_t end = thread->end >> 6
 
 #define LOOP_CAPTS \
   for (idx = thread->begin >> 6; idx < end; idx++)
 
 #define LOOP_WHITE_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | ((long64)p[0] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[0] << shift[i]); \
     func##_pivot0(table_w, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 
 #define LOOP_BLACK_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | ((long64)p[1] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[1] << shift[i]); \
     func##_pivot1(table_b, idx3, occ, p, ##__VA_ARGS__); \
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
 
 #define BEGIN_CAPTS_PIVOT_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
-  long64 end = thread->end
+  uint64_t end = thread->end
 
 #define LOOP_CAPTS_PIVOT1 \
   for (idx = thread->begin; idx < end; idx++)
 
 #ifdef USE_POPCNT
 #define FILL_OCC_CAPTS_PIVOT1 \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 1; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
@@ -415,7 +415,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 #else
 #define FILL_OCC_CAPTS_PIVOT1 \
   int c = 0; \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 1; k--, idx2 >>= 6) \
     bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
@@ -430,7 +430,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
   do { for (j = 1; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
     if (KK_map[p[0]][p[k]] < 0 || mirror[p[0]][p[k]] < 0) continue; \
-    long64 idx3 = idx2 | ((long64)KK_map[p[0]][p[k]] << shift[1]); \
+    uint64_t idx3 = idx2 | ((uint64_t)KK_map[p[0]][p[k]] << shift[1]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
@@ -439,7 +439,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 
 #ifdef USE_POPCNT
 #define FILL_OCC_CAPTS_PIVOT0 \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
@@ -447,7 +447,7 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
 #else
 #define FILL_OCC_CAPTS_PIVOT0 \
   int c = 0; \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--, idx2 >>= 6) \
     bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
@@ -462,18 +462,18 @@ static void func##_pivot1(ubyte *restrict table, long64 idx, bitboard occ, int *
     k = black_pcs[j]; \
     if ((p[k] & 0x24) || KK_map[p[k]][p[1]] < 0 || mirror[p[k]][p[1]] < 0) \
       continue; \
-    long64 idx3 = idx2 | ((long64)KK_map[p[k]][p[1]] << shift[1]); \
+    uint64_t idx3 = idx2 | ((uint64_t)KK_map[p[k]][p[1]] << shift[1]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
 #define BEGIN_ITER \
-  long64 idx, idx2; \
+  uint64_t idx, idx2; \
   bitboard occ; \
   int i; \
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
   int p[MAX_PIECES]; \
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
 #define LOOP_ITER \
   for (idx = thread->begin; idx < end; idx++)

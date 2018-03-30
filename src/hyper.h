@@ -98,7 +98,7 @@ static __inline__ bitboard RookRange(int sq, bitboard occ)
   file ^= __builtin_bswap64(reverse);
   file &= hyper->filemask;
 
-  uint32 shift = sq & 0x38;
+  uint32_t shift = sq & 0x38;
   rank = ((bitboard)hyper_rank[4 * ((occ >> shift) & 0x7e) + (sq & 0x07)]) << shift;
 
   return file | rank;
@@ -115,7 +115,7 @@ static __inline__ bitboard RookRange(int sq, bitboard occ)
   file ^= __builtin_bswap64(reverse);
   file &= hyper_rook_mask[sq];
 
-  uint32 shift = sq & 0x38;
+  uint32_t shift = sq & 0x38;
   rank = ((bitboard)hyper_rank[4 * ((occ >> shift) & 0x7e) + (sq & 0x07)]) << shift;
 
   return file | rank;
@@ -132,4 +132,3 @@ bitboard RookRange(int sq, bitboard occ) __attribute__ ((pure));
 #endif
 
 #endif
-

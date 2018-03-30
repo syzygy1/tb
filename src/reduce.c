@@ -5,17 +5,18 @@
 */
 
 #include "lz4.h"
+#include "util.h"
 
 static int reduce_cnt;
 
 static char *lz4_buf = NULL;
 
-void save_table(ubyte *table, char color)
+void save_table(uint8_t *table, char color)
 {
   int i;
   FILE *F;
   char name[64];
-  ubyte v[256];
+  uint8_t v[256];
 
   if (!lz4_buf) {
     lz4_buf = malloc(4 + LZ4_compressBound(COPYSIZE));
@@ -73,8 +74,8 @@ void save_table(ubyte *table, char color)
   }
 #endif
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
@@ -82,15 +83,15 @@ void save_table(ubyte *table, char color)
     for (i = 0; i < chunk; i++)
       copybuf[i] = v[ptr[i]];
     ptr += chunk;
-    uint32 lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 4, chunk);
-    *(uint32 *)lz4_buf = lz4_size;
+    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 4, chunk);
+    *(uint32_t *)lz4_buf = lz4_size;
     fwrite(lz4_buf, 1, lz4_size + 4, F);
   }
 
   fclose(F);
 }
 
-void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
+void reconstruct_table_pass(uint8_t *table, char color, int k, uint8_t *v)
 {
   int i;
   FILE *F;
@@ -103,13 +104,13 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4size;
+    uint32_t lz4size;
     fread(&lz4size, 1, 4, F);
     fread(lz4_buf, 1, lz4size, F);
     LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
@@ -122,12 +123,12 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
   unlink(name);
 }
 
-void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
+void verify_stats(uint8_t *table, uint64_t *tot_stats, struct dtz_map *map)
 {
-  long64 stats[MAX_VALS];
-  long64 stats2[MAX_VALS];
+  uint64_t stats[MAX_VALS];
+  uint64_t stats2[MAX_VALS];
   int i, j;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
 
   for (i = 0; i < 256; i++)
     stats[i] = stats2[i] = 0;
@@ -178,10 +179,10 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   for (i = 0; i < 256; i++)
     if (stats[i] != stats2[i] && i != map->max_num) {
       fprintf(stderr, "stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
-		    i, stats[i], i, stats2[i]);
+                    i, stats[i], i, stats2[i]);
       int j;
       for (j = 0; j < 4; j++)
-	fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
+        fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
       verify_ok = 0;
     }
 
@@ -189,12 +190,12 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
     exit(1);
 }
 
-void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
+void reconstruct_table(uint8_t *table, char color, struct dtz_map *map)
 {
   int i, k;
   int num = map->max_num;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
-  ubyte v[256];
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
+  uint8_t v[256];
 
   for (i = 0; i < 256; i++)
     v[i] = 0;
@@ -235,26 +236,26 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
     if (k == 0) {
       v[255] = inv_map[1][0];
       if (map->ply_accurate_win)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 1] = inv_map[0][i];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[i + 1] = inv_map[0][i];
       else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 1] = inv_map[0][i / 2];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[i + 1] = inv_map[0][i / 2];
       if (map->ply_accurate_loss)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[254 - i] = inv_map[1][i];
       else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i / 2];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[254 - i] = inv_map[1][i / 2];
       for (; i <= REDUCE_PLY; i += 2) {
-	v[1 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
-	v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
+        v[1 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
+        v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
       }
       red_cnt = REDUCE_PLY - DRAW_RULE - 2;
     } else {
       for (i = 0; i <= REDUCE_PLY_RED + 1; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
+        v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
+        v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -264,26 +265,26 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
   for (k = 0; k < num_saves; k++) {
     if (k == 0) {
       if (map->ply_accurate_win)
-	for (i = 3; i <= DRAW_RULE; i++)
-	  v[1 + (i - 3)] = inv_map[0][i - 1];
+        for (i = 3; i <= DRAW_RULE; i++)
+          v[1 + (i - 3)] = inv_map[0][i - 1];
       else
-	for (i = 3; i <= DRAW_RULE; i++)
-	  v[1 + (i - 3)] = inv_map[0][(i - 1) / 2];
+        for (i = 3; i <= DRAW_RULE; i++)
+          v[1 + (i - 3)] = inv_map[0][(i - 1) / 2];
       if (map->ply_accurate_loss)
-	for (i = 2; i <= DRAW_RULE; i++)
-	  v[255 - (i - 2)] = inv_map[1][i - 1];
+        for (i = 2; i <= DRAW_RULE; i++)
+          v[255 - (i - 2)] = inv_map[1][i - 1];
       else
-	for (i = 2; i <= DRAW_RULE; i++)
-	  v[255 - (i - 2)] = inv_map[1][(i - 1) / 2];
+        for (i = 2; i <= DRAW_RULE; i++)
+          v[255 - (i - 2)] = inv_map[1][(i - 1) / 2];
       for (i = DRAW_RULE + 1; i < REDUCE_PLY; i += 2) {
-	v[DRAW_RULE - 1 + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
-	v[254 - (DRAW_RULE - 2) - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
+        v[DRAW_RULE - 1 + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
+        v[254 - (DRAW_RULE - 2) - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
       }
       red_cnt = REDUCE_PLY - 1 - DRAW_RULE;
     } else {
       for (i = 0; i < REDUCE_PLY_RED; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
+        v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
+        v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -303,7 +304,7 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
 void reduce_tables(void)
 {
   int i;
-  ubyte v[256];
+  uint8_t v[256];
 
   if (!copybuf)
     copybuf = malloc(COPYSIZE);
@@ -408,7 +409,7 @@ void reduce_tables(void)
     reduce_cnt += REDUCE_PLY_RED;
 }
 
-void store_table(ubyte *table, char color)
+void store_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
@@ -428,22 +429,22 @@ void store_table(ubyte *table, char color)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
+    uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
     ptr += chunk;
-    *(uint32 *)lz4_buf = lz4_size;
+    *(uint32_t *)lz4_buf = lz4_size;
     fwrite(lz4_buf, 1, lz4_size + 4, F);
   }
 
   fclose(F);
 }
 
-void load_table(ubyte *table, char color)
+void load_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
@@ -455,13 +456,13 @@ void load_table(ubyte *table, char color)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4size;
+    uint32_t lz4size;
     fread(&lz4size, 1, 4, F);
     fread(lz4_buf, 1, lz4size, F);
     LZ4_uncompress(lz4_buf, (char *)ptr, chunk);

@@ -14,7 +14,7 @@ extern bitboard attack_table[97264];
 struct Magic {
   bitboard *data;
   bitboard mask;
-  long64 magic;
+  uint64_t magic;
 };
 
 extern struct Magic bishop_magic[64];
@@ -37,4 +37,3 @@ static __inline__ bitboard RookRange(int sq, bitboard occ)
 #endif
 
 #endif
-

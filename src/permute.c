@@ -17,28 +17,23 @@
 #include "threads.h"
 #include "probe.h"
 
-long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type);
-long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file);
-void calc_order_piece(int num, int ord, int *order, ubyte *norm);
-void calc_order_pawn(int num, int ord, int ord2, int *order, ubyte *norm);
-
-long64 *restrict work_convert = NULL;
-long64 *restrict work_est = NULL;
+uint64_t *restrict work_convert = NULL;
+uint64_t *restrict work_est = NULL;
 
 extern int total_work;
 extern int numthreads;
-extern long64 sq_mask[64];
+extern uint64_t sq_mask[64];
 extern int compress_type;
 
 #ifdef SMALL
 extern short KK_map[64][64];
-extern char mirror[64][64];
-extern long64 diagonal;
+extern int8_t mirror[64][64];
+extern uint64_t diagonal;
 extern int shift[];
 #endif
 
 char name[64];
-long64 tb_size;
+uint64_t tb_size;
 
 struct TBEntry_piece entry_piece;
 struct TBEntry_pawn entry_pawn;
@@ -53,17 +48,17 @@ struct TBEntry_pawn entry_pawn;
 #error unsupported
 #endif
 
-ubyte order_list[MAX_PERMS];
-ubyte order2_list[MAX_PERMS];
+uint8_t order_list[MAX_PERMS];
+uint8_t order2_list[MAX_PERMS];
 
-ubyte piece_perm_list[MAX_PERMS][TBPIECES];
-ubyte pidx_list[MAX_PERMS][TBPIECES];
+uint8_t piece_perm_list[MAX_PERMS][TBPIECES];
+uint8_t pidx_list[MAX_PERMS][TBPIECES];
 
 int num_types, num_type_perms;
-ubyte type[TBPIECES];
-ubyte type_perm_list[MAX_PERMS][TBPIECES];
+uint8_t type[TBPIECES];
+uint8_t type_perm_list[MAX_PERMS][TBPIECES];
 
-long64 compest[MAX_PERMS];
+uint64_t compest[MAX_PERMS];
 
 int trylist[MAX_CANDS];
 
@@ -73,9 +68,9 @@ int numpcs;
 static int pw[TBPIECES];
 int cmp[16];
 
-void setup_pieces(struct TBEntry_piece *ptr, unsigned char *data);
+void setup_pieces(struct TBEntry_piece *ptr, uint8_t *data);
 
-static ubyte perm_tmp[TBPIECES];
+static uint8_t perm_tmp[TBPIECES];
 
 void generate_type_perms2(int n, int k)
 {
@@ -107,7 +102,7 @@ void generate_type_perms(int n)
 }
 
 int num_segs, seg_size;
-long64 *restrict segs = NULL;
+uint64_t *restrict segs = NULL;
 
 #define NUM_SEGS 1000
 #define SEG_SIZE (64*256)
@@ -142,9 +137,9 @@ int myrand(void)
   return result;
 }
 
-long64 llrand(void)
+uint64_t llrand(void)
 {
-  long64 rand1, rand2;
+  uint64_t rand1, rand2;
 
   rand1 = myrand();
   rand2 = myrand();
@@ -154,7 +149,7 @@ long64 llrand(void)
   return rand1;
 }
 
-void generate_test_list(long64 size, int n)
+void generate_test_list(uint64_t size, int n)
 {
   int i, j;
 
@@ -163,7 +158,7 @@ void generate_test_list(long64 size, int n)
   if (n <= 3 || size <= 100000) {
     // 1 entry covering whole table
     num_segs = 1;
-    segs = malloc(sizeof(long64));
+    segs = malloc(sizeof(uint64_t));
     seg_size = size;
     segs[0] = 0;
   } else {
@@ -174,28 +169,28 @@ void generate_test_list(long64 size, int n)
       num_segs = n > 5 ? NUM_SEGS : NUM_SEGS / 2;
       seg_size = n > 5 ? SEG_SIZE : SEG_SIZE / 1;
     }
-    long64 max = size - num_segs * (long64)seg_size + 1;
-    segs = malloc(sizeof(long64) * num_segs);
+    uint64_t max = size - num_segs * (uint64_t)seg_size + 1;
+    segs = malloc(sizeof(uint64_t) * num_segs);
     for (i = 0; i < num_segs; i++)
       segs[i] = llrand() % max;
     for (i = 0; i < num_segs; i++)
       for (j = i + 1; j < num_segs; j++)
         if (segs[i] > segs[j]) {
-	  long64 tmp = segs[i];
-	  segs[i] = segs[j];
-	  segs[j] = tmp;
-	}
+          uint64_t tmp = segs[i];
+          segs[i] = segs[j];
+          segs[j] = tmp;
+        }
     for (i = 0; i < num_segs; i++)
       segs[i] += i * seg_size;
   }
 }
 
-long64 mask_a1h1, mask_a1h8;
+uint64_t mask_a1h1, mask_a1h8;
 
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
 #ifndef SMALL
-static const char mirror[] = {
+static const int8_t mirror[] = {
   0, 1, 1, 1, 1, 1, 1, 0,
  -1, 0, 1, 1, 1, 1, 0,-1,
  -1,-1, 0, 1, 1, 0,-1,-1,
@@ -206,7 +201,7 @@ static const char mirror[] = {
   0, 1, 1, 1, 1, 1, 1, 0
 };
 
-static long64 tri0x40[] = {
+static uint64_t tri0x40[] = {
   6, 0, 1, 2, 2, 1, 0, 6,
   0, 7, 3, 4, 4, 3, 7, 0,
   1, 3, 8, 5, 5, 8, 3, 1,
@@ -218,20 +213,22 @@ static long64 tri0x40[] = {
 };
 #endif
 
-static long64 sq_mask_pawn[64];
+static uint64_t sq_mask_pawn[64];
 
-static long64 flip0x40[] = {
+static uint64_t flip0x40[] = {
   0, 0, 1, 2, 3, 4, 5, 0
 };
 
-long64 encode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor);
-void decode_piece(struct TBEntry_piece *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor, int *restrict order, long64 idx);
-long64 encode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor);
-void decode_pawn(struct TBEntry_pawn *restrict ptr, ubyte *restrict norm, int *restrict pos, long64 *restrict factor, int *restrict order, long64 idx, int file);
+#if 0
+uint64_t encode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm, int *restrict pos, uint64_t *restrict factor);
+void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm, int *restrict pos, uint64_t *restrict factor, int *restrict order, uint64_t idx);
+uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm, int *restrict pos, uint64_t *restrict factor);
+void decode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm, int *restrict pos, uint64_t *restrict factor, int *restrict order, uint64_t idx, int file);
+#endif
 
-ubyte *restrict permute_v;
+uint8_t *restrict permute_v;
 
-static void set_norm_piece(int *pcs, ubyte *type_perm, ubyte *norm, int order)
+static void p_set_norm_piece(int *pcs, uint8_t *type_perm, uint8_t *norm, int order)
 {
   int i, j;
 
@@ -253,21 +250,21 @@ static void set_norm_piece(int *pcs, ubyte *type_perm, ubyte *norm, int order)
   if (entry_piece.enc_type <= 2) {
     for (i = 0, j = norm[0]; i < num_types;)
       if (i != order) {
-	norm[j] = pcs[type_perm[i]];
-	j += pcs[type_perm[i]];
-	i++;
+        norm[j] = pcs[type_perm[i]];
+        j += pcs[type_perm[i]];
+        i++;
       } else
-	i += norm[0];
+        i += norm[0];
   } else {
     for (i = 0, j = norm[0]; i < num_types; i++)
       if (i != order) {
-	norm[j] = pcs[type_perm[i]];
-	j += pcs[type_perm[i]];
+        norm[j] = pcs[type_perm[i]];
+        j += pcs[type_perm[i]];
       }
   }
 }
 
-static void set_norm_pawn(int *pcs, ubyte *type_perm, ubyte *norm, int order, int order2)
+static void p_set_norm_pawn(int *pcs, uint8_t *type_perm, uint8_t *norm, int order, int order2)
 {
   int i, j;
 
@@ -285,8 +282,8 @@ static void set_norm_pawn(int *pcs, ubyte *type_perm, ubyte *norm, int order, in
 }
 
 static struct {
-  ubyte *src;
-  ubyte *dst;
+  uint8_t *src;
+  uint8_t *dst;
   int *pcs;
   int p;
   int file;
@@ -294,7 +291,7 @@ static struct {
 
 void convert_data_piece(struct thread_data *thread)
 {
-  long64 idx1, idx2, idx3;
+  uint64_t idx1, idx2, idx3;
   int i;
   int sq;
 #ifdef SMALL
@@ -304,15 +301,15 @@ void convert_data_piece(struct thread_data *thread)
   assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
-  long64 factor[TBPIECES];
-  ubyte norm[TBPIECES];
-  ubyte *restrict src = convert_data.src;
-  ubyte *restrict dst = convert_data.dst;
-  ubyte *restrict pidx = pidx_list[convert_data.p];
-  long64 end = thread->end;
-  ubyte *restrict v = permute_v;
+  uint64_t factor[TBPIECES];
+  uint8_t norm[TBPIECES];
+  uint8_t *restrict src = convert_data.src;
+  uint8_t *restrict dst = convert_data.dst;
+  uint8_t *restrict pidx = pidx_list[convert_data.p];
+  uint64_t end = thread->end;
+  uint8_t *restrict v = permute_v;
 
-  set_norm_piece(convert_data.pcs, type_perm_list[convert_data.p], norm, order_list[convert_data.p]);
+  p_set_norm_piece(convert_data.pcs, type_perm_list[convert_data.p], norm, order_list[convert_data.p]);
   calc_order_piece(n, order_list[convert_data.p], order, norm);
   calc_factors_piece(factor, n, order_list[convert_data.p], norm, entry_piece.enc_type);
 
@@ -340,7 +337,7 @@ void convert_data_piece(struct thread_data *thread)
   else {
     if (mirror[sq][sq2] < 0)
       idx3 = MIRROR_A1H8(idx3);
-    idx3 |= (long64)KK_map[sq][sq2] << shift[1];
+    idx3 |= (uint64_t)KK_map[sq][sq2] << shift[1];
   }
 #endif
   __builtin_prefetch(&src[idx3], 0, 3);
@@ -367,8 +364,8 @@ void convert_data_piece(struct thread_data *thread)
       idx2 = diagonal;
     else {
       if (mirror[sq][sq2] < 0)
-	idx2 = MIRROR_A1H8(idx2);
-      idx2 |= (long64)KK_map[sq][sq2] << shift[1];
+        idx2 = MIRROR_A1H8(idx2);
+      idx2 |= (uint64_t)KK_map[sq][sq2] << shift[1];
     }
 #endif
     __builtin_prefetch(&src[idx2], 0, 3);
@@ -381,22 +378,22 @@ void convert_data_piece(struct thread_data *thread)
 
 void convert_data_pawn(struct thread_data *thread)
 {
-  long64 idx1, idx2, idx3;
+  uint64_t idx1, idx2, idx3;
   int i;
   int n = entry_pawn.num;
   assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
-  long64 factor[TBPIECES];
-  ubyte norm[TBPIECES];
-  ubyte *restrict src = convert_data.src;
-  ubyte *restrict dst = convert_data.dst;
-  ubyte *restrict pidx = pidx_list[convert_data.p];
+  uint64_t factor[TBPIECES];
+  uint8_t norm[TBPIECES];
+  uint8_t *restrict src = convert_data.src;
+  uint8_t *restrict dst = convert_data.dst;
+  uint8_t *restrict pidx = pidx_list[convert_data.p];
   int file = convert_data.file;
-  long64 end = thread->end;
-  ubyte *v = permute_v;
+  uint64_t end = thread->end;
+  uint8_t *v = permute_v;
 
-  set_norm_pawn(convert_data.pcs, type_perm_list[convert_data.p], norm, order_list[convert_data.p], order2_list[convert_data.p]);
+  p_set_norm_pawn(convert_data.pcs, type_perm_list[convert_data.p], norm, order_list[convert_data.p], order2_list[convert_data.p]);
   calc_order_pawn(n, order_list[convert_data.p], order2_list[convert_data.p], order, norm);
   calc_factors_pawn(factor, n, order_list[convert_data.p], order2_list[convert_data.p], norm, file);
 
@@ -422,8 +419,8 @@ void convert_data_pawn(struct thread_data *thread)
   dst[idx1 - 1] = v[src[idx3]];
 }
 
-struct HuffCode *construct_pairs(unsigned char *restrict data, long64 size, int minfreq, int maxsymbols, int wdl);
-long64 calc_size(struct HuffCode *restrict c);
+struct HuffCode *construct_pairs(uint8_t *restrict data, uint64_t size, int minfreq, int maxsymbols, int wdl);
+uint64_t calc_size(struct HuffCode *c);
 
 void init_0x40(int numpcs)
 {
@@ -450,11 +447,11 @@ void init_0x40(int numpcs)
 }
 
 static struct {
-  ubyte *table;
+  uint8_t *table;
   int *pcs;
-  ubyte *dst;
+  uint8_t *dst;
   int num_cands;
-  uint32 dsize;
+  uint32_t dsize;
   int file;
 } est_data;
 
@@ -462,13 +459,13 @@ static struct {
 void convert_est_data_piece(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *restrict table = est_data.table;
+  uint8_t *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
   int *restrict pcs = est_data.pcs;
-  uint32 dsize = est_data.dsize;
-  ubyte *restrict dst = est_data.dst;
-  ubyte *restrict v = permute_v;
-  long64 idx;
+  uint32_t dsize = est_data.dsize;
+  uint8_t *restrict dst = est_data.dst;
+  uint8_t *restrict v = permute_v;
+  uint64_t idx;
   int n = entry_piece.num;
   assume(n >= 3 && n <= TBPIECES);
   int sq;
@@ -476,90 +473,90 @@ void convert_est_data_piece(struct thread_data *thread)
   int sq2;
 #endif
   int pos[TBPIECES];
-  long64 factor[TBPIECES];
+  uint64_t factor[TBPIECES];
   int order[TBPIECES];
-  ubyte norm[TBPIECES];
+  uint8_t norm[TBPIECES];
 
-  long64 idx_cache[MAX_CANDS];
+  uint64_t idx_cache[MAX_CANDS];
   
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
-	for (m = 0; m < num_types; m++)
-	  if (pcs[type_perm_list[trylist[p]][m]] != pcs[type_perm_list[trylist[q]][m]]) break;
-	if (m < num_types) break;
+        for (m = 0; m < num_types; m++)
+          if (pcs[type_perm_list[trylist[p]][m]] != pcs[type_perm_list[trylist[q]][m]]) break;
+        if (m < num_types) break;
       }
       int l = trylist[p];
-      set_norm_piece(pcs, type_perm_list[l], norm, order_list[l]);
+      p_set_norm_piece(pcs, type_perm_list[l], norm, order_list[l]);
       calc_order_piece(n, order_list[l], order, norm);
       calc_factors_piece(factor, n, order_list[l], norm, entry_piece.enc_type);
       // prefetch for j = 0
       decode_piece(&entry_piece, norm, pos, factor, order, segs[i]);
       for (r = p; r < q; r++) {
-	l = trylist[r];
+        l = trylist[r];
 #ifndef SMALL
-	idx = pos[pidx_list[l][1]];
-	for (m = 2; m < n; m++)
-	  idx = (idx << 6) | pos[pidx_list[l][m]];
-	sq = pos[pidx_list[l][0]];
-	idx ^= sq_mask[sq];
-	if (mirror[sq] < 0)
-	  idx = MIRROR_A1H8(idx);
-	idx |= tri0x40[sq];
+        idx = pos[pidx_list[l][1]];
+        for (m = 2; m < n; m++)
+          idx = (idx << 6) | pos[pidx_list[l][m]];
+        sq = pos[pidx_list[l][0]];
+        idx ^= sq_mask[sq];
+        if (mirror[sq] < 0)
+          idx = MIRROR_A1H8(idx);
+        idx |= tri0x40[sq];
 #else
-	idx = pos[pidx_list[l][2]];
-	for (m = 3; m < n; m++)
-	  idx = (idx << 6) | pos[pidx_list[l][m]];
-	sq = pos[pidx_list[l][0]];
-	idx ^= sq_mask[sq];
-	sq2 = pos[pidx_list[l][1]];
-	if (unlikely(KK_map[sq][sq2] < 0))
-	  idx = diagonal;
-	else {
-	  if (mirror[sq][sq2] < 0)
-	    idx = MIRROR_A1H8(idx);
-	  idx |= (long64)KK_map[sq][sq2] << shift[1];
-	}
+        idx = pos[pidx_list[l][2]];
+        for (m = 3; m < n; m++)
+          idx = (idx << 6) | pos[pidx_list[l][m]];
+        sq = pos[pidx_list[l][0]];
+        idx ^= sq_mask[sq];
+        sq2 = pos[pidx_list[l][1]];
+        if (unlikely(KK_map[sq][sq2] < 0))
+          idx = diagonal;
+        else {
+          if (mirror[sq][sq2] < 0)
+            idx = MIRROR_A1H8(idx);
+          idx |= (uint64_t)KK_map[sq][sq2] << shift[1];
+        }
 #endif
-	__builtin_prefetch(&table[idx], 0, 3);
-	idx_cache[r] = idx;
+        __builtin_prefetch(&table[idx], 0, 3);
+        idx_cache[r] = idx;
       }
       for (j = 1; j < seg_size; j++) {
-	// prefetch for j, copy for j - 1
-	decode_piece(&entry_piece, norm, pos, factor, order, segs[i] + j);
-	for (r = p; r < q; r++) {
-	  l = trylist[r];
+        // prefetch for j, copy for j - 1
+        decode_piece(&entry_piece, norm, pos, factor, order, segs[i] + j);
+        for (r = p; r < q; r++) {
+          l = trylist[r];
 #ifndef SMALL
-	  idx = pos[pidx_list[l][1]];
-	  for (m = 2; m < n; m++)
-	    idx = (idx << 6) | pos[pidx_list[l][m]];
-	  sq = pos[pidx_list[l][0]];
-	  idx ^= sq_mask[sq];
-	  if (mirror[sq] < 0)
-	    idx = MIRROR_A1H8(idx);
-	  idx |= tri0x40[sq];
+          idx = pos[pidx_list[l][1]];
+          for (m = 2; m < n; m++)
+            idx = (idx << 6) | pos[pidx_list[l][m]];
+          sq = pos[pidx_list[l][0]];
+          idx ^= sq_mask[sq];
+          if (mirror[sq] < 0)
+            idx = MIRROR_A1H8(idx);
+          idx |= tri0x40[sq];
 #else
-	  idx = pos[pidx_list[l][2]];
-	  for (m = 3; m < n; m++)
-	    idx = (idx << 6) | pos[pidx_list[l][m]];
-	  sq = pos[pidx_list[l][0]];
-	  idx ^= sq_mask[sq];
-	  sq2 = pos[pidx_list[l][1]];
-	  if (unlikely(KK_map[sq][sq2] < 0))
-	    idx = diagonal;
-	  else {
-	    if (mirror[sq][sq2] < 0)
-	      idx = MIRROR_A1H8(idx);
-	    idx |= (long64)KK_map[sq][sq2] << shift[1];
-	  }
+          idx = pos[pidx_list[l][2]];
+          for (m = 3; m < n; m++)
+            idx = (idx << 6) | pos[pidx_list[l][m]];
+          sq = pos[pidx_list[l][0]];
+          idx ^= sq_mask[sq];
+          sq2 = pos[pidx_list[l][1]];
+          if (unlikely(KK_map[sq][sq2] < 0))
+            idx = diagonal;
+          else {
+            if (mirror[sq][sq2] < 0)
+              idx = MIRROR_A1H8(idx);
+            idx |= (uint64_t)KK_map[sq][sq2] << shift[1];
+          }
 #endif
-	  __builtin_prefetch(&table[idx], 0, 3);
-	  dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
-	  idx_cache[r] = idx;
-	}
+          __builtin_prefetch(&table[idx], 0, 3);
+          dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
+          idx_cache[r] = idx;
+        }
       }
       for (r = p; r < q; r++)
-	dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
+        dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
       p = q;
     }
   }
@@ -568,46 +565,46 @@ void convert_est_data_piece(struct thread_data *thread)
 void convert_est_data_piece(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *restrict table = est_data.table;
+  uint8_t *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
   int *restrict pcs = est_data.pcs;
-  uint32 dsize = est_data.dsize;
-  char *restrict dst = est_data.dst;
-  char *restrict v = permute_v;
-  long64 idx;
+  uint32_t dsize = est_data.dsize;
+  uint8_t *restrict dst = est_data.dst;
+  uint8_t *restrict v = permute_v;
+  uint64_t idx;
   int n = entry_piece.num;
   assume(n >= 3 && n <= TBPIECES);
   int sq;
   int pos[TBPIECES];
-  long64 factor[TBPIECES];
+  uint64_t factor[TBPIECES];
   int order[TBPIECES];
-  ubyte norm[TBPIECES];
+  uint8_t norm[TBPIECES];
   
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
-	for (m = 0; m < num_types; m++)
-	  if (pcs[type_perm_list[trylist[p]][m]] != pcs[type_perm_list[trylist[q]][m]]) break;
-	if (m < num_types) break;
+        for (m = 0; m < num_types; m++)
+          if (pcs[type_perm_list[trylist[p]][m]] != pcs[type_perm_list[trylist[q]][m]]) break;
+        if (m < num_types) break;
       }
       int l = trylist[p];
-      set_norm_piece(pcs, type_perm_list[l], norm, order_list[l]);
+      p_set_norm_piece(pcs, type_perm_list[l], norm, order_list[l]);
       calc_order_piece(n, order_list[l], order, norm);
       calc_factors_piece(factor, n, order_list[l], norm, entry_piece.enc_type);
       for (j = 0; j < seg_size; j++) {
-	decode_piece(&entry_piece, norm, pos, factor, order, segs[i] + j);
-	for (r = p; r < q; r++) {
-	  l = trylist[r];
-	  idx = pos[pidx_list[l][1]];
-	  for (m = 2; m < n; m++)
-	    idx = (idx << 6) | pos[pidx_list[l][m]];
-	  sq = pos[pidx_list[l][0]];
-	  idx ^= sq_mask[sq];
-	  if (mirror[sq] < 0)
-	    idx = MIRROR_A1H8(idx);
-	  idx |= tri0x40[sq];
-	  dst[r * dsize + k + j] = v[table[idx]];
-	}
+        decode_piece(&entry_piece, norm, pos, factor, order, segs[i] + j);
+        for (r = p; r < q; r++) {
+          l = trylist[r];
+          idx = pos[pidx_list[l][1]];
+          for (m = 2; m < n; m++)
+            idx = (idx << 6) | pos[pidx_list[l][m]];
+          sq = pos[pidx_list[l][0]];
+          idx ^= sq_mask[sq];
+          if (mirror[sq] < 0)
+            idx = MIRROR_A1H8(idx);
+          idx |= tri0x40[sq];
+          dst[r * dsize + k + j] = v[table[idx]];
+        }
       }
       p = q;
     }
@@ -619,60 +616,60 @@ void convert_est_data_piece(struct thread_data *thread)
 void convert_est_data_pawn(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *restrict table = est_data.table;
+  uint8_t *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
   int *restrict pcs = est_data.pcs;
-  uint32 dsize = est_data.dsize;
-  ubyte *restrict dst = est_data.dst;
-  ubyte *restrict v = permute_v;
+  uint32_t dsize = est_data.dsize;
+  uint8_t *restrict dst = est_data.dst;
+  uint8_t *restrict v = permute_v;
   int file = est_data.file;
-  long64 idx;
+  uint64_t idx;
   int n = entry_pawn.num;
   assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
-  long64 factor[TBPIECES];
+  uint64_t factor[TBPIECES];
   int order[TBPIECES];
-  ubyte norm[TBPIECES];
+  uint8_t norm[TBPIECES];
 
-  long64 idx_cache[MAX_CANDS];
+  uint64_t idx_cache[MAX_CANDS];
   
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
-	for (m = 0; m < num_types; m++)
-	  if (cmp[type_perm_list[trylist[p]][m]] != cmp[type_perm_list[trylist[q]][m]]) break;
-	if (m < num_types) break;
+        for (m = 0; m < num_types; m++)
+          if (cmp[type_perm_list[trylist[p]][m]] != cmp[type_perm_list[trylist[q]][m]]) break;
+        if (m < num_types) break;
       }
       int l = trylist[p];
-      set_norm_pawn(pcs, type_perm_list[l], norm, order_list[l], order2_list[l]);
+      p_set_norm_pawn(pcs, type_perm_list[l], norm, order_list[l], order2_list[l]);
       calc_order_pawn(n, order_list[l], order2_list[l], order, norm);
       calc_factors_pawn(factor, n, order_list[l], order2_list[l], norm, file);
       // prefetch for j = 0
       decode_pawn(&entry_pawn, norm, pos, factor, order, segs[i], file);
       for (r = p; r < q; r++) {
-	l = trylist[r];
-	idx = pos[pidx_list[l][1]];
-	for (m = 2; m < n; m++)
-	  idx = (idx << 6) | pos[pidx_list[l][m]];
-	idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
-	__builtin_prefetch(&table[idx], 0, 3);
-	idx_cache[r] = idx;
+        l = trylist[r];
+        idx = pos[pidx_list[l][1]];
+        for (m = 2; m < n; m++)
+          idx = (idx << 6) | pos[pidx_list[l][m]];
+        idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
+        __builtin_prefetch(&table[idx], 0, 3);
+        idx_cache[r] = idx;
       }
       for (j = 1; j < seg_size; j++) {
-	decode_pawn(&entry_pawn, norm, pos, factor, order, segs[i] + j, file);
-	for (r = p; r < q; r++) {
-	  l = trylist[r];
-	  idx = pos[pidx_list[l][1]];
-	  for (m = 2; m < n; m++)
-	    idx = (idx << 6) | pos[pidx_list[l][m]];
-	  idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
-	  __builtin_prefetch(&table[idx], 0, 3);
-	  dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
-	  idx_cache[r] = idx;
-	}
+        decode_pawn(&entry_pawn, norm, pos, factor, order, segs[i] + j, file);
+        for (r = p; r < q; r++) {
+          l = trylist[r];
+          idx = pos[pidx_list[l][1]];
+          for (m = 2; m < n; m++)
+            idx = (idx << 6) | pos[pidx_list[l][m]];
+          idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
+          __builtin_prefetch(&table[idx], 0, 3);
+          dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
+          idx_cache[r] = idx;
+        }
       }
       for (r = p; r < q; r++)
-	dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
+        dst[r * dsize + k + j - 1] = v[table[idx_cache[r]]];
       p = q;
     }
   }
@@ -681,42 +678,42 @@ void convert_est_data_pawn(struct thread_data *thread)
 void convert_est_data_pawn(struct thread_data *thread)
 {
   int i, j, k, m, p, q, r;
-  ubyte *restrict table = est_data.table;
+  uint8_t *restrict table = est_data.table;
   int num_cands = est_data.num_cands;
   int *restrict pcs = est_data.pcs;
-  uint32 dsize = est_data.dsize;
-  ubyte *restrict dst = est_data.dst;
-  ubyte *restrict v = permute_v;
+  uint32_t dsize = est_data.dsize;
+  uint8_t *restrict dst = est_data.dst;
+  uint8_t *restrict v = permute_v;
   int file = est_data.file;
-  long64 idx;
+  uint64_t idx;
   int n = entry_pawn.num;
   assume(n >= 3 && n <= TBPIECES);
   int pos[TBPIECES];
-  long64 factor[TBPIECES];
+  uint64_t factor[TBPIECES];
   int order[TBPIECES];
-  ubyte norm[TBPIECES];
+  uint8_t norm[TBPIECES];
   
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
-	for (m = 0; m < num_types; m++)
-	  if (cmp[type_perm_list[trylist[p]][m]] != cmp[type_perm_list[trylist[q]][m]]) break;
-	if (m < num_types) break;
+        for (m = 0; m < num_types; m++)
+          if (cmp[type_perm_list[trylist[p]][m]] != cmp[type_perm_list[trylist[q]][m]]) break;
+        if (m < num_types) break;
       }
       int l = trylist[p];
-      set_norm_pawn(pcs, type_perm_list[l], norm, order_list[l], order2_list[l]);
+      p_set_norm_pawn(pcs, type_perm_list[l], norm, order_list[l], order2_list[l]);
       calc_order_pawn(n, order_list[l], order2_list[l], order, norm);
       calc_factors_pawn(factor, n, order_list[l], order2_list[l], norm, file);
       for (j = 0; j < seg_size; j++) {
-	decode_pawn(&entry_pawn, norm, pos, factor, order, segs[i] + j, file);
-	for (r = p; r < q; r++) {
-	  l = trylist[r];
-	  idx = pos[pidx_list[l][1]];
-	  for (m = 2; m < n; m++)
-	    idx = (idx << 6) | pos[pidx_list[l][m]];
-	  idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
-	  dst[r * dsize + k + j] = v[table[idx]];
-	}
+        decode_pawn(&entry_pawn, norm, pos, factor, order, segs[i] + j, file);
+        for (r = p; r < q; r++) {
+          l = trylist[r];
+          idx = pos[pidx_list[l][1]];
+          for (m = 2; m < n; m++)
+            idx = (idx << 6) | pos[pidx_list[l][m]];
+          idx ^= sq_mask_pawn[pos[pidx_list[l][0]]];
+          dst[r * dsize + k + j] = v[table[idx]];
+        }
       }
       p = q;
     }
@@ -724,26 +721,26 @@ void convert_est_data_pawn(struct thread_data *thread)
 }
 #endif
 
-void estimate_compression_piece(ubyte *restrict table, int *restrict pcs,
-				  int wdl, int num_cands)
+void estimate_compression_piece(uint8_t *restrict table, int *restrict pcs,
+                                  int wdl, int num_cands)
 {
   int i, p;
 
-  uint32 dsize = num_segs * seg_size;
-  ubyte *restrict dst = malloc(num_cands * dsize + 1);
+  uint32_t dsize = num_segs * seg_size;
+  uint8_t *restrict dst = malloc(num_cands * dsize + 1);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
   est_data.num_cands = num_cands;
   est_data.dsize = dsize;
-  ubyte *dst0 = dst;
+  uint8_t *dst0 = dst;
 
   if (num_segs > 1)
     run_threaded(convert_est_data_piece, work_est, 0);
   else
     run_single(convert_est_data_piece, work_est, 0);
 
-  long64 csize;
+  uint64_t csize;
 
   for (p = 0; p < num_cands; p++, dst += dsize) {
     struct HuffCode *restrict c = construct_pairs(dst, dsize, 20, 100, wdl);
@@ -760,30 +757,30 @@ void estimate_compression_piece(ubyte *restrict table, int *restrict pcs,
   free(dst0);
 }
 
-void estimate_compression_pawn(ubyte *restrict table, int *restrict pcs,
-				int file, int wdl, int num_cands)
+void estimate_compression_pawn(uint8_t *restrict table, int *restrict pcs,
+                                int file, int wdl, int num_cands)
 {
   int i, p;
 
-  uint32 dsize = num_segs * seg_size;
-  ubyte *restrict dst = malloc(num_cands * dsize + 1);
+  uint32_t dsize = num_segs * seg_size;
+  uint8_t *restrict dst = malloc(num_cands * dsize + 1);
   est_data.table = table;
   est_data.pcs = pcs;
   est_data.dst = dst;
   est_data.num_cands = num_cands;
   est_data.dsize = dsize;
   est_data.file = file;
-  ubyte *dst0 = dst;
+  uint8_t *dst0 = dst;
 
   if (num_segs > 1)
     run_threaded(convert_est_data_pawn, work_est, 0);
   else
     run_single(convert_est_data_pawn, work_est, 0);
 
-  long64 csize;
+  uint64_t csize;
 
   for (p = 0; p < num_cands; p++, dst += dsize) {
-    struct HuffCode *restrict c = construct_pairs((ubyte *)dst, dsize, 20, 100, wdl);
+    struct HuffCode *restrict c = construct_pairs((uint8_t *)dst, dsize, 20, 100, wdl);
     csize = calc_size(c);
     free(c);
     printf("[%2d] order: %d", p, order_list[trylist[p]]);
@@ -797,13 +794,13 @@ void estimate_compression_pawn(ubyte *restrict table, int *restrict pcs,
   free(dst0);
 }
 
-long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
-			    int *restrict pcs, int wdl, int file)
+uint64_t estimate_compression(uint8_t *restrict table, int *restrict bestp,
+                            int *restrict pcs, int wdl, int file)
 {
   int i, j, k, p, q;
   int num_cands, bp = 0;
-  long64 best;
-  ubyte bestperm[TBPIECES];
+  uint64_t best;
+  uint8_t bestperm[TBPIECES];
 
   if (compress_type == 1) {
     *bestp = 0;
@@ -823,46 +820,46 @@ long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
     num_cands = 0;
     for (p = 0; p < num_types; p++) {
       for (i = 0; i < k; i++)
-	if (type[p] == bestperm[i]) break;
+        if (type[p] == bestperm[i]) break;
       if (i < k) continue;
       for (q = 0; q < num_types; q++) {
-	if (q == p) continue;
-	for (i = 0; i < k; i++)
-	  if (type[q] == bestperm[i]) break;
-	if (i < k) continue;
-	// look for permutation starting with bestperm[0..k-1],p,q
-	for (i = 0; i < num_type_perms; i++) {
-	  for (j = 0; j < k; j++)
-	    if (type_perm_list[i][j] != bestperm[j]) break;
-	  if (j < k) continue;
-	  if (type_perm_list[i][k] == type[p] && type_perm_list[i][k+1] == type[q]) break;
-	}
-	if (i < num_type_perms) {
-	  if (compest[i]) {
-	    if (compest[i] < best) {
-	      best = compest[i];
-	      bp = i;
-	    }
-	  } else
-	    trylist[num_cands++] = i;
-	}
+        if (q == p) continue;
+        for (i = 0; i < k; i++)
+          if (type[q] == bestperm[i]) break;
+        if (i < k) continue;
+        // look for permutation starting with bestperm[0..k-1],p,q
+        for (i = 0; i < num_type_perms; i++) {
+          for (j = 0; j < k; j++)
+            if (type_perm_list[i][j] != bestperm[j]) break;
+          if (j < k) continue;
+          if (type_perm_list[i][k] == type[p] && type_perm_list[i][k+1] == type[q]) break;
+        }
+        if (i < num_type_perms) {
+          if (compest[i]) {
+            if (compest[i] < best) {
+              best = compest[i];
+              bp = i;
+            }
+          } else
+            trylist[num_cands++] = i;
+        }
       }
     }
     for (i = 0; i < num_cands; i++)
       for (j = i + 1; j < num_cands; j++)
-	if (trylist[i] > trylist[j]) {
-	  int tmp = trylist[i];
-	  trylist[i] = trylist[j];
-	  trylist[j] = tmp;
-	}
+        if (trylist[i] > trylist[j]) {
+          int tmp = trylist[i];
+          trylist[i] = trylist[j];
+          trylist[j] = tmp;
+        }
     if (file < 0)
       estimate_compression_piece(table, pcs, wdl, num_cands);
     else
       estimate_compression_pawn(table, pcs, file, wdl, num_cands);
     for (i = 0; i < num_cands; i++) {
       if (compest[trylist[i]] < best) {
-	best = compest[trylist[i]];
-	bp = trylist[i];
+        best = compest[trylist[i]];
+        bp = trylist[i];
       }
     }
     bestperm[k] = type_perm_list[bp][k];
@@ -872,10 +869,10 @@ long64 estimate_compression(ubyte *restrict table, int *restrict bestp,
   return best;
 }
 
-ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
+uint8_t *init_permute_piece(int *pcs, int *pt, uint8_t *tb_table)
 {
   int i, j, k, m, l;
-  long64 factor[TBPIECES];
+  uint64_t factor[TBPIECES];
   int tidx[16];
 
   for (i = 0, k = 0; i < 16; i++)
@@ -908,63 +905,63 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
   if (entry_piece.enc_type == 0) { /* 111 */
     for (i = 0; i < num_type_perms;) {
       for (j = num_types - 3; j >= 0; j--)
-	if (pcs[type_perm_list[i][j]] == 1 &&
-		pcs[type_perm_list[i][j + 1]] == 1 &&
-		pcs[type_perm_list[i][j + 2]] == 1) break;
+        if (pcs[type_perm_list[i][j]] == 1 &&
+                pcs[type_perm_list[i][j + 1]] == 1 &&
+                pcs[type_perm_list[i][j + 2]] == 1) break;
       if (j < 0) {
-	num_type_perms--;
-	for (k = 0; k < num_types; k++)
-	  type_perm_list[i][k] = type_perm_list[num_type_perms][k];
+        num_type_perms--;
+        for (k = 0; k < num_types; k++)
+          type_perm_list[i][k] = type_perm_list[num_type_perms][k];
       } else {
-	piece_perm_list[i][2] = tidx[type_perm_list[i][j]];
-	piece_perm_list[i][1] = tidx[type_perm_list[i][j + 1]];
-	piece_perm_list[i][0] = tidx[type_perm_list[i][j + 2]];
-	for (k = 0, m = 3; k < num_types;)
-	  if (k != j) {
-	    for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
-	      piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
-	    k++;
-	  } else
-	    k += 3;
-	order_list[i] = j;
-	i++;
+        piece_perm_list[i][2] = tidx[type_perm_list[i][j]];
+        piece_perm_list[i][1] = tidx[type_perm_list[i][j + 1]];
+        piece_perm_list[i][0] = tidx[type_perm_list[i][j + 2]];
+        for (k = 0, m = 3; k < num_types;)
+          if (k != j) {
+            for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
+              piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
+            k++;
+          } else
+            k += 3;
+        order_list[i] = j;
+        i++;
       }
     }
   } else if (entry_piece.enc_type == 2) { /* KK or 11 */
     for (i = 0; i < num_type_perms;) {
       for (j = num_types - 2; j >= 0; j--)
-	if (pcs[type_perm_list[i][j]] == 1 &&
-		pcs[type_perm_list[i][j + 1]] == 1) break;
+        if (pcs[type_perm_list[i][j]] == 1 &&
+                pcs[type_perm_list[i][j + 1]] == 1) break;
       if (j < 0) {
-	num_type_perms--;
-	for (k = 0; k < num_types; k++)
-	  type_perm_list[i][k] = type_perm_list[num_type_perms][k];
+        num_type_perms--;
+        for (k = 0; k < num_types; k++)
+          type_perm_list[i][k] = type_perm_list[num_type_perms][k];
       } else {
-	piece_perm_list[i][1] = tidx[type_perm_list[i][j]];
-	piece_perm_list[i][0] = tidx[type_perm_list[i][j + 1]];
-	for (k = 0, m = 2; k < num_types;)
-	  if (k != j) {
-	    for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
-	      piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
-	    k++;
-	  } else
-	    k += 2;
-	order_list[i] = j;
-	i++;
+        piece_perm_list[i][1] = tidx[type_perm_list[i][j]];
+        piece_perm_list[i][0] = tidx[type_perm_list[i][j + 1]];
+        for (k = 0, m = 2; k < num_types;)
+          if (k != j) {
+            for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
+              piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
+            k++;
+          } else
+            k += 2;
+        order_list[i] = j;
+        i++;
       }
     }
   } else { /* 2, or 3, or 4, or higher; only possible for suicide chess */
     int p = entry_piece.enc_type - 1;
     for (i = 0; i < num_type_perms;) {
       for (j = num_types - 1; j >= 0; j--)
-	if (pcs[type_perm_list[i][j]] == p) break;
+        if (pcs[type_perm_list[i][j]] == p) break;
       for (k = 0; k < p; k++)
-	piece_perm_list[i][k] = tidx[type_perm_list[i][j]] + k;
+        piece_perm_list[i][k] = tidx[type_perm_list[i][j]] + k;
       for (k = 0, m = p; k < num_types; k++)
-	if (k != j) {
-	  for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
-	    piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
-	}
+        if (k != j) {
+          for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
+            piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
+        }
       order_list[i] = j;
       i++;
     }
@@ -973,22 +970,22 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
   for (i = 0; i < num_type_perms; i++)
     for (j = i + 1; j < num_type_perms; j++) {
       for (k = 0; k < num_types; k++)
-	if (pcs[type_perm_list[i][k]] != pcs[type_perm_list[j][k]]) break;
+        if (pcs[type_perm_list[i][k]] != pcs[type_perm_list[j][k]]) break;
       if (k < num_types && pcs[type_perm_list[i][k]] > pcs[type_perm_list[j][k]]) {
-	ubyte tmp;
-	for (k = 0; k < num_types; k++) {
-	  tmp = type_perm_list[i][k];
-	  type_perm_list[i][k] = type_perm_list[j][k];
-	  type_perm_list[j][k] = tmp;
-	}
-	for (k = 0; k < entry_piece.num; k++) {
-	  tmp = piece_perm_list[i][k];
-	  piece_perm_list[i][k] = piece_perm_list[j][k];
-	  piece_perm_list[j][k] = tmp;
-	}
-	tmp = order_list[i];
-	order_list[i] = order_list[j];
-	order_list[j] = tmp;
+        uint8_t tmp;
+        for (k = 0; k < num_types; k++) {
+          tmp = type_perm_list[i][k];
+          type_perm_list[i][k] = type_perm_list[j][k];
+          type_perm_list[j][k] = tmp;
+        }
+        for (k = 0; k < entry_piece.num; k++) {
+          tmp = piece_perm_list[i][k];
+          piece_perm_list[i][k] = piece_perm_list[j][k];
+          piece_perm_list[j][k] = tmp;
+        }
+        tmp = order_list[i];
+        order_list[i] = order_list[j];
+        order_list[j] = tmp;
       }
     }
 
@@ -996,9 +993,9 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
     for (j = 0; j < entry_piece.num; j++)
       pidx_list[i][piece_perm_list[i][j]] = j;
 
-  ubyte norm[TBPIECES];
+  uint8_t norm[TBPIECES];
   int order[TBPIECES];
-  set_norm_piece(pcs, type_perm_list[0], norm, order_list[0]);
+  p_set_norm_piece(pcs, type_perm_list[0], norm, order_list[0]);
   calc_order_piece(entry_piece.num, order_list[0], order, norm);
   tb_size = calc_factors_piece(factor, entry_piece.num, order_list[0], norm, entry_piece.enc_type);
   printf("tb_size = %"PRIu64"\n", tb_size);
@@ -1015,8 +1012,8 @@ ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table)
   return tb_table;
 }
 
-void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table,
-			ubyte *best, ubyte *v)
+void permute_piece_wdl(uint8_t *tb_table, int *pcs, int *pt, uint8_t *table,
+                        uint8_t *best, uint8_t *v)
 {
   int i;
 
@@ -1044,14 +1041,14 @@ void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table,
   run_threaded(convert_data_piece, work_convert, 1);
 }
 
-long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best,
-			  int *bestp, ubyte *v)
+uint64_t estimate_piece_dtz(int *pcs, int *pt, uint8_t *table, uint8_t *best,
+                          int *bestp, uint8_t *v)
 {
   int i;
 
   permute_v = v;
 
-  long64 estim = estimate_compression(table, bestp, pcs, 0, -1);
+  uint64_t estim = estimate_compression(table, bestp, pcs, 0, -1);
 
   for (i = 0; i < entry_piece.num; i++)
     best[i] = pt[piece_perm_list[*bestp][i]];
@@ -1066,7 +1063,7 @@ long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best,
   return estim;
 }
 
-void permute_piece_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, ubyte *v)
+void permute_piece_dtz(uint8_t *tb_table, int *pcs, uint8_t *table, int bestp, uint8_t *v)
 {
   permute_v = v;
 
@@ -1088,13 +1085,13 @@ void init_permute_pawn(int *pcs, int *pt)
 
   for (i = 0; i < numpcs; i++)
     pw[i] = (pt[i] == WPAWN) ? 0x38 : 0x00;
-  long64 pw_mask = 0;
+  uint64_t pw_mask = 0;
   for (i = 1; i < numpcs; i++)
-    pw_mask |= ((long64)pw[i]) << (6 * (numpcs - i - 1));
+    pw_mask |= ((uint64_t)pw[i]) << (6 * (numpcs - i - 1));
 
   if (pw[0])
     for (i = 1; i < 4; i++) {
-      long64 tmp = flip0x40[i];
+      uint64_t tmp = flip0x40[i];
       flip0x40[i] = flip0x40[7 - i];
       flip0x40[7 - i] = tmp;
     }
@@ -1144,8 +1141,8 @@ void init_permute_pawn(int *pcs, int *pt)
       piece_perm_list[i][m] = tidx[pivtype ^ 0x08] + (m - entry_pawn.pawns[0]);
     for (k = 0; k < num_types; k++)
       if (k != j0 && k != j1)
-	for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
-	  piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
+        for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
+          piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
   }
 
   for (i = 0; i < 16; i++)
@@ -1156,25 +1153,25 @@ void init_permute_pawn(int *pcs, int *pt)
   for (i = 0; i < num_type_perms; i++)
     for (j = i + 1; j < num_type_perms; j++) {
       for (k = 0; k < num_types; k++)
-	if (cmp[type_perm_list[i][k]] != cmp[type_perm_list[j][k]]) break;
+        if (cmp[type_perm_list[i][k]] != cmp[type_perm_list[j][k]]) break;
       if (k < num_types && cmp[type_perm_list[i][k]] > cmp[type_perm_list[j][k]]) {
-	ubyte tmp;
-	for (k = 0; k < num_types; k++) {
-	  tmp = type_perm_list[i][k];
-	  type_perm_list[i][k] = type_perm_list[j][k];
-	  type_perm_list[j][k] = tmp;
-	}
-	for (k = 0; k < entry_pawn.num; k++) {
-	  tmp = piece_perm_list[i][k];
-	  piece_perm_list[i][k] = piece_perm_list[j][k];
-	  piece_perm_list[j][k] = tmp;
-	}
-	tmp = order_list[i];
-	order_list[i] = order_list[j];
-	order_list[j] = tmp;
-	tmp = order2_list[i];
-	order2_list[i] = order2_list[j];
-	order2_list[j] = tmp;
+        uint8_t tmp;
+        for (k = 0; k < num_types; k++) {
+          tmp = type_perm_list[i][k];
+          type_perm_list[i][k] = type_perm_list[j][k];
+          type_perm_list[j][k] = tmp;
+        }
+        for (k = 0; k < entry_pawn.num; k++) {
+          tmp = piece_perm_list[i][k];
+          piece_perm_list[i][k] = piece_perm_list[j][k];
+          piece_perm_list[j][k] = tmp;
+        }
+        tmp = order_list[i];
+        order_list[i] = order_list[j];
+        order_list[j] = tmp;
+        tmp = order2_list[i];
+        order2_list[i] = order2_list[j];
+        order2_list[j] = tmp;
       }
     }
 
@@ -1185,12 +1182,12 @@ void init_permute_pawn(int *pcs, int *pt)
   work_convert = alloc_work(total_work);
 }
 
-ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
+uint8_t *init_permute_file(int *pcs, int file, uint8_t *tb_table)
 {
-  long64 factor[TBPIECES];
-  ubyte norm[TBPIECES];
+  uint64_t factor[TBPIECES];
+  uint8_t norm[TBPIECES];
   int order[TBPIECES];
-  set_norm_pawn(pcs, type_perm_list[0], norm, order_list[0], order2_list[0]);
+  p_set_norm_pawn(pcs, type_perm_list[0], norm, order_list[0], order2_list[0]);
   calc_order_pawn(entry_pawn.num, order_list[0], order2_list[0], order, norm);
   tb_size = calc_factors_pawn(factor, entry_pawn.num, order_list[0], order2_list[0], norm, file);
   printf("tb_size = %"PRIu64"\n", tb_size);
@@ -1207,7 +1204,7 @@ ubyte *init_permute_file(int *pcs, int file, ubyte *tb_table)
   return tb_table;
 }
 
-void permute_pawn_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *best, int file, ubyte *v)
+void permute_pawn_wdl(uint8_t *tb_table, int *pcs, int *pt, uint8_t *table, uint8_t *best, int file, uint8_t *v)
 {
   int i;
 
@@ -1239,13 +1236,13 @@ void permute_pawn_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *b
   run_threaded(convert_data_pawn, work_convert, 1);
 }
 
-long64 estimate_pawn_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, int file, ubyte *v)
+uint64_t estimate_pawn_dtz(int *pcs, int *pt, uint8_t *table, uint8_t *best, int *bestp, int file, uint8_t *v)
 {
   int i;
 
   permute_v = v;
 
-  long64 estim = estimate_compression(table, bestp, pcs, 0, file);
+  uint64_t estim = estimate_compression(table, bestp, pcs, 0, file);
 
   for (i = 0; i < entry_pawn.num; i++)
     best[i] = pt[piece_perm_list[*bestp][i]];
@@ -1262,7 +1259,7 @@ long64 estimate_pawn_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *best
   return estim;
 }
 
-void permute_pawn_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, int file, ubyte *v)
+void permute_pawn_dtz(uint8_t *tb_table, int *pcs, uint8_t *table, int bestp, int file, uint8_t *v)
 {
   permute_v = v;
 
