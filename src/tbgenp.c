@@ -23,6 +23,7 @@
 extern int total_work;
 extern struct thread_data *thread_data;
 extern int numthreads;
+extern int thread_affinity;
 extern struct timeval start_time, cur_time;
 
 static long64 *restrict work_g, *restrict work_piv;
@@ -633,6 +634,7 @@ static struct option options[] = {
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
   { "disk", 0, NULL, 'd' },
+  { "affinity", 0, NULL, 'a' },
   { 0, 0, NULL, 0 }
 };
 
@@ -647,9 +649,13 @@ int main(int argc, char **argv)
   int save_to_disk = 0;
 
   numthreads = 1;
+  thread_affinity = 0;
   do {
-    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "at:gwzsd", options, &longindex);
     switch (val) {
+    case 'a':
+      thread_affinity = 1;
+      break;
     case 't':
       numthreads = atoi(optarg);
       break;

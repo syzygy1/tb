@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -88,6 +88,7 @@ static struct {
 
 int total_work;
 int numthreads;
+int thread_affinity;
 
 struct timeval start_time, cur_time;
 
@@ -149,6 +150,23 @@ void init_threads(int pawns)
       exit(1);
     }
   }
+
+  if (thread_affinity) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(0, &cpuset);
+    int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+    if (rc)
+      fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
+    CPU_CLR(0, &cpuset);
+    for (i = 1; i < numthreads; i++) {
+      CPU_SET(i, &cpuset);
+      rc = pthread_setaffinity_np(threads[i - 1], sizeof(cpuset), &cpuset);
+      CPU_CLR(i, &cpuset);
+      if (rc)
+        fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
+    }
+  }
 #else
   threads = malloc((numthreads - 1) * sizeof(*threads));
   start_event = malloc((numthreads - 1) * sizeof(*start_event));
@@ -169,6 +187,9 @@ void init_threads(int pawns)
       exit(1);
     }
   }
+
+  if (thread_affinity)
+    fprintf(stderr, "Thread affinities not yet implemented on Windows.\n");
 #endif
 }
 

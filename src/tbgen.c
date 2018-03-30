@@ -42,6 +42,7 @@ static int captured_piece;
 static long64 size;
 
 extern int numthreads;
+extern int thread_affinity;
 
 extern struct timeval start_time, cur_time;
 
@@ -536,6 +537,7 @@ static struct option options[] = {
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
   { "disk", 0, NULL, 'd' },
+  { "affinity", 0, NULL, 'a' },
   { 0, 0, NULL, 0 }
 };
 
@@ -551,8 +553,11 @@ int main(int argc, char **argv)
 
   numthreads = 1;
   do {
-    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "at:gwzsd", options, &longindex);
     switch (val) {
+    case 'a':
+      thread_affinity = 1;
+      break;
     case 't':
       numthreads = atoi(optarg);
       break;
