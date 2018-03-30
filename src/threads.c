@@ -15,7 +15,7 @@
 #include "threads.h"
 #include "util.h"
 
-struct thread_data thread_data[MAX_THREADS];
+struct thread_data *thread_data;
 
 #ifndef __WIN32__ /* pthread */
 
@@ -65,16 +65,16 @@ int barrier_wait(barrier_t *barrier)
 }
 #endif
 
-pthread_t threads[MAX_THREADS - 1];
+pthread_t *threads;
 static pthread_attr_t thread_attr;
 static pthread_barrier_t barrier_start, barrier_end;
 #define THREAD_FUNC void*
 
 #else /* WIN32 */
 
-HANDLE threads[MAX_THREADS - 1];
-HANDLE start_event[MAX_THREADS - 1];
-HANDLE stop_event[MAX_THREADS - 1];
+HANDLE *threads;
+HANDLE *start_event;
+HANDLE *stop_event;
 #define THREAD_FUNC DWORD
 
 #endif
@@ -123,6 +123,8 @@ void init_threads(int pawns)
 {
   int i;
 
+  thread_data = malloc(numthreads * sizeof(*thread_data));
+
   for (i = 0; i < numthreads; i++)
     thread_data[i].thread = i;
 
@@ -133,6 +135,7 @@ void init_threads(int pawns)
   }
 
 #ifndef __WIN32__
+  threads = malloc((numthreads - 1) * sizeof(*threads));
   pthread_attr_init(&thread_attr);
   pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   pthread_barrier_init(&barrier_start, NULL, numthreads);
@@ -147,6 +150,9 @@ void init_threads(int pawns)
     }
   }
 #else
+  threads = malloc((numthreads - 1) * sizeof(*threads));
+  start_event = malloc((numthreads - 1) * sizeof(*start_event));
+  stop_event = malloc((numthreads - 1) * sizeof(*stop_event));
   for (i = 0; i < numthreads - 1; i++) {
     start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);

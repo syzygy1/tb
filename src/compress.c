@@ -197,8 +197,8 @@ struct {
 } paircands[MAX_NEW];
 
 ubyte newtest[MAXSYMB][MAXSYMB];
-uint32 countfirst[MAX_THREADS][MAX_NEW][MAXSYMB];
-uint32 countsecond[MAX_THREADS][MAX_NEW][MAXSYMB];
+uint32 (*countfirst)[MAX_NEW][MAXSYMB];
+uint32 (*countsecond)[MAX_NEW][MAXSYMB];
 
 extern int total_work;
 static long64 *restrict work = NULL, *restrict work_adj = NULL;
@@ -217,6 +217,17 @@ static int wdl_vals[5];
 static ubyte wdl_flags;
 int compress_type;
 static ubyte dc_to_val[4];
+
+static int64 (*countfreq)[9][16];
+static int64 (*countfreq_dtz)[255][255];
+
+void compress_alloc(void)
+{
+  countfirst = malloc(numthreads * sizeof(*countfirst));
+  countsecond = malloc(numthreads * sizeof(*countsecond));
+  countfreq = malloc(numthreads * sizeof(*countfreq));
+  countfreq_dtz = malloc(numthreads * sizeof(*countfreq_dtz));
+}
 
 void compress_init_wdl(int *vals, int flags)
 {
@@ -358,8 +369,6 @@ void fill_dontcares(struct thread_data *thread)
   }
 }
 
-static int64 countfreq[MAX_THREADS][9][16];
-
 static void count_pairs_wdl(struct thread_data *thread)
 {
   int s1, s2;
@@ -376,8 +385,6 @@ static void count_pairs_wdl(struct thread_data *thread)
     s1 = s2;
   }
 }
-
-static int64 countfreq_dtz[MAX_THREADS][255][255];
 
 static void count_pairs_dtz(struct thread_data *thread)
 {

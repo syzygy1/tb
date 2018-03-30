@@ -24,7 +24,7 @@
 void transform_table(struct thread_data *thread);
 
 extern int total_work;
-extern struct thread_data thread_data[];
+extern struct thread_data *thread_data;
 static long64 *work_g;
 #ifndef SMALL
 static long64 *work_piv;
@@ -117,6 +117,7 @@ void permute_piece_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, ubyte
 struct tb_handle *create_tb(char *tablename, int wdl, int blocksize);
 void compress_tb(struct tb_handle *F, ubyte *data, ubyte *perm, int minfreq);
 void merge_tb(struct tb_handle *F);
+void compress_alloc(void);
 void compress_init_wdl(int *vals, int flags);
 void compress_init_dtz(struct dtz_map *map);
 
@@ -646,7 +647,6 @@ int main(int argc, char **argv)
   }
 
   if (numthreads < 1) numthreads = 1;
-  else if (numthreads > MAX_THREADS) numthreads = MAX_THREADS;
 
   printf("number of threads = %d\n", numthreads);
 
@@ -764,6 +764,8 @@ int main(int argc, char **argv)
 
   table_w = alloc_huge(2 * alloc_size);
   table_b = table_w + alloc_size;
+
+  compress_alloc();
 
   init_threads(0);
   init_tables();

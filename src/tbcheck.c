@@ -79,7 +79,6 @@ int main(int argc, char **argv)
   }
 
   if (numthreads < 1) numthreads = 1;
-  else if (numthreads > MAX_THREADS) numthreads = MAX_THREADS;
 
   total_work = (numthreads == 1) ? 1 : 100 + 10 * numthreads;
 
