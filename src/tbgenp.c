@@ -854,7 +854,7 @@ int main(int argc, char **argv)
     pw[i] = (pt[i] == WPAWN) ? 0x38 : 0x00;
   pw_mask = 0;
   for (i = 1; i < numpcs; i++)
-    pw_mask |= pw[i] << (6 * (numpcs - i - 1));
+    pw_mask |= (long64)pw[i] << (6 * (numpcs - i - 1));
   pw_pawnmask = pw_mask >> (6 * (numpcs - numpawns));
 
   idx_mask1[numpcs - 1] = 0xffffffffffffffc0ULL;
