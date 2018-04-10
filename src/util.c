@@ -46,7 +46,7 @@ void *map_file(char *name, int shared, long64 *size)
   }
   DWORD size_low, size_high;
   size_low = GetFileSize(h, &size_high);
-  *size = ((long64)size_high) << 32 | ((long64)size_low);
+  *size = ((long64)size_high << 32) | (long64)size_low;
   HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
 				  NULL);
   if (map == NULL) {
