@@ -2526,8 +2526,6 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 }
 
 #if defined(REGULAR)
-static int white_king, black_king;
-
 int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
              int alpha, int beta)
 {
@@ -2907,8 +2905,6 @@ int old_probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int be
 #include "sprobe.c"
 #endif
 #elif defined(ATOMIC)
-static int white_king, black_king;
-
 int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
 {
   int i, j, k, s, t;
@@ -3004,8 +3000,6 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
   return alpha > v ? alpha : v;
 }
 #elif defined(LOSER)
-static int white_king, black_king;
-
 int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
 {
   int i, j, k, s, t;

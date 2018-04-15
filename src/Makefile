@@ -11,9 +11,6 @@ FLAGS = -DMAGIC
 # does not seem to matter.
 FLAGS += -DUSE_POPCNT
 
-# Specify maximum number of threads
-FLAGS += -DMAX_THREADS=12
-
 # Specify maximum number of pieces. More than 7 won't work.
 FLAGS += -DTBPIECES=7
 
@@ -26,7 +23,7 @@ CC = gcc -pthread
 
 # Compilation flags
 # For Haswell add -mbmi2 and select -DBMI2 above.
-#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-boungs -flto
+#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-boungs
 CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds -flto
 #CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined -Wno-array-bounds -flto -fprofile-use -lgcov
 #LDFLAGS = -lubsan

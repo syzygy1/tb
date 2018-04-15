@@ -103,8 +103,8 @@ static uint64_t HashLen0to16(const char *s, size_t len) {
     uint8_t a = s[0];
     uint8_t b = s[len >> 1];
     uint8_t c = s[len - 1];
-    uint32_t y = ((uint32)a) + (((uint32)b) << 8);
-    uint32_t z = len + (((uint32)c) << 2);
+    uint32_t y = ((uint32_t)a) + (((uint32_t)b) << 8);
+    uint32_t z = len + (((uint32_t)c) << 2);
     return ShiftMix(y * k2 ^ z * k3) * k2;
   }
   return k2;

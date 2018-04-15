@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -69,7 +69,7 @@ uint8_t loss_win[256];
 // check whether all moves end up in wins for the opponent
 // if we are here, all captures are losing
 static int check_loss(int *restrict pcs, uint64_t idx0, uint8_t *restrict table,
-        bitboard occ, int *restrict p)
+    bitboard occ, int *restrict p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -116,7 +116,7 @@ static int check_loss(int *restrict pcs, uint64_t idx0, uint8_t *restrict table,
 
 #define ASM_GOTO
 static int is_attacked(int sq, const int *restrict pcs, bitboard occ,
-                        const int *restrict p)
+    const int *restrict p)
 {
   int k;
 
@@ -137,7 +137,7 @@ lab:
 }
 
 static int check_mate(int *restrict pcs, uint64_t idx0, uint8_t *restrict table,
-        bitboard occ, int *restrict p)
+    bitboard occ, int *restrict p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -618,7 +618,7 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void iterate()
+void iterate(void)
 {
   int i;
   iter_cnt = 0;
@@ -778,7 +778,7 @@ MARK(reset_capt_closs)
   MARK_END;
 }
 
-void reset_captures_w(struct thread_data *thread)
+void reset_captures_worker_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -794,7 +794,7 @@ void reset_captures_w(struct thread_data *thread)
   }
 }
 
-void reset_captures_b(struct thread_data *thread)
+void reset_captures_worker_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -810,7 +810,7 @@ void reset_captures_b(struct thread_data *thread)
   }
 }
 
-void reset_captures(void)
+void reset_captures_w(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -828,7 +828,7 @@ void reset_captures(void)
     for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
 
-  to_fix_w = to_fix_b = 0;
+  to_fix_w = 0;
 
   for (i = 0; i < n; i++) { // loop over black pieces
     if (!(pt[i] & 0x08) || i == black_king) continue;
@@ -842,8 +842,29 @@ void reset_captures(void)
         pcs2[j++] = black_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(reset_captures_w, work_g, 1);
+    run_threaded(reset_captures_worker_w, work_g, 1);
   }
+}
+
+void reset_captures_b(void)
+{
+  int i, j, k;
+  int n = numpcs;
+  uint8_t v[256];
+
+  reset_v = v;
+
+  for (i = 0; i < 256; i++)
+    v[i] = 0;
+
+  if (num_saves == 0)
+    for (i = DRAW_RULE; i < REDUCE_PLY; i++)
+      v[LOSS_IN_ONE - i] = 1;
+  else
+    for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
+      v[LOSS_IN_ONE - i] = 1;
+
+  to_fix_b = 0;
 
   for (i = 0; i < n; i++) { // loop over white pieces
     if ((pt[i] & 0x08) || i == white_king) continue;
@@ -857,14 +878,14 @@ void reset_captures(void)
         pcs2[j++] = white_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(reset_captures_b, work_g, 1);
+    run_threaded(reset_captures_worker_b, work_g, 1);
   }
 }
 
 // CAPT_CLOSS means there is a capture into a cursed win, preventing a loss
 // we need to determine if there are regular moves into a slower cursed loss
-int compute_capt_closs(int *restrict pcs, uint64_t idx0, uint8_t *restrict table,
-        bitboard occ, int *restrict p)
+int compute_capt_closs(int *restrict pcs, uint64_t idx0,
+    uint8_t *restrict table, bitboard occ, int *restrict p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -906,7 +927,7 @@ int compute_capt_closs(int *restrict pcs, uint64_t idx0, uint8_t *restrict table
   return best;
 }
 
-void fix_closs_w(struct thread_data *thread)
+void fix_closs_worker_w(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -918,7 +939,7 @@ void fix_closs_w(struct thread_data *thread)
   }
 }
 
-void fix_closs_b(struct thread_data *thread)
+void fix_closs_worker_b(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -930,11 +951,11 @@ void fix_closs_b(struct thread_data *thread)
   }
 }
 
-void fix_closs(void)
+void fix_closs_w(void)
 {
   int i;
 
-  if (!to_fix_w && !to_fix_b) return;
+  if (!to_fix_w) return;
 
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
@@ -953,13 +974,33 @@ void fix_closs(void)
       win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
   }
 
-  if (to_fix_w) {
-    printf("fixing cursed white losses.\n");
-    run_threaded(fix_closs_w, work_g, 1);
-  }
-  if (to_fix_b) {
-    printf("fixing cursed black losses.\n");
-    run_threaded(fix_closs_b, work_g, 1);
-  }
+  printf("fixing cursed white losses.\n");
+  run_threaded(fix_closs_worker_w, work_g, 1);
 }
 
+void fix_closs_b(void)
+{
+  int i;
+
+  if (!to_fix_b) return;
+
+  for (i = 0; i < 256; i++)
+    win_loss[i] = 0;
+  if (num_saves == 0) {
+    // if no legal moves or all moves lose, then CLOSS capture was best
+    for (i = 0; i < CAPT_CWIN; i++)
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
+    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
+    for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
+      win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
+  } else {
+    // CAPT_CLOSS will be set to 0, then overridden by what was saved before
+    for (i = 0; i < CAPT_CWIN_RED + 2; i++)
+      win_loss[i] = CAPT_CLOSS;
+    for (i = 0; i < REDUCE_PLY_RED; i++)
+      win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
+  }
+
+  printf("fixing cursed black losses.\n");
+  run_threaded(fix_closs_worker_b, work_g, 1);
+}

@@ -15,7 +15,7 @@
 #include "threads.h"
 #include "util.h"
 
-struct thread_data thread_data[MAX_THREADS];
+struct thread_data *thread_data;
 
 #ifndef __WIN32__ /* pthread */
 
@@ -65,33 +65,34 @@ int barrier_wait(barrier_t *barrier)
 }
 #endif
 
-pthread_t threads[MAX_THREADS - 1];
+pthread_t *threads;
 static pthread_attr_t thread_attr;
 static pthread_barrier_t barrier_start, barrier_end;
 #define THREAD_FUNC void*
 
 #else /* WIN32 */
 
-HANDLE threads[MAX_THREADS - 1];
-HANDLE start_event[MAX_THREADS - 1];
-HANDLE stop_event[MAX_THREADS - 1];
+HANDLE *threads;
+HANDLE *start_event;
+HANDLE *stop_event;
 #define THREAD_FUNC DWORD
 
 #endif
 
 static struct {
   void (*func)(struct thread_data *);
-  long64 *work;
+  uint64_t *work;
   int counter;
   int total;
 } queue;
 
 int total_work;
 int numthreads;
+int thread_affinity;
 
 struct timeval start_time, cur_time;
 
-void fill_work(int n, long64 size, long64 mask, long64 *w)
+void fill_work(int n, uint64_t size, uint64_t mask, uint64_t *w)
 {
   int i;
 
@@ -99,17 +100,25 @@ void fill_work(int n, long64 size, long64 mask, long64 *w)
   w[n] = size;
 
   for (i = 1; i < n; i++)
-    w[i] = ((((long64)i) * size) / ((long64)n)) & ~mask;
+    w[i] = ((((uint64_t)i) * size) / ((uint64_t)n)) & ~mask;
 }
 
-long64 *alloc_work(int n)
+void fill_work_offset(int n, uint64_t size, uint64_t mask, uint64_t *w,
+    uint64_t offset)
 {
-  return (long64 *)malloc((n + 1) * sizeof(long64));
+  fill_work(n, size, mask, w);
+  for (int i = 0; i <= n; i++)
+    w[i] += offset;
 }
 
-long64 *create_work(int n, long64 size, long64 mask)
+uint64_t *alloc_work(int n)
 {
-  long64 *w;
+  return (uint64_t *)malloc((n + 1) * sizeof(uint64_t));
+}
+
+uint64_t *create_work(int n, uint64_t size, uint64_t mask)
+{
+  uint64_t *w;
 
   w = alloc_work(n);
   fill_work(n, size, mask, w);
@@ -123,16 +132,19 @@ void init_threads(int pawns)
 {
   int i;
 
+  thread_data = malloc(numthreads * sizeof(*thread_data));
+
   for (i = 0; i < numthreads; i++)
     thread_data[i].thread = i;
 
   if (pawns) {
-    void *p = (void *)alloc_aligned(64 * numthreads, 64);
+    uint8_t *p = alloc_aligned(64 * numthreads, 64);
     for (i = 0; i < numthreads; i++)
-      thread_data[i].p = (int *)(((ubyte *)p) + 64 * i);
+      thread_data[i].p = (int *)(p + 64 * i);
   }
 
 #ifndef __WIN32__
+  threads = malloc((numthreads - 1) * sizeof(*threads));
   pthread_attr_init(&thread_attr);
   pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   pthread_barrier_init(&barrier_start, NULL, numthreads);
@@ -146,7 +158,27 @@ void init_threads(int pawns)
       exit(1);
     }
   }
+
+  if (thread_affinity) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(0, &cpuset);
+    int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+    if (rc)
+      fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
+    CPU_CLR(0, &cpuset);
+    for (i = 1; i < numthreads; i++) {
+      CPU_SET(i, &cpuset);
+      rc = pthread_setaffinity_np(threads[i - 1], sizeof(cpuset), &cpuset);
+      CPU_CLR(i, &cpuset);
+      if (rc)
+        fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
+    }
+  }
 #else
+  threads = malloc((numthreads - 1) * sizeof(*threads));
+  start_event = malloc((numthreads - 1) * sizeof(*start_event));
+  stop_event = malloc((numthreads - 1) * sizeof(*stop_event));
   for (i = 0; i < numthreads - 1; i++) {
     start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
@@ -163,6 +195,9 @@ void init_threads(int pawns)
       exit(1);
     }
   }
+
+  if (thread_affinity)
+    fprintf(stderr, "Thread affinities not yet implemented on Windows.\n");
 #endif
 }
 
@@ -208,7 +243,7 @@ THREAD_FUNC worker(void *arg)
   return 0;
 }
 
-void run_threaded(void (*func)(struct thread_data *), long64 *work, int report_time)
+void run_threaded(void (*func)(struct thread_data *), uint64_t *work, int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;
@@ -232,7 +267,7 @@ void run_threaded(void (*func)(struct thread_data *), long64 *work, int report_t
   cur_time = stop_time;
 }
 
-void run_single(void (*func)(struct thread_data *), long64 *work, int report_time)
+void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;

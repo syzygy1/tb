@@ -1,15 +1,18 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
+#include <assert.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <inttypes.h>
+
 #include "checksum.h"
+#include "compress.h"
 #include "defs.h"
 #include "huffman.h"
 #include "probe.h"
@@ -17,8 +20,6 @@
 #include "types.h"
 #include "util.h"
 
-#define MAXSYMB (4095 + 8)
-#define MAXINT64 0x7fffffffffffffff
 #define MAX_NEW 250
 
 static struct dtz_map *dtz_map;
@@ -26,7 +27,6 @@ static struct dtz_map *dtz_map;
 extern int split;
 extern int numpcs;
 extern int numpawns;
-extern uint64_t tb_size;
 
 int blockbits = 8;
 
@@ -37,11 +37,19 @@ int low, high;
 
 char name[64];
 
-static struct HuffCode *setup_code(unsigned char *data, uint64_t size);
+static void calc_symbol_tweaks(struct HuffCode *restrict c);
+struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
+    int minfreq, int maxsymbols);
+static void compress_data_single_valued(struct tb_handle *F, int num);
 
 struct Symbol {
   uint16_t pattern[2];
-  uint8_t first, second;
+  union {
+    struct {
+      uint8_t first, second;
+    };
+    uint16_t sym;
+  };
   int len;
 };
 
@@ -72,19 +80,19 @@ struct {
   int s1, s2;
 } paircands[MAX_NEW];
 
-uint8_t newtest[MAXSYMB][MAXSYMB];
-uint32_t countfirst[MAX_THREADS][MAX_NEW][MAXSYMB];
-uint32_t countsecond[MAX_THREADS][MAX_NEW][MAXSYMB];
+static uint8_t newtest[MAXSYMB][MAXSYMB];
+static uint32_t (*countfirst)[MAX_NEW][MAXSYMB];
+static uint32_t (*countsecond)[MAX_NEW][MAXSYMB];
 
 extern int total_work;
 static uint64_t *restrict work = NULL, *restrict work_adj = NULL;
 
 static struct {
-  uint8_t *data;
+  void *data;
   uint64_t size;
 } compress_state;
 
-uint8_t pairfirst[4][MAXSYMB], pairsecond[4][MAXSYMB];
+static uint8_t pairfirst[4][MAXSYMB], pairsecond[4][MAXSYMB];
 
 static int t1[4][4];
 static int t2[4][4];
@@ -94,9 +102,34 @@ static uint8_t wdl_flags;
 int compress_type;
 static uint8_t dc_to_val[4];
 
-#define T uint8_t
+static int64_t (*countfreq)[9][16];
+static int64_t (*countfreq_dtz_u8)[255][255];
+static int64_t (*countfreq_dtz_u16)[MAX_VALS][MAX_VALS];
+
+#define read_symbol(x) _Generic((x), \
+  u8: symcode[x][(&(x))[1]], \
+  u16: x \
+);
+
+#define write_symbol(x, y) _Generic((x), \
+  u8: ((x) = (y)->first, (&(x))[1] = (y)->second ), \
+  u16: (x) = (y)->sym \
+);
+
+#define T u8
 #include "compress_tmpl.c"
 #undef T
+
+#define T u16
+#include "compress_tmpl.c"
+#undef T
+
+void compress_alloc_wdl()
+{
+  countfirst = malloc(numthreads * sizeof(*countfirst));
+  countsecond = malloc(numthreads * sizeof(*countsecond));
+  countfreq = malloc(numthreads * sizeof(*countfreq));
+}
 
 void compress_init_wdl(int *vals, int flags)
 {
@@ -240,8 +273,6 @@ void fill_dontcares(struct thread_data *thread)
 }
 #endif
 
-static int64_t countfreq[MAX_THREADS][9][16];
-
 static void count_pairs_wdl(struct thread_data *thread)
 {
   int s1, s2;
@@ -258,93 +289,6 @@ static void count_pairs_wdl(struct thread_data *thread)
     s1 = s2;
   }
 }
-
-static int64_t countfreq_dtz[MAX_THREADS][255][255];
-
-#if 0
-static void count_pairs_dtz(struct thread_data *thread)
-{
-  int s1, s2;
-  uint64_t idx = thread->begin;
-  uint64_t end = thread->end;
-  uint8_t *restrict data = compress_state.data;
-  int t = thread->thread;
-
-  if (idx == 0) idx = 1;
-  s1 = data[idx - 1];
-  for (; idx < end; idx++) {
-    s2 = data[idx];
-    countfreq_dtz[t][s1][s2]++;
-    s1 = s2;
-  }
-}
-
-void adjust_work_replace(uint64_t *restrict work)
-{
-  uint64_t idx, idx2;
-  uint64_t end = compress_state.size;
-  uint8_t *restrict data = compress_state.data;
-  int i, s1, s2, j;
-
-  for (i = 1; i < total_work; i++) {
-    idx = work[i];
-    if (idx <= work[i - 1]) {
-      work[i] = work[i - 1];
-      continue;
-    }
-    s1 = symcode[data[idx]][data[idx + 1]];
-    idx += symtable[s1].len;
-    j = 0;
-    while (idx < end) {
-      s2 = symcode[data[idx]][data[idx + 1]];
-      if (newtest[s1][s2]) j = 0;
-      else {
-        if (j == 1) break;
-        j = 1;
-        idx2 = idx;
-      }
-      idx += symtable[s2].len;
-      s1 = s2;
-    }
-    if (idx < end)
-      work[i] = idx2;
-    else
-      work[i] = end;
-  }
-}
-
-void replace_pairs(struct thread_data *thread)
-{
-  uint64_t idx = thread->begin;
-  uint64_t end = thread->end;
-  uint8_t *restrict data = compress_state.data;
-  int s1, s2, a;
-  int t = thread->thread;
-
-  a = -1;
-  s1 = symcode[data[idx]][data[idx + 1]];
-  idx += symtable[s1].len;
-  while (idx < end) {
-    s2 = symcode[data[idx]][data[idx + 1]];
-    idx += symtable[s2].len;
-    if (newtest[s1][s2]) {
-      struct Symbol *sym = &symtable[newpairs[newtest[s1][s2] - 1].sym];
-      data[idx - sym->len] = sym->first;
-      data[idx - sym->len + 1] = sym->second;
-      if (likely(a >= 0)) countfirst[t][newtest[s1][s2] - 1][a]++;
-      a = newtest[s1][s2] - 1;
-      if (unlikely(idx == compress_state.size)) break;
-      s1 = symcode[data[idx]][data[idx + 1]];
-      idx += symtable[s1].len;
-      countsecond[t][a][s1]++;
-      a = newpairs[a].sym;
-    } else {
-      a = s1;
-      s1 = s2;
-    }
-  }
-}
-#endif
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -400,7 +344,8 @@ static void remove_wdl_worker(struct thread_data *thread)
   }
 }
 
-void adjust_work_dontcares_wdl(uint64_t *restrict work1, uint64_t *restrict work2)
+void adjust_work_dontcares_wdl(uint64_t *restrict work1,
+    uint64_t *restrict work2)
 {
   uint64_t idx;
   uint64_t end = work1[total_work];
@@ -424,7 +369,7 @@ void adjust_work_dontcares_wdl(uint64_t *restrict work1, uint64_t *restrict work
 static int d[5] = { 5, 5, 6, 7, 8 };
 
 struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
-                                     int minfreq, int maxsymbols)
+    int minfreq, int maxsymbols)
 {
   int i, j, k, l;
   int s1, s2;
@@ -710,8 +655,8 @@ lab:
           countsecond[t][i][j] = 0;
         }
 
-    adjust_work_replace_uint8_t(work);
-    run_threaded(replace_pairs, work, 0);
+    adjust_work_replace_u8(work);
+    run_threaded(replace_pairs_u8, work, 0);
 
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num3; i++)
@@ -729,7 +674,7 @@ lab:
 
   }
 
-  struct HuffCode *restrict c = setup_code(data, size);
+  struct HuffCode *restrict c = setup_code_u8(data, size);
 
   // map remaining don't cares to a value
   for (k = 5; k < 9; k++)
@@ -773,284 +718,26 @@ lab:
   }
   num_syms = k;
 
-  create_code(c);
-  sort_code(c, num_syms);
+  create_code(c, num_syms);
+  sort_code(c);
 
   return c;
 }
 
-#if 0
-// might not be a win
-static void remove_dtz_worker(struct thread_data *thread)
-{
-  uint64_t idx, idx2;
-  uint64_t end = thread->end;
-  uint8_t *restrict data = compress_state.data;
-  uint64_t size = compress_state.size;
-  int s;
-  int num = num_vals;
-  int max = dtz_map->high_freq_max;
-
-  idx = thread->begin;
-  while (idx < end) {
-    for (; idx < end; idx++)
-      if (data[idx] == num) break;
-    if (idx == end) break;
-    for (idx2 = idx + 1; idx2 < end; idx2++)
-      if (data[idx2] != num) break;
-    if (idx2 - idx >= 32) {
-      idx = idx2;
-      continue;
-    }
-    if (idx == 0)
-      s = data[idx2];
-    else {
-      s = data[idx - 1];
-      if (idx2 < size && data[idx2] < s)
-        s = data[idx2];
-    }
-    if (s >= max)
-      idx = idx2;
-    else
-      for (; idx < idx2; idx++)
-        data[idx] = s;
-  }
-}
-
-void adjust_work_dontcares_dtz(uint64_t *restrict work1, uint64_t *restrict work2)
-{
-  uint64_t idx;
-  uint64_t end = work1[total_work];
-  uint8_t *data = compress_state.data;
-  int i;
-  int num = num_vals;
-
-  work2[0] = work1[0];
-  for (i = 1; i < total_work; i++) {
-    idx = work1[i];
-    if (idx < work2[i - 1]) {
-      work2[i] = work2[i - 1];
-      continue;
-    }
-    while (idx < end && (data[idx - 1] == num || data[idx] == num
-                                        || data[idx - 1] == data[idx]))
-//    while (idx < end && data[idx] == num)
-      idx++;
-    work2[i] = idx;
-  }
-  work2[total_work] = work1[total_work];
-}
-
-struct HuffCode *construct_pairs_dtz(uint8_t *restrict data, uint64_t size,
-                                     int minfreq, int maxsymbols)
-{
-  int i, j, k, l;
-  int num, t;
-
-  if (!work)
-    work = alloc_work(total_work);
-  if (!work_adj)
-    work_adj = alloc_work(total_work);
-
-  num_syms = num_vals;
-
-  num_ctrl = num_vals - 1;
-  cur_ctrl_idx = 0;
-  compress_state.data = data;
-  compress_state.size = size;
-
-  fill_work(total_work, size, 0, work);
-
-  if (maxsymbols > 0) {
-    maxsymbols += num_syms;
-    if (maxsymbols > 4095)
-      maxsymbols = 4095;
-  } else {
-    maxsymbols = 4095;
-  }
-
-  adjust_work_dontcares_dtz(work, work_adj);
-  run_threaded(remove_dtz_worker, work_adj, 0);
-
-  // first round of freq counting, to fill in dont cares
-  for (i = 0; i < num_syms; i++)
-    for (j = 0; j < num_syms; j++)
-      pairfreq[i][j] = 0;
-
-  if (num_syms > 255) {
-    fprintf(stderr, "error\n");
-    exit(1);
-  }
-  for (t = 0; t < numthreads; t++)
-    for (i = 0; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        countfreq_dtz[t][i][j] = 0;
-  run_threaded(count_pairs_dtz, work, 0);
-  for (t = 0; t < numthreads; t++)
-    for (i = 0; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] += countfreq_dtz[t][i][j];
-
-  for (j = 0; j < num_syms; j++)
-    pairfirst[0][j] = pairsecond[0][j] = 0;
-  for (i = 1; i < num_syms; i++)
-    for (j = 0; j < num_syms; j++) {
-      if (pairfreq[j][i] > pairfreq[j][pairfirst[0][j]])
-        pairfirst[0][j] = i;
-      if (pairfreq[i][j] > pairfreq[pairsecond[0][j]][j])
-        pairsecond[0][j] = i;
-    }
-
-  dcfreq[0][0] = -1;
-  for (i = 0; i < num_syms; i++)
-    for (j = 0; j < num_syms; j++)
-      if (pairfreq[i][j] > dcfreq[0][0]) {
-        dcfreq[0][0] = pairfreq[i][j];
-        t1[0][0] = i;
-        t2[0][0] = j;
-      }
-
-  for (i = 0; i < MAXSYMB; i++)
-    for (j = 0; j < MAXSYMB; j++)
-      newtest[i][j] = 0;
-
-  adjust_work_dontcares(work, work_adj);
-  run_threaded(fill_dontcares, work_adj, 0);
-
-  for (i = 0; i < num_syms; i++)
-    for (j = 0; j < num_syms; j++)
-      pairfreq[i][j] = 0;
-
-  for (t = 0; t < numthreads; t++)
-    for (i = 0; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        countfreq_dtz[t][i][j] = 0;
-  run_threaded(count_pairs_dtz, work, 0);
-  for (t = 0; t < numthreads; t++)
-    for (i = 0; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] += countfreq_dtz[t][i][j];
-
-  for (i = 0; i < num_syms; i++)
-    for (j = 0; j < 256; j++)
-      symcode[i][j] = i;
-
-  while (num_syms < maxsymbols) {
-
-    num = 0;
-    for (i = 0; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        if (pairfreq[i][j] >= minfreq && (num < MAX_NEW - 1 || pairfreq[i][j] > newpairs[num-1].freq) && (symtable[i].len + symtable[j].len <= 256)) {
-          for (k = 0; k < num; k++)
-            if (newpairs[k].freq < pairfreq[i][j]) break;
-          if (num < MAX_NEW - 1) num++;
-          for (l = num - 1; l > k; l--)
-            newpairs[l] = newpairs[l-1];
-          newpairs[k].freq = pairfreq[i][j];
-          newpairs[k].s1 = i;
-          newpairs[k].s2 = j;
-        }
-
-    for (i = 0; i < num_syms; i++)
-      pairfirst[0][i] = pairsecond[0][i] = 0;
-
-    // keep track of number of skipped pairs to make sure they'll be
-    // considered in the next iteration (before running out of symbols)
-    int skipped = 0; // just a rough estimate
-    int64_t max = newpairs[0].freq;
-    for (i = 0, j = 0; i < num && num_syms + j + skipped <= maxsymbols; i++) {
-      while (max > newpairs[i].freq * 2) {
-        skipped += i;
-        max /= 2;
-      }
-      if (!pairsecond[0][newpairs[i].s1] && !pairfirst[0][newpairs[i].s2])
-        newpairs[j++] = newpairs[i];
-      else
-        skipped++;
-      pairfirst[0][newpairs[i].s1] = 1;
-      pairsecond[0][newpairs[i].s2] = 1;
-    }
-    num = j;
-
-    if (num_syms + num > maxsymbols)
-      num = maxsymbols - num_syms;
-
-    for (i = 0; i < num; i++) {
-      newpairs[i].sym = num_syms;
-      symtable[num_syms].len = symtable[newpairs[i].s1].len + symtable[newpairs[i].s2].len;
-      symtable[num_syms].pattern[0] = newpairs[i].s1;
-      symtable[num_syms].pattern[1] = newpairs[i].s2;
-      if (!cur_ctrl_idx)
-        num_ctrl++;
-      if (num_ctrl == 256) break;
-      symtable[num_syms].first = num_ctrl;
-      symtable[num_syms].second = cur_ctrl_idx;
-      symcode[num_ctrl][cur_ctrl_idx] = num_syms;
-      cur_ctrl_idx++;
-      if (cur_ctrl_idx == 256) cur_ctrl_idx = 0;
-      num_syms++;
-    }
-
-    if (i != num) {
-      printf("Ran short of symbols.\n"); // not an error
-      num = i;
-      num_ctrl--;
-    }
-
-    if (num == 0) break;
-
-    for (i = 0; i < num_syms - num; i++)
-      for (j = num_syms - num; j < num_syms; j++)
-        pairfreq[i][j] = 0;
-    for (; i < num_syms; i++)
-      for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] = 0;
-
-    for (i = 0; i < num; i++)
-      newtest[newpairs[i].s1][newpairs[i].s2] = i + 1;
-
-// thread this later
-    for (t = 0; t < numthreads; t++)
-      for (i = 0; i < num; i++)
-        for (j = 0; j < num_syms; j++) {
-          countfirst[t][i][j] = 0;
-          countsecond[t][i][j] = 0;
-        }
-
-    adjust_work_replace(work);
-    run_threaded(replace_pairs, work, 0);
-
-    for (t = 0; t < numthreads; t++)
-      for (i = 0; i < num; i++)
-        for (j = 0; j < num_syms; j++) {
-          pairfreq[j][newpairs[i].s1] -= countfirst[t][i][j];
-          pairfreq[j][newpairs[i].sym] += countfirst[t][i][j];
-          pairfreq[newpairs[i].s2][j] -= countsecond[t][i][j];
-          pairfreq[newpairs[i].sym][j] += countsecond[t][i][j];
-        }
-
-    for (i = 0; i < num; i++)
-      pairfreq[newpairs[i].s1][newpairs[i].s2] = 0;
-
-    for (i = 0; i < num; i++)
-      newtest[newpairs[i].s1][newpairs[i].s2] = 0;
-  }
-
-  struct HuffCode *restrict c = setup_code(data, size);
-  create_code(c);
-  sort_code(c, num_syms);
-
-  return c;
-}
-#endif
-
-struct HuffCode *construct_pairs(uint8_t *restrict data, uint64_t size,
+struct HuffCode *construct_pairs_u8(u8 *restrict data, uint64_t size,
                                  int minfreq, int maxsymbols, int wdl)
 {
   if (wdl)
     return construct_pairs_wdl(data, size, minfreq, maxsymbols);
   else
-    return construct_pairs_dtz(data, size, minfreq, maxsymbols);
+    return construct_pairs_dtz_u8(data, size, minfreq, maxsymbols);
+}
+
+struct HuffCode *construct_pairs_u16(u16 *restrict data,
+    uint64_t size, int minfreq, int maxsymbols, int wdl)
+{
+  assert(!wdl);
+  return construct_pairs_dtz_u16(data, size, minfreq, maxsymbols);
 }
 
 void calc_symbol_tweaks(struct HuffCode *restrict c)
@@ -1075,6 +762,7 @@ void calc_symbol_tweaks(struct HuffCode *restrict c)
   }
 }
 
+#if 0
 static struct HuffCode *setup_code(uint8_t *restrict data, uint64_t size)
 {
   uint64_t idx;
@@ -1107,7 +795,7 @@ void calc_block_sizes(uint8_t *restrict data, uint64_t size,
   uint64_t optsize, compsize;
 
   block = 0;
-  compsize = MAXINT64;
+  compsize = INT64_MAX;
   blocksize = maxsize + 1;
   do {
     optsize = compsize;
@@ -1251,28 +939,7 @@ void calc_block_sizes(uint8_t *restrict data, uint64_t size,
   printf("idxbits = %d\n", idxbits);
   printf("num_indices = %d\n", num_indices);
 }
-
-struct tb_handle {
-  char name[64];
-  int num_tables;
-  int wdl;
-  int split;
-  uint8_t perm[8][TBPIECES];
-  int default_blocksize;
-  int blocksize[8];
-  int idxbits[8];
-  uint64_t real_num_blocks[8];
-  uint64_t num_blocks[8];
-  int num_indices[8];
-  int num_syms[8];
-  int num_values[8];
-  struct HuffCode *c[8];
-  struct Symbol *symtable[8];
-  struct dtz_map *map[4];
-  int flags[8];
-  uint8_t single_val[8];
-  FILE *H[8];
-};
+#endif
 
 void write_final(struct tb_handle *F, FILE *G)
 {
@@ -1404,6 +1071,7 @@ void write_final(struct tb_handle *F, FILE *G)
   }
 }
 
+#if 0
 void write_ctb_data(FILE *F, uint8_t *restrict data,
                     struct HuffCode *restrict c, uint64_t size, int blocksize)
 {
@@ -1541,6 +1209,7 @@ static void compress_data(struct tb_handle *F, int num, FILE *G,
 
   write_ctb_data(G, data, c, size, F->blocksize[num]);
 }
+#endif
 
 struct tb_handle *create_tb(char *tablename, int wdl, int blocksize)
 {
@@ -1575,6 +1244,7 @@ static void compress_data_single_valued(struct tb_handle *F, int num)
   }
 }
 
+#if 0
 void compress_tb(struct tb_handle *F, uint8_t *restrict data,
                  uint8_t *restrict perm, int minfreq)
 {
@@ -1606,6 +1276,7 @@ void compress_tb(struct tb_handle *F, uint8_t *restrict data,
     compress_data_single_valued(F, num);
   }
 }
+#endif
 
 void merge_tb(struct tb_handle *F)
 {

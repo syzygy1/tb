@@ -25,29 +25,29 @@ extern int total_work;
 static uint64_t checksum1[2];
 static uint64_t checksum2[2];
 static uint64_t *results = NULL;
-static char *data;
-static long64 size;
+static uint8_t *data;
+static uint64_t size;
 static int checksum_found;
 static int checksum_match;
-static long64 *work = NULL;
+static uint64_t *work = NULL;
 
 static void checksum_worker(struct thread_data *thread)
 {
-  long64 idx;
-  long64 end = thread->end;
+  uint64_t idx;
+  uint64_t end = thread->end;
 
   for (idx = thread->begin; idx < end; idx++) {
-    long64 start = idx * CHUNK;
-    long64 chunk = CHUNK;
+    uint64_t start = idx * CHUNK;
+    uint64_t chunk = CHUNK;
     if (start + chunk > size)
       chunk = size - start;
-    CityHashCrc256(data + start, chunk, &results[4 * idx]);
+    CityHashCrc256((char *)(data + start), chunk, &results[4 * idx]);
   }
 }
 
 static void calc_checksum(char *name)
 {
-  long64 orig_size;
+  uint64_t orig_size;
 
   if (!work) work = alloc_work(total_work);
 
@@ -91,10 +91,10 @@ void print_checksum(char *name, char *sum)
 
   int i;
   static char nibble[16] = "0123456789abcdef";
-  ubyte *c = (ubyte *)checksum1;
+  uint8_t *c = (uint8_t *)checksum1;
 
   for (i = 0; i < 16; i++) {
-    ubyte b = c[i];
+    uint8_t b = c[i];
     sum[2 * i] = nibble[b >> 4];
     sum[2 * i + 1] = nibble[b & 0x0f];
   }

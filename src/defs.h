@@ -23,7 +23,7 @@
 
 #define MAX_VALS (((MAX_STATS / 2) - DRAW_RULE) / 2)
 
-enum { MAXSYMB = 4095 };
+enum { MAXSYMB = 4095 + 8 };
 
 // GIVEAWAY is a variation on SUICIDE
 #ifdef GIVEAWAY
@@ -43,5 +43,8 @@ enum { MAXSYMB = 4095 };
 #define likely(x) __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #endif
+
+#define PASTER(x,y) x##_##y
+#define EVALUATOR(x,y) PASTER(x,y)
 
 #endif

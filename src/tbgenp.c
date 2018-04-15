@@ -21,8 +21,9 @@
 #define MAX_PIECES 8
 
 extern int total_work;
-extern struct thread_data thread_data[];
+extern struct thread_data *thread_data;
 extern int numthreads;
+extern int thread_affinity;
 extern struct timeval start_time, cur_time;
 
 static uint64_t *restrict work_g, *restrict work_piv;
@@ -114,6 +115,7 @@ void permute_pawn_dtz(uint8_t *tb_table, int *pcs, uint8_t *table, int bestp, in
 struct tb_handle *create_tb(char *tablename, int wdl, int blocksize);
 void compress_tb(struct tb_handle *F, uint8_t *restrict data, uint8_t *restrict perm, int minfreq);
 void merge_tb(struct tb_handle *F);
+void compress_alloc(void);
 void compress_init_wdl(int *vals, int flags);
 void compress_init_dtz(struct dtz_map *map);
 
@@ -632,6 +634,7 @@ static struct option options[] = {
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
   { "disk", 0, NULL, 'd' },
+  { "affinity", 0, NULL, 'a' },
   { 0, 0, NULL, 0 }
 };
 
@@ -646,9 +649,13 @@ int main(int argc, char **argv)
   int save_to_disk = 0;
 
   numthreads = 1;
+  thread_affinity = 0;
   do {
-    val = getopt_long(argc, argv, "t:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "at:gwzsd", options, &longindex);
     switch (val) {
+    case 'a':
+      thread_affinity = 1;
+      break;
     case 't':
       numthreads = atoi(optarg);
       break;
@@ -764,7 +771,6 @@ int main(int argc, char **argv)
   }
 
   if (numthreads < 1) numthreads = 1;
-  else if (numthreads > MAX_THREADS) numthreads = MAX_THREADS;
 
   printf("number of threads = %d\n", numthreads);
 
@@ -924,6 +930,8 @@ int main(int argc, char **argv)
 
   table_w = alloc_huge(2 * size);
   table_b = table_w + size;
+
+  compress_alloc();
 
   init_threads(1);
   init_tables();

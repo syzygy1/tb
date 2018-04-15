@@ -74,26 +74,53 @@ static void find_loop(struct thread_data *thread)
 
 static uint64_t find_val(uint8_t *table, uint8_t v)
 {
-  found_idx = 0xffffffffffffffffULL;
+  found_idx = UINT64_MAX;
   find_val_table = table;
   find_val_v = v;
 
   run_threaded(find_loop, work_g, 0);
 
-  if (found_idx == 0xffffffffffffffffULL)
+  if (found_idx == UINT64_MAX) {
     fprintf(stderr, "find_val: not found!\n");
+    exit(EXIT_FAILURE);
+  }
 
   return found_idx;
 }
 
-uint8_t *count_stats_table;
+uint8_t *count_stats_table_u8;
 
-static void count_stats(struct thread_data *thread)
+static void count_stats_u8(struct thread_data *thread)
 {
   uint64_t idx;
   uint64_t end = thread->end;
   uint64_t *stats = thread->stats;
-  uint8_t *table = count_stats_table;
+  uint8_t *table = count_stats_table_u8;
+
+  if (end <= diagonal) {
+    for (idx = thread->begin; idx < end; idx++)
+      stats[table[idx]] += 2;
+  } else {
+    for (idx = thread->begin; idx < diagonal; idx++)
+      stats[table[idx]] += 2;
+    for (; idx < end; idx++) {
+      uint64_t idx2 = MIRROR_A1H8(idx) | (idx & mask[0]);
+      if (idx == idx2)
+        stats[table[idx]] += 2;
+      else
+        stats[table[idx]]++;
+    }
+  }
+}
+
+uint16_t *count_stats_table_u16;
+
+static void count_stats_u16(struct thread_data *thread)
+{
+  uint64_t idx;
+  uint64_t end = thread->end;
+  uint64_t *stats = thread->stats;
+  uint16_t *table = count_stats_table_u16;
 
   if (end <= diagonal) {
     for (idx = thread->begin; idx < end; idx++)
@@ -124,11 +151,11 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm, 
 {
   int i, j, n;
 
-  for (i = 0; i < 256 * numthreads; i++)
+  for (i = 0; i < MAX_VALS * numthreads; i++)
     thread_stats[i] = 0;
 
-  count_stats_table = table;
-  run_threaded(count_stats, work_g, 0);
+  count_stats_table_u8 = table;
+  run_threaded(count_stats_u8, work_g, 0);
 
   if (num_saves == 0)
     n = REDUCE_PLY - 2;
@@ -299,9 +326,9 @@ void collect_stats(int phase)
   int i;
 
   if (thread_stats == NULL) {
-    thread_stats = (uint64_t *)alloc_aligned(8 * 256 * numthreads, 64);
+    thread_stats = (uint64_t *)alloc_aligned(8 * MAX_VALS * numthreads, 64);
     for (i = 0; i < numthreads; i++)
-      thread_data[i].stats = thread_stats + i * 256;
+      thread_data[i].stats = thread_stats + i * MAX_VALS;
 
     for (i = 0; i < MAX_STATS; i++)
       total_stats_w[i] = total_stats_b[i] = 0;

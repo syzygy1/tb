@@ -5,8 +5,7 @@
 */
 
 #include "lz4.h"
-
-static char *lz4_buf = NULL;
+#include "util.h"
 
 #define MAX_SAVES 16
 
@@ -26,13 +25,7 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin, uint64_t 
   char name[64];
   uint8_t v[256];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   if (local == num_saves) {
     sprintf(name, "%s.%c.%d", tablename, color, num_saves);
@@ -109,6 +102,8 @@ void reconstruct_table_pass(uint8_t *table, char color, int k, uint8_t *v)
   int i;
   FILE *F;
   char name[64];
+
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c.%d", tablename, color, k);
 
@@ -441,13 +436,7 @@ void store_table(uint8_t *table, char color)
   FILE *F;
   char name[64];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c", tablename, color);
 
@@ -476,6 +465,8 @@ void load_table(uint8_t *table, char color)
   FILE *F;
   char name[64];
 
+  char *lz4_buf = get_lz4_buf();
+
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "rb"))) {
@@ -499,4 +490,3 @@ void load_table(uint8_t *table, char color)
   fclose(F);
   unlink(name);
 }
-

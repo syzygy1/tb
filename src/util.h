@@ -20,5 +20,6 @@ void write_bits(FILE *F, uint32_t bits, int n);
 extern uint8_t *copybuf;
 
 void copy_bytes(FILE *F, FILE *G, uint64_t num);
+char *get_lz4_buf(void);
 
 #endif

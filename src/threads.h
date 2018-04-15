@@ -38,15 +38,20 @@ struct thread_data {
 };
 
 void init_threads(int pawns);
-void run_threaded(void (*func)(struct thread_data *), uint64_t *work, int report_time);
-void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_time);
+void run_threaded(void (*func)(struct thread_data *), uint64_t *work,
+    int report_time);
+void run_single(void (*func)(struct thread_data *), uint64_t *work,
+    int report_time);
 void fill_work(int n, uint64_t size, uint64_t mask, uint64_t *w);
+void fill_work_offset(int n, uint64_t size, uint64_t mask, uint64_t *w,
+    uint64_t offset);
 uint64_t *alloc_work(int n);
 uint64_t *create_work(int n, uint64_t size, uint64_t mask);
 
 extern int numthreads;
+extern int thread_affinity;
 extern int total_work;
-extern struct thread_data thread_data[];
+extern struct thread_data *thread_data;
 extern struct timeval start_time, cur_time;
 
 #endif

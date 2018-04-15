@@ -330,7 +330,6 @@ int main(int argc, char **argv)
   }
 
   if (numthreads < 1) numthreads = 1;
-  else if (numthreads > MAX_THREADS) numthreads = MAX_THREADS;
 
   printf("number of threads = %d\n", numthreads);
 

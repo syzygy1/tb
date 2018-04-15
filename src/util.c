@@ -12,9 +12,10 @@
 #endif
 
 #include "defs.h"
+#include "lz4.h"
 #include "util.h"
 
-void *map_file(char *name, int shared, long64 *size)
+void *map_file(char *name, int shared, uint64_t *size)
 {
 #ifndef __WIN32__
 
@@ -49,7 +50,7 @@ void *map_file(char *name, int shared, long64 *size)
   }
   DWORD size_low, size_high;
   size_low = GetFileSize(h, &size_high);
-  *size = ((long64)size_high) << 32 | ((long64)size_low);
+  *size = ((uint64_t)size_high << 32) | (uint64_t)size_low;
   HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
                                  NULL);
   if (map == NULL) {
@@ -67,7 +68,7 @@ void *map_file(char *name, int shared, long64 *size)
 #endif
 }
 
-void unmap_file(void *data, long64 size)
+void unmap_file(void *data, uint64_t size)
 {
 #ifndef __WIN32__
 
@@ -80,7 +81,7 @@ void unmap_file(void *data, long64 size)
 #endif
 }
 
-void *alloc_aligned(long64 size, uintptr_t alignment)
+void *alloc_aligned(uint64_t size, uintptr_t alignment)
 {
 #ifndef __WIN32__
 
@@ -110,7 +111,7 @@ void *alloc_aligned(long64 size, uintptr_t alignment)
 #endif
 }
 
-void *alloc_huge(long64 size)
+void *alloc_huge(uint64_t size)
 {
   void *ptr;
 
@@ -243,6 +244,20 @@ void copy_bytes(FILE *F, FILE *G, uint64_t num)
     fwrite(copybuf, 1, COPYSIZE, F);
     num -= COPYSIZE;
   }
-  fread(copybuf, 1, n, G);
-  fwrite(copybuf, 1, n, F);
+  fread(copybuf, 1, num, G);
+  fwrite(copybuf, 1, num, F);
+}
+
+static char *lz4_buf = NULL;
+
+char *get_lz4_buf(void)
+{
+  if (!lz4_buf)
+    lz4_buf = malloc(4 + LZ4_compressBound(COPYSIZE));
+  if (!lz4_buf) {
+    fprintf(stderr, "Out of memory.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  return lz4_buf;
 }
