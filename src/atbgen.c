@@ -312,7 +312,7 @@ static void probe_captures_w(struct thread_data *thread)
         int sq = p[k];
         if (bit[sq] & bits) continue;
         if (bit[sq] & KingRange(p[black_king])) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           mark_capt_wins(k, table_w, idx3 & ~mask[k], occ, p);
           continue;
         }
@@ -332,7 +332,7 @@ static void probe_captures_w(struct thread_data *thread)
           }
           if (l < n) continue;
         }
-        uint64_t idx3 = idx2 | (p[k] << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
         int v = probe_tb(pt2, p, 0, bb, -2, 2);
         switch (v) {
         case -2:
@@ -375,7 +375,7 @@ static void probe_captures_b(struct thread_data *thread)
         int sq = p[k];
         if (bit[sq] & bits) continue;
         if (bit[sq] & KingRange(p[0])) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           mark_capt_wins(k, table_b, idx3 & ~mask[k], occ, p);
           continue;
         }
@@ -395,7 +395,7 @@ static void probe_captures_b(struct thread_data *thread)
           }
           if (l < n) continue;
         }
-        uint64_t idx3 = idx2 | (p[k] << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
         int v = probe_tb(pt2, p, 1, bb, -2, 2);
         switch (v) {
         case -2:
@@ -724,7 +724,7 @@ void reset_captures_w(struct thread_data *thread)
         }
         int v = probe_tb(pt2, p, 0, bb, 0, 2);
         if (v == 1) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           reset_capt_closs(k, table_w, idx3 & ~mask[k], occ, p);
         }
       }
@@ -764,7 +764,7 @@ void reset_captures_b(struct thread_data *thread)
         }
         int v = probe_tb(pt2, p, 1, bb, 0, 2);
         if (v == 1) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           reset_capt_closs(k, table_b, idx3 & ~mask[k], occ, p);
         }
       }

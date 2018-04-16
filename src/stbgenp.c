@@ -1078,11 +1078,11 @@ void calc_pawn_moves_w(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | (((p[i] + 0x08) ^ 0x38) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] + 0x08];
         if (tbl_to_wdl[table_b[idx2]] > best) best = tbl_to_wdl[table_b[idx2]];
         if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-          if (i) idx2 = idx0 | (((p[i] + 0x10) ^ 0x38) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] + 0x10];
           int v0, v1 = 3;
           bitboard bits = sides_mask[p[i] + 0x10] & occ;
@@ -1156,11 +1156,11 @@ void calc_pawn_moves_b(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | ((p[i] - 0x08) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x08) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] - 0x08];
         if (tbl_to_wdl[table_w[idx2]] > best) best = tbl_to_wdl[table_w[idx2]];
         if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-          if (i) idx2 = idx0 | ((p[i] - 0x10) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x10) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] - 0x10];
           int v0, v1 = 3;
           bitboard bits = sides_mask[p[i] - 0x10] & occ;
@@ -1218,7 +1218,7 @@ void reset_captures_w(struct thread_data *thread)
       for (j = 0; white_pcs[j] >= 0; j++) {
         k = white_pcs[j];
         if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue;
-        uint64_t idx3 = idx2 | (p[k] << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
         reset_capts(k, table_w, idx3 & ~mask[k], occ, p);
       }
     }
@@ -1241,7 +1241,7 @@ void reset_captures_b(struct thread_data *thread)
       for (j = 0; black_pcs[j] >= 0; j++) {
         k = black_pcs[j];
         if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue;
-        uint64_t idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]);
         reset_capts(k, table_b, idx3 & ~mask[k], occ, p);
       }
     }
@@ -1428,4 +1428,3 @@ void reset_pawn_captures_threaded(void)
   printf("\n\n");
 }
 #endif
-

@@ -297,7 +297,7 @@ void probe_captures_w(struct thread_data *thread)
         int sq = p[k];
         if (bit[sq] & bits) continue;
         if (bit[sq] & KingRange(p[black_king])) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           mark_capt_wins(k, table_w, idx3 & ~mask[k], occ, p);
           continue;
         }
@@ -317,7 +317,7 @@ void probe_captures_w(struct thread_data *thread)
           }
           if (l < n) continue;
         }
-        uint64_t idx3 = idx2 | (p[k] << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
         int v = probe_tb(pt2, p, 0, occ2, -2, 2);
         switch (v) {
         case -2:
@@ -361,7 +361,7 @@ void probe_captures_b(struct thread_data *thread)
         int sq = p[k];
         if (bit[sq] & bits) continue;
         if (bit[sq] & KingRange(p[white_king])) {
-          uint64_t idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]);
           mark_capt_wins(k, table_b, idx3 & ~mask[k], occ, p);
           continue;
         }
@@ -381,7 +381,7 @@ void probe_captures_b(struct thread_data *thread)
           }
           if (l < n) continue;
         }
-        uint64_t idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]);
+        uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]);
         int v = probe_tb(pt2, p, 1, occ2, -2, 2);
         switch (v) {
         case -2:
@@ -945,11 +945,11 @@ void calc_pawn_moves_w(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | (((p[i] + 0x08) ^ 0x38) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] + 0x08];
         if (tbl_to_wdl[table_b[idx2]] > best) best = tbl_to_wdl[table_b[idx2]];
         if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-          if (i) idx2 = idx0 | (((p[i] + 0x10) ^ 0x38) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] + 0x10];
           if (table_b[idx2] == ILLEGAL) continue;
           int v0, v1 = 3;
@@ -1025,11 +1025,11 @@ void calc_pawn_moves_b(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | ((p[i] - 0x08) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x08) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] - 0x08];
         if (tbl_to_wdl[table_w[idx2]] > best) best = tbl_to_wdl[table_w[idx2]];
         if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-          if (i) idx2 = idx0 | ((p[i] - 0x10) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x10) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] - 0x10];
           if (table_w[idx2] == ILLEGAL) continue;
           int v0, v1 = 3;
@@ -1107,7 +1107,7 @@ void reset_captures_w(struct thread_data *thread)
         }
         int v = probe_tb(pt2, p, 0, occ2, 0, 2);
         if (v == 1) {
-          uint64_t idx3 = idx2 | (p[k] << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]);
           reset_capt_closs(k, table_w, idx3 & ~mask[k], occ, p);
         }
       }
@@ -1148,7 +1148,7 @@ void reset_captures_b(struct thread_data *thread)
         }
         int v = probe_tb(pt2, p, 1, occ2, 0, 2);
         if (v == 1) {
-          uint64_t idx3 = idx2 | ((p[k] ^ pw[i]) << shift[i]);
+          uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]);
           reset_capt_closs(k, table_b, idx3 & ~mask[k], occ, p);
         }
       }

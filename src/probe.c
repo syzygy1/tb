@@ -745,12 +745,12 @@ uint8_t PP_sq[278][2];
 uint8_t invmtwist[64];
 #endif
 
-static int binomial[5][64];
-static int pawnidx[5][24];
-static int pfactor[5][4];
+static int binomial[6][64];
+static int pawnidx[6][24];
+static int pfactor[6][4];
 #ifdef CONNECTED_KINGS
-static int multidx[5][10];
-static int mfactor[5];
+static int multidx[6][10];
+static int mfactor[6];
 #endif
 
 void init_indices(void)
@@ -782,7 +782,7 @@ void init_indices(void)
 #endif
 
 // binomial[k-1][n] = Bin(n, k)
-  for (i = 0; i < 5; i++)
+  for (i = 0; i < 6; i++)
     for (j = 0; j < 64; j++) {
       int f = j;
       int l = 1;
@@ -793,7 +793,7 @@ void init_indices(void)
       binomial[i][j] = f / l;
     }
 
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < 6; i++) {
     int s = 0;
     for (j = 0; j < 6; j++) {
       pawnidx[i][j] = s;
@@ -822,7 +822,7 @@ void init_indices(void)
 
 //#ifdef SUICIDE
 #ifdef CONNECTED_KINGS
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < 6; i++) {
     int s = 0;
     for (j = 0; j < 10; j++) {
       multidx[i][j] = s;

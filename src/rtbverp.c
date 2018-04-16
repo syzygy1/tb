@@ -637,11 +637,11 @@ int check_mate_pawns_w(uint64_t idx0, uint8_t *table, bitboard occ, int *p)
         return 0;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | (((p[i] + 0x08) ^ 0x38) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
       else idx2 = idx | piv_idx[p[i] + 0x08];
       if (table[idx2] < WDL_ILLEGAL) return 0;
       if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-        if (i) idx2 = idx | (((p[i] + 0x10) ^ 0x38) << shift[i]);
+        if (i) idx2 = idx | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
         else idx2 = idx | piv_idx[p[i] + 0x10];
         if (table[idx2] < WDL_ILLEGAL) return 0;
       }
@@ -666,11 +666,11 @@ int check_mate_pawns_b(uint64_t idx0, uint8_t *table, bitboard occ, int *p)
         return 0;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((p[i] - 0x08) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)(p[i] - 0x08) << shift[i]);
       else idx2 = idx | piv_idx[p[i] - 0x08];
       if (table[idx2] < WDL_ILLEGAL) return 0;
       if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-        if (i) idx2 = idx | ((p[i] - 0x10) << shift[i]);
+        if (i) idx2 = idx | ((uint64_t)(p[i] - 0x10) << shift[i]);
         else idx2 = idx | piv_idx[p[i] - 0x10];
         if (table[idx2] < WDL_ILLEGAL) return 0;
       }
@@ -1491,11 +1491,11 @@ int has_moves_pawns_w(uint64_t idx0, bitboard occ, int *p)
         return 1;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | (((p[i] + 0x08) ^ 0x38) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
       else idx2 = idx | piv_idx[p[i] + 0x08];
       if (table[idx2] != WDL_ILLEGAL) return 1;
       if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-        if (i) idx2 = idx | (((p[i] + 0x10) ^ 0x38) << shift[i]);
+        if (i) idx2 = idx | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
         else idx2 = idx | piv_idx[p[i] + 0x10];
         if (table[idx2] != WDL_ILLEGAL) return 1;
       }
@@ -1521,11 +1521,11 @@ int has_moves_pawns_b(uint64_t idx0, bitboard occ, int *p)
         return 1;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((p[i] - 0x08) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)(p[i] - 0x08) << shift[i]);
       else idx2 = idx | piv_idx[p[i] - 0x08];
       if (table[idx2] != WDL_ILLEGAL) return 1;
       if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-        if (i) idx2 = idx | ((p[i] - 0x10) << shift[i]);
+        if (i) idx2 = idx | ((uint64_t)(p[i] - 0x10) << shift[i]);
         else idx2 = idx | piv_idx[p[i] - 0x10];
         if (table[idx2] != WDL_ILLEGAL) return 1;
       }
@@ -1626,11 +1626,11 @@ void calc_pawn_moves_w(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | (((p[i] + 0x08) ^ 0x38) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] + 0x08];
         if (wdl_to_pawn[table_b[idx2]] > best) best = wdl_to_pawn[table_b[idx2]];
         if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-          if (i) idx2 = idx0 | (((p[i] + 0x10) ^ 0x38) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] + 0x10];
           if (table_b[idx2] == WDL_ILLEGAL) continue;
           int v0, v1 = 3;
@@ -1705,11 +1705,11 @@ void calc_pawn_moves_b(struct thread_data *thread)
         }
       } else {
         uint64_t idx0 = idx & ~mask[i];
-        if (i) idx2 = idx0 | ((p[i] - 0x08) << shift[i]);
+        if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x08) << shift[i]);
         else idx2 = idx0 | piv_idx[p[i] - 0x08];
         if (wdl_to_pawn[table_w[idx2]] > best) best = wdl_to_pawn[table_w[idx2]];
         if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-          if (i) idx2 = idx0 | ((p[i] - 0x10) << shift[i]);
+          if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x10) << shift[i]);
           else idx2 = idx0 | piv_idx[p[i] - 0x10];
           if (table_w[idx2] == WDL_ILLEGAL) continue;
           int v0, v1 = 3;
