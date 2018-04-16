@@ -916,7 +916,7 @@ int main(int argc, char **argv)
   if (!symmetric)
     sort_values(total_stats_b, &map_b, 1, ply_accurate_b, ply_accurate_w);
 
-  int wide =  (map_w.max_num >= MAX_NARROW && map_b.max_num >= MAX_NARROW)
+  int wide =  (map_w.max_num >= MAX_NARROW || map_b.max_num >= MAX_NARROW)
             && generate_dtz;
   compress_alloc_wdl();
 
