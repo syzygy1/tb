@@ -81,7 +81,7 @@ HANDLE *stop_event;
 
 static struct {
   void (*func)(struct thread_data *);
-  long64 *work;
+  uint64_t *work;
   int counter;
   int total;
 } queue;
@@ -92,7 +92,7 @@ int thread_affinity;
 
 struct timeval start_time, cur_time;
 
-void fill_work(int n, long64 size, long64 mask, long64 *w)
+void fill_work(int n, uint64_t size, uint64_t mask, uint64_t *w)
 {
   int i;
 
@@ -100,17 +100,25 @@ void fill_work(int n, long64 size, long64 mask, long64 *w)
   w[n] = size;
 
   for (i = 1; i < n; i++)
-    w[i] = ((((long64)i) * size) / ((long64)n)) & ~mask;
+    w[i] = ((((uint64_t)i) * size) / ((uint64_t)n)) & ~mask;
 }
 
-long64 *alloc_work(int n)
+void fill_work_offset(int n, uint64_t size, uint64_t mask, uint64_t *w,
+    uint64_t offset)
 {
-  return (long64 *)malloc((n + 1) * sizeof(long64));
+  fill_work(n, size, mask, w);
+  for (int i = 0; i <= n; i++)
+    w[i] += offset;
 }
 
-long64 *create_work(int n, long64 size, long64 mask)
+uint64_t *alloc_work(int n)
 {
-  long64 *w;
+  return (uint64_t *)malloc((n + 1) * sizeof(uint64_t));
+}
+
+uint64_t *create_work(int n, uint64_t size, uint64_t mask)
+{
+  uint64_t *w;
 
   w = alloc_work(n);
   fill_work(n, size, mask, w);
@@ -130,9 +138,9 @@ void init_threads(int pawns)
     thread_data[i].thread = i;
 
   if (pawns) {
-    void *p = (void *)alloc_aligned(64 * numthreads, 64);
+    uint8_t *p = alloc_aligned(64 * numthreads, 64);
     for (i = 0; i < numthreads; i++)
-      thread_data[i].p = (int *)(((ubyte *)p) + 64 * i);
+      thread_data[i].p = (int *)(p + 64 * i);
   }
 
 #ifndef __WIN32__
@@ -144,7 +152,7 @@ void init_threads(int pawns)
 
   for (i = 0; i < numthreads - 1; i++) {
     int rc = pthread_create(&threads[i], NULL, worker,
-				  (void *)&(thread_data[i]));
+                                  (void *)&(thread_data[i]));
     if (rc) {
       fprintf(stderr, "ERROR: pthread_create() returned %d\n", rc);
       exit(1);
@@ -181,7 +189,7 @@ void init_threads(int pawns)
   }
   for (i = 0; i < numthreads - 1; i++) {
     threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
-				  0, NULL);
+                                  0, NULL);
     if (threads[i] == NULL) {
       fprintf(stderr, "CreateThread() failed.\n");
       exit(1);
@@ -208,7 +216,7 @@ THREAD_FUNC worker(void *arg)
     else {
       int i;
       for (i = 0; i < numthreads - 1; i++)
-	SetEvent(start_event[i]);
+        SetEvent(start_event[i]);
     }
 #endif
 
@@ -235,7 +243,7 @@ THREAD_FUNC worker(void *arg)
   return 0;
 }
 
-void run_threaded(void (*func)(struct thread_data *), long64 *work, int report_time)
+void run_threaded(void (*func)(struct thread_data *), uint64_t *work, int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;
@@ -259,7 +267,7 @@ void run_threaded(void (*func)(struct thread_data *), long64 *work, int report_t
   cur_time = stop_time;
 }
 
-void run_single(void (*func)(struct thread_data *), long64 *work, int report_time)
+void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;
@@ -280,4 +288,3 @@ void run_single(void (*func)(struct thread_data *), long64 *work, int report_tim
     printf("time taken = %3d:%02d.%03d\n", secs / 60, secs % 60, usecs/1000);
   cur_time = stop_time;
 }
-

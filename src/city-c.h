@@ -50,29 +50,26 @@
 /* Define to 1 if the compiler supports __builtin_expect. */
 #define HAVE_BUILTIN_EXPECT 1
 
-typedef uint8_t uint8;
-typedef uint32_t uint32;
-
 struct Pair {
-  uint64 first;
-  uint64 second;
+  uint64_t first;
+  uint64_t second;
 };
 typedef struct Pair uint128;
 
-static uint64 __inline__ Uint128Low64(const uint128 x) { return x.first; }
-static uint64 __inline__ Uint128High64(const uint128 x) { return x.second; }
+static uint64_t __inline__ Uint128Low64(const uint128 x) { return x.first; }
+static uint64_t __inline__ Uint128High64(const uint128 x) { return x.second; }
 
 // Hash function for a byte array.
-uint64 CityHash64(const char *buf, size_t len);
+uint64_t CityHash64(const char *buf, size_t len);
 
 // Hash function for a byte array.  For convenience, a 64-bit seed is also
 // hashed into the result.
-uint64 CityHash64WithSeed(const char *buf, size_t len, uint64 seed);
+uint64_t CityHash64WithSeed(const char *buf, size_t len, uint64_t seed);
 
 // Hash function for a byte array.  For convenience, two seeds are also
 // hashed into the result.
-uint64 CityHash64WithSeeds(const char *buf, size_t len,
-                           uint64 seed0, uint64 seed1);
+uint64_t CityHash64WithSeeds(const char *buf, size_t len,
+                           uint64_t seed0, uint64_t seed1);
 
 // Hash function for a byte array.
 uint128 CityHash128(const char *s, size_t len);
@@ -83,12 +80,12 @@ uint128 CityHash128WithSeed(const char *s, size_t len, uint128 seed);
 
 // Hash 128 input bits down to 64 bits of output.
 // This is intended to be a reasonably good hash function.
-static uint64 __inline__ Hash128to64(const uint128 x) {
+static uint64_t __inline__ Hash128to64(const uint128 x) {
   // Murmur-inspired hashing.
-  const uint64 kMul = 0x9ddfea08eb382d69ULL;
-  uint64 a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
+  const uint64_t kMul = 0x9ddfea08eb382d69ULL;
+  uint64_t a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
   a ^= (a >> 47);
-  uint64 b = (Uint128High64(x) ^ a) * kMul;
+  uint64_t b = (Uint128High64(x) ^ a) * kMul;
   b ^= (b >> 47);
   b *= kMul;
   return b;

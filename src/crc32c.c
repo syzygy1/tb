@@ -6,7 +6,7 @@
 
 #define CRC32C(c,d) (c=(c>>8)^crc_c[(c^(d))&0xFF])
 
-static const uint32 crc_c[256] = {
+static const uint32_t crc_c[256] = {
   0x00000000, 0xF26B8303, 0xE13B70F7, 0x1350F3F4,
   0xC79A971F, 0x35F1141C, 0x26A1E7E8, 0xD4CA64EB,
   0x8AD958CF, 0x78B2DBCC, 0x6BE22838, 0x9989AB3B,
@@ -73,19 +73,19 @@ static const uint32 crc_c[256] = {
   0xBE2DA0A5, 0x4C4623A6, 0x5F16D052, 0xAD7D5351,
 };
 
-uint64 _mm_crc32_u64(uint64 crc, uint64 v)
+uint64_t _mm_crc32_u64(uint64_t crc, uint64_t v)
 {
   int i;
   union {
-    unsigned char buf[8];
-    uint64 v;
+    uint8_t buf[8];
+    uint64_t v;
   } in;
-  uint32 crc32 = crc;
+  uint32_t crc32 = crc;
 
   in.v = v;
   for (i = 0; i < 8; i++)
     CRC32C(crc32, in.buf[i]);
 
-  return (uint64)crc32;
+  return (uint64_t)crc32;
 }
 

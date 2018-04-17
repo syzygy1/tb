@@ -9,9 +9,9 @@ vpath %.o $(OBJDIR)
 vpath %.P
 vpath %.P $(DEPDIR)
 
-TBOBJS = tbgen.o tbgenp.o permute.o compress.o threads.o lz4.o tbver.o tbverp.o decompress.o checksum.o city-c.o tbcheck.o util.o
-GENTBOBJS = tbgen.o permute.o compress.o threads.o lz4.o checksum.o city-c.o util.o
-GENTBPOBJS = tbgenp.o permute.o compress.o threads.o lz4.o checksum.o city-c.o util.o
+TBOBJS = tbgen.o tbgenp.o permute.o compress.o huffman.o threads.o lz4.o tbver.o tbverp.o decompress.o checksum.o city-c.o tbcheck.o util.o
+GENTBOBJS = tbgen.o permute.o compress.o huffman.o threads.o lz4.o checksum.o city-c.o util.o
+GENTBPOBJS = tbgenp.o permute.o compress.o huffman.o threads.o lz4.o checksum.o city-c.o util.o
 VERTBOBJS = tbver.o decompress.o threads.o checksum.o city-c.o util.o
 VERTBPOBJS = tbverp.o decompress.o threads.o checksum.o city-c.o util.o
 

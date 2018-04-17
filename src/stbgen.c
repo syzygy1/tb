@@ -51,14 +51,14 @@ void reduce_tables(void);
 #define VOLATILE
 
 #define SET_CHANGED(x) \
-{ ubyte dummy = CHANGED; \
+{ uint8_t dummy = CHANGED; \
 __asm__( \
 "movb %2, %%al\n\t" \
 "lock cmpxchgb %1, %0" \
 : "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); }
 
 #define SET_CAPT_VALUE(x,v) \
-{ ubyte dummy = v; \
+{ uint8_t dummy = v; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -70,7 +70,7 @@ __asm__( \
 : "+m" (x), "+r" (dummy) : : "eax"); }
 
 #define SET_WIN_VALUE(x,v) \
-{ ubyte dummy = v; \
+{ uint8_t dummy = v; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -84,7 +84,7 @@ __asm__( \
 // table[idx] > THREAT_CWIN2, then table[idx] = THREAT_CWIN2
 // table[idx] == BASE_WIN + 101, then table[idx] = THREAT_CWIN1
 #define SET_THREAT_CWIN(x) \
-{ ubyte dummy = THREAT_CWIN2; \
+{ uint8_t dummy = THREAT_CWIN2; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -106,7 +106,7 @@ __asm__( \
 // table[idx] > THREAT_CWIN2, then table[idx] = BASE_WIN + 101
 // table[idx] == THREAT_CWIN2, then table[idx] = THREAT_CWIN1
 #define SET_CWIN_IN_1(x) \
-{ ubyte dummy = BASE_WIN + DRAW_RULE + 1; \
+{ uint8_t dummy = BASE_WIN + DRAW_RULE + 1; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -122,37 +122,37 @@ __asm__( \
 "2:" \
 : "+m" (x), "+r" (dummy) : "i" (THREAT_CWIN2) : "eax"); }
 
-ubyte win_loss[256];
-ubyte loss_win[256];
+uint8_t win_loss[256];
+uint8_t loss_win[256];
 
 void calc_broken(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
   for (idx = thread->begin; idx < end; idx += 64) {
     FILL_OCC64_cheap {
       for (i = 0, bb = 1; i < 64; i++, bb <<= 1) {
-	if (occ & bb)
-	  table_w[idx + i] = table_b[idx + i] = BROKEN;
-	else
-	  table_w[idx + i] = table_b[idx + i] = UNKNOWN;
+        if (occ & bb)
+          table_w[idx + i] = table_b[idx + i] = BROKEN;
+        else
+          table_w[idx + i] = table_b[idx + i] = UNKNOWN;
       }
     } else {
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = BROKEN;
+        table_w[idx + i] = table_b[idx + i] = BROKEN;
     }
   }
 }
 
 // check whether all moves end up in wins for the opponent
-int check_loss(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
   int best = BASE_LOSS - 2;
 
@@ -178,7 +178,7 @@ MARK_PIVOT(mark_capt_wins)
   MARK_BEGIN_PIVOT;
   table[idx2] = CAPT_WIN;
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     table[idx3] = CAPT_WIN;
   }
   MARK_END;
@@ -191,18 +191,18 @@ MARK(mark_capt_wins)
   MARK_END;
 }
 
-MARK_PIVOT(mark_capt_value, ubyte v)
+MARK_PIVOT(mark_capt_value, uint8_t v)
 {
   MARK_BEGIN_PIVOT;
   SET_CAPT_VALUE(table[idx2], v);
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     SET_CAPT_VALUE(table[idx3], v);
   }
   MARK_END;
 }
 
-MARK(mark_capt_value, ubyte v)
+MARK(mark_capt_value, uint8_t v)
 {
   MARK_BEGIN;
   SET_CAPT_VALUE(table[idx2], v);
@@ -234,25 +234,25 @@ void probe_captures_w(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_WHITE_PIECES(mark_capt_wins);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_WHITE_PIECES(mark_capt_value, CAPT_CWIN);
-	break;
+        has_cursed |= 1;
+        LOOP_WHITE_PIECES(mark_capt_value, CAPT_CWIN);
+        break;
       case 0:
-	LOOP_WHITE_PIECES(mark_capt_value, CAPT_DRAW);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_value, CAPT_DRAW);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_WHITE_PIECES(mark_capt_value, CAPT_CLOSS);
-	break;
+        has_cursed |= 2;
+        LOOP_WHITE_PIECES(mark_capt_value, CAPT_CLOSS);
+        break;
       case 2:
-	LOOP_WHITE_PIECES(mark_capt_value, CAPT_LOSS);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_value, CAPT_LOSS);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -284,25 +284,25 @@ void probe_pivot_captures_b(struct thread_data *thread)
       MAKE_IDX2_PIVOT;
       switch (v) {
       case -2:
-	LOOP_BLACK_PIECES_PIVOT(mark_capt_wins);
-	break;
+        LOOP_BLACK_PIECES_PIVOT(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_CWIN);
-	break;
+        has_cursed |= 1;
+        LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_CWIN);
+        break;
       case 0:
-	LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_DRAW);
-	break;
+        LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_DRAW);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_CLOSS);
-	break;
+        has_cursed |= 2;
+        LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_CLOSS);
+        break;
       case 2:
-	LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_LOSS);
-	break;
+        LOOP_BLACK_PIECES_PIVOT(mark_capt_value, CAPT_LOSS);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -333,25 +333,25 @@ void probe_captures_b(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_BLACK_PIECES(mark_capt_wins);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_BLACK_PIECES(mark_capt_value, CAPT_CWIN);
-	break;
+        has_cursed |= 1;
+        LOOP_BLACK_PIECES(mark_capt_value, CAPT_CWIN);
+        break;
       case 0:
-	LOOP_BLACK_PIECES(mark_capt_value, CAPT_DRAW);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_value, CAPT_DRAW);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_BLACK_PIECES(mark_capt_value, CAPT_CLOSS);
-	break;
+        has_cursed |= 2;
+        LOOP_BLACK_PIECES(mark_capt_value, CAPT_CLOSS);
+        break;
       case 2:
-	LOOP_BLACK_PIECES(mark_capt_value, CAPT_LOSS);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_value, CAPT_LOSS);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -404,9 +404,9 @@ void calc_captures_b(void)
       if (pt[i] & 0x08) continue;
       captured_piece = i;
       if (i == 0)
-	run_threaded(probe_pivot_captures_b, work_piv, 1);
+        run_threaded(probe_pivot_captures_b, work_piv, 1);
       else
-	run_threaded(probe_captures_b, work_g, 1);
+        run_threaded(probe_captures_b, work_g, 1);
     }
   }
 }
@@ -417,7 +417,7 @@ MARK_PIVOT(mark_changed)
   if (table[idx2] == UNKNOWN)
     SET_CHANGED(table[idx2]);
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     if (table[idx3] == UNKNOWN)
       SET_CHANGED(table[idx3]);
   }
@@ -437,7 +437,7 @@ MARK_PIVOT(mark_wins, int v)
   MARK_BEGIN_PIVOT;
   SET_WIN_VALUE(table[idx2], v);
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     SET_WIN_VALUE(table[idx3], v);
   }
   MARK_END;
@@ -455,7 +455,7 @@ MARK_PIVOT(mark_threat_cwins)
   MARK_BEGIN_PIVOT;
   SET_THREAT_CWIN(table[idx2]);
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     SET_THREAT_CWIN(table[idx3]);
   }
   MARK_END;
@@ -473,7 +473,7 @@ MARK_PIVOT(mark_cwins_in_1)
   MARK_BEGIN_PIVOT;
   SET_CWIN_IN_1(table[idx2]);
   if (PIVOT_ON_DIAG(idx2)) {
-    long64 idx3 = PIVOT_MIRROR(idx2);
+    uint64_t idx3 = PIVOT_MIRROR(idx2);
     SET_CWIN_IN_1(table[idx3]);
   }
   MARK_END;
@@ -486,17 +486,17 @@ MARK(mark_cwins_in_1)
   MARK_END;
 }
 
-ubyte *iter_table, *iter_table_opp;
+uint8_t *iter_table, *iter_table_opp;
 int *iter_pcs;
 int *iter_pcs_opp;
-ubyte tbl[256];
+uint8_t tbl[256];
 
 void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
-  ubyte *table = iter_table;
-  ubyte *table_opp = iter_table_opp;
+  uint8_t *table = iter_table;
+  uint8_t *table_opp = iter_table_opp;
   int *pcs = iter_pcs;
   int *pcs_opp = iter_pcs_opp;
 
@@ -510,10 +510,10 @@ void iter(struct thread_data *thread)
     case 1: /* CHANGE */
       v = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-	table[idx] = v;
-	RETRO(mark_wins, loss_win[v]);
+        table[idx] = v;
+        RETRO(mark_wins, loss_win[v]);
       } else {
-	table[idx] = UNKNOWN;
+        table[idx] = UNKNOWN;
       }
       break;
     case 2: /* normal WIN, including CAPT_WIN, WIN_IN_ONE */
@@ -528,13 +528,13 @@ void iter(struct thread_data *thread)
     case 5: /* CHANGED -> BASE_WIN + DRAW_RULE + 1 */
       v = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-	table[idx] = v;
-	if (v == BASE_LOSS - DRAW_RULE)
-	  RETRO(mark_cwins_in_1);
-	else
-	  RETRO(mark_wins, loss_win[v]);
+        table[idx] = v;
+        if (v == BASE_LOSS - DRAW_RULE)
+          RETRO(mark_cwins_in_1);
+        else
+          RETRO(mark_wins, loss_win[v]);
       } else {
-	table[idx] = UNKNOWN;
+        table[idx] = UNKNOWN;
       }
       break;
     default:
@@ -683,7 +683,7 @@ void iterate()
       num_saves++;
 
       for (i = 0; i < 256; i++)
-	win_loss[i] = loss_win[i] = 0;
+        win_loss[i] = loss_win[i] = 0;
       win_loss[CAPT_WIN] = 0xff;
       win_loss[CAPT_CWIN] = 0xff;
       win_loss[THREAT_WIN] = 0xff;
@@ -697,13 +697,13 @@ void iterate()
       loss_win[BASE_LOSS - ply - 4] = BASE_WIN + ply + 8;
 
       while (ply < REDUCE_PLY_RED && !finished) {
-	finished = 1;
-	ply++;
-	tbl[BASE_WIN + ply + 5] = 0;
-	tbl[BASE_WIN + ply + 7] = 2;
-	win_loss[BASE_WIN + ply + 6] = BASE_LOSS - ply - 4;
-	loss_win[BASE_LOSS - ply - 4] = BASE_WIN + ply + 8;
-	run_iter();
+        finished = 1;
+        ply++;
+        tbl[BASE_WIN + ply + 5] = 0;
+        tbl[BASE_WIN + ply + 7] = 2;
+        win_loss[BASE_WIN + ply + 6] = BASE_LOSS - ply - 4;
+        loss_win[BASE_LOSS - ply - 4] = BASE_WIN + ply + 8;
+        run_iter();
       }
 
       tbl[BASE_WIN + ply + 6] = 0;
@@ -730,7 +730,7 @@ MARK_PIVOT(mark_threat_draws)
   if (table[idx2] == UNKNOWN) {
     table[idx2] = THREAT_DRAW;
     if (PIVOT_ON_DIAG(idx2)) {
-      long64 idx3 = PIVOT_MIRROR(idx2);
+      uint64_t idx3 = PIVOT_MIRROR(idx2);
       table[idx3] = THREAT_DRAW;
     }
   }
@@ -748,8 +748,8 @@ MARK(mark_threat_draws)
 void find_draw_threats(struct thread_data *thread)
 {
   BEGIN_ITER;
-  ubyte *table = iter_table;
-  ubyte *table_opp = iter_table_opp;
+  uint8_t *table = iter_table;
+  uint8_t *table_opp = iter_table_opp;
   int *pcs_opp = iter_pcs_opp;
 
   LOOP_ITER {

@@ -30,12 +30,10 @@
 
 #include <stdint.h>
 
-typedef uint64_t uint64;
-
 // Hash function for a byte array.
-void CityHashCrc128(const char *s, size_t len, uint64 *result);
+void CityHashCrc128(const char *s, size_t len, uint64_t *result);
 
 // Hash function for a byte array.  Sets result[0] ... result[3].
-void CityHashCrc256(const char *s, size_t len, uint64 *result);
+void CityHashCrc256(const char *s, size_t len, uint64_t *result);
 
 #endif  // CITY_HASH_CRC_H_
