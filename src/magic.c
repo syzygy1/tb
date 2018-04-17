@@ -163,7 +163,7 @@ static signed char m_rook_dir[4][2] = {
 };
 
 static void init_magics(struct MagicInit *magic_init, struct Magic *magic,
-			signed char dir[][2], int shift)
+                        signed char dir[][2], int shift)
 {
   int sq, sq88;
   int i, j, d, num;
@@ -183,7 +183,7 @@ static void init_magics(struct MagicInit *magic_init, struct Magic *magic,
     for (i = 0; i < 4; i++) {
       if ((sq88 + dir[i][1]) & 0x88) continue;
       for (d = 2; !((sq88 + d * dir[i][1]) & 0x88); d++)
-	bb |= bit[sq + (d - 1) * dir[i][0]];
+        bb |= bit[sq + (d - 1) * dir[i][0]];
     }
     magic[sq].mask = bb;
 
@@ -198,14 +198,14 @@ static void init_magics(struct MagicInit *magic_init, struct Magic *magic,
     for (i = 0; i < (1 << num); i++) {
       bb = 0;
       for (j = 0; j < num; j++)
-	if (i & (1 << j))
-	  bb |= bit[squares[j]];
+        if (i & (1 << j))
+          bb |= bit[squares[j]];
       bb2 = 0;
       for (j = 0; j < 4; j++) {
-	for (d = 1; !((sq88 + d * dir[j][1]) & 0x88); d++) {
-	  bb2 |= bit[sq + d * dir[j][0]];
-	  if (bb & bit[sq + d * dir[j][0]]) break;
-	}
+        for (d = 1; !((sq88 + d * dir[j][1]) & 0x88); d++) {
+          bb2 |= bit[sq + d * dir[j][0]];
+          if (bb & bit[sq + d * dir[j][0]]) break;
+        }
       }
       j = (bb * magic[sq].magic) >> shift;
       magic[sq].data[j] = bb2;
@@ -220,4 +220,3 @@ void set_up_move_gen(void)
 }
 
 #endif
-

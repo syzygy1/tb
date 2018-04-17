@@ -13,7 +13,7 @@ struct Hyper hyper_table[64];
 #else
 bitboard hyper_rook_mask[64];
 #endif
-ubyte hyper_rank[512];
+uint8_t hyper_rank[512];
 
 #ifdef HYPER_SSE3
 #include <tmmintrin.h>
@@ -114,7 +114,7 @@ static void set_up_move_gen(void)
 {
   int sq, sq88, d;
   int i, j;
-  ubyte b;
+  uint8_t b;
   bitboard bb, bb2;
 #ifdef HYPER_SSE3
   __m128i xmm1, xmm2;
@@ -169,12 +169,12 @@ static void set_up_move_gen(void)
     for (j = 0; j < 8; j++) {
       b = 0;
       for (d = j + 1; d < 8; d++) {
-	b |= 1 << d;
-	if (i & (1 << d)) break;
+        b |= 1 << d;
+        if (i & (1 << d)) break;
       }
       for (d = j - 1; d >= 0; d--) {
-	b |= 1 << d;
-	if (i & (1 << d)) break;
+        b |= 1 << d;
+        if (i & (1 << d)) break;
       }
       hyper_rank[4 * i + j] = b;
     }
@@ -182,4 +182,3 @@ static void set_up_move_gen(void)
 }
 
 #endif
-

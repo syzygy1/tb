@@ -5,34 +5,27 @@
 */
 
 #include "lz4.h"
-
-static char *lz4_buf = NULL;
+#include "util.h"
 
 #define MAX_SAVES 16
 
 void reduce_tables(int local);
 void count_stats(struct thread_data *thread);
-void collect_stats(long64 *work, int phase, int local);
+void collect_stats(uint64_t *work, int phase, int local);
 
 static FILE *tmp_table[MAX_SAVES][2];
 static int reduce_cnt[MAX_SAVES];
 static int stats_val[MAX_SAVES];
 static int reduce_val[MAX_SAVES];
 
-void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
+void save_table(uint8_t *table, char color, int local, uint64_t begin, uint64_t size)
 {
   int i;
   FILE *F;
   char name[64];
-  ubyte v[256];
+  uint8_t v[256];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   if (local == num_saves) {
     sprintf(name, "%s.%c.%d", tablename, color, num_saves);
@@ -88,8 +81,8 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
   }
 #endif
 
-  ubyte *ptr = table + begin;
-  long64 total = size;
+  uint8_t *ptr = table + begin;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
@@ -97,18 +90,20 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
     for (i = 0; i < chunk; i++)
       copybuf[i] = v[ptr[i]];
     ptr += chunk;
-    uint32 lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
-    ((uint32 *)lz4_buf)[0] = lz4_size;
-    ((uint32 *)lz4_buf)[1] = chunk;
+    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
+    ((uint32_t *)lz4_buf)[0] = lz4_size;
+    ((uint32_t *)lz4_buf)[1] = chunk;
     fwrite(lz4_buf, 1, lz4_size + 8, F);
   }
 }
 
-void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
+void reconstruct_table_pass(uint8_t *table, char color, int k, uint8_t *v)
 {
   int i;
   FILE *F;
   char name[64];
+
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c.%d", tablename, color, k);
 
@@ -117,11 +112,11 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk;
-    uint32 lz4_size;
+    uint32_t lz4_size;
     fread(&lz4_size, 1, 4, F);
     fread(&chunk, 1, 4, F);
     fread(lz4_buf, 1, lz4_size, F);
@@ -136,12 +131,12 @@ void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
   unlink(name);
 }
 
-void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
+void verify_stats(uint8_t *table, uint64_t *tot_stats, struct dtz_map *map)
 {
-  long64 stats[256];
-  long64 stats2[256];
+  uint64_t stats[256];
+  uint64_t stats2[256];
   int i, j;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
 
   for (i = 0; i < 256; i++)
     stats[i] = stats2[i] = 0;
@@ -177,10 +172,10 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
   for (i = 0; i < 256; i++)
     if (stats[i] != stats2[i] && i != map->max_num) {
       fprintf(stderr, "stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
-		    i, stats[i], i, stats2[i]);
+                    i, stats[i], i, stats2[i]);
       int j;
       for (j = 0; j < 4; j++)
-	fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
+        fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
       verify_ok = 0;
     }
 
@@ -188,12 +183,12 @@ void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
     exit(1);
 }
 
-void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
+void reconstruct_table(uint8_t *table, char color, struct dtz_map *map)
 {
   int i, k;
   int num = map->max_num;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
-  ubyte v[256];
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
+  uint8_t v[256];
 
   for (i = 0; i < 256; i++)
     v[i] = 0;
@@ -238,26 +233,26 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
       v[255] = inv_map[1][0];
       v[1] = num;
       if (map->ply_accurate_win)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 2] = inv_map[0][i];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[i + 2] = inv_map[0][i];
       else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 2] = inv_map[0][i / 2];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[i + 2] = inv_map[0][i / 2];
       if (map->ply_accurate_loss)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[254 - i] = inv_map[1][i];
       else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i / 2];
+        for (i = 0; i < DRAW_RULE; i++)
+          v[254 - i] = inv_map[1][i / 2];
       for (; i <= REDUCE_PLY; i += 2) {
-	v[2 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
-	v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
+        v[2 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
+        v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
       }
       red_cnt = REDUCE_PLY - DRAW_RULE - 2;
     } else {
       for (i = 0; i <= REDUCE_PLY_RED + 1; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
+        v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
+        v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -268,27 +263,27 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
     if (k == 0) {
       v[1] = inv_map[0][0];
       if (map->ply_accurate_win)
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[1 + i] = inv_map[0][i - 1];
+        for (i = 1; i <= DRAW_RULE; i++)
+          v[1 + i] = inv_map[0][i - 1];
       else
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[1 + i] = inv_map[0][(i - 1) / 2];
+        for (i = 1; i <= DRAW_RULE; i++)
+          v[1 + i] = inv_map[0][(i - 1) / 2];
       v[255] = inv_map[1][0];
       if (map->ply_accurate_loss)
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[255 - i] = inv_map[1][i - 1];
+        for (i = 1; i <= DRAW_RULE; i++)
+          v[255 - i] = inv_map[1][i - 1];
       else
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[255 - i] = inv_map[1][(i - 1) / 2];
+        for (i = 1; i <= DRAW_RULE; i++)
+          v[255 - i] = inv_map[1][(i - 1) / 2];
       for (i = DRAW_RULE + 1; i < REDUCE_PLY; i += 2) {
-	v[2 + DRAW_RULE + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
-	v[254 - DRAW_RULE - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
+        v[2 + DRAW_RULE + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
+        v[254 - DRAW_RULE - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
       }
       red_cnt = REDUCE_PLY - 1 - DRAW_RULE;
     } else {
       for (i = 0; i < REDUCE_PLY_RED; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
+        v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
+        v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
       }
       red_cnt += REDUCE_PLY_RED;
     }
@@ -308,9 +303,9 @@ void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
 void reduce_tables(int local)
 {
   int i;
-  ubyte v[256];
-  long64 *work;
-  long64 save_begin = begin;
+  uint8_t v[256];
+  uint64_t *work;
+  uint64_t save_begin = begin;
 
   if (!copybuf)
     copybuf = malloc(COPYSIZE);
@@ -436,18 +431,12 @@ void reduce_tables(int local)
   }
 }
 
-void store_table(ubyte *table, char color)
+void store_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c", tablename, color);
 
@@ -456,25 +445,27 @@ void store_table(ubyte *table, char color)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
+    uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
     ptr += chunk;
-    *(uint32 *)lz4_buf = lz4_size;
+    *(uint32_t *)lz4_buf = lz4_size;
     fwrite(lz4_buf, 1, lz4_size + 4, F);
   }
 
   fclose(F);
 }
 
-void load_table(ubyte *table, char color)
+void load_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
+
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c", tablename, color);
 
@@ -483,13 +474,13 @@ void load_table(ubyte *table, char color)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4size;
+    uint32_t lz4size;
     fread(&lz4size, 1, 4, F);
     fread(lz4_buf, 1, lz4size, F);
     LZ4_uncompress(lz4_buf, (char *)ptr, chunk);
@@ -499,4 +490,3 @@ void load_table(ubyte *table, char color)
   fclose(F);
   unlink(name);
 }
-

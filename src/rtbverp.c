@@ -7,7 +7,7 @@
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
 
 #define SET_CAPT_VALUE(x,v) \
-{ ubyte dummy = v; \
+{ uint8_t dummy = v; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -19,7 +19,7 @@ __asm__( \
 : "+m" (x), "+r" (dummy) : : "eax"); }
 
 #define SET_CAPT_LOSS(x) \
-{ ubyte dummy = CAPT_LOSS; \
+{ uint8_t dummy = CAPT_LOSS; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -52,7 +52,7 @@ __asm__( \
 #define W_BROKEN 12
 #define W_ERROR 13
 
-static ubyte w_wdl_matrix[256][8] = {
+static uint8_t w_wdl_matrix[256][8] = {
   { W_LOSS, W_MATE, W_CAPT_LOSS, W_CAPT_CLOSS, W_CAPT_DRAW, W_CAPT_CWIN, W_CAPT_WIN, 0 },
   { W_CLOSS, W_ERROR, W_CLOSS, W_CAPT_CLOSS, W_CAPT_DRAW, W_CAPT_CWIN, W_CAPT_WIN, 0 },
   { W_DRAW, W_ERROR, W_DRAW, W_DRAW, W_CAPT_DRAW, W_CAPT_CWIN, W_CAPT_WIN, 0 },
@@ -60,11 +60,11 @@ static ubyte w_wdl_matrix[256][8] = {
   { W_WIN, W_ERROR, W_WIN, W_WIN, W_WIN, W_WIN, W_CAPT_WIN, 0 }
 };
 
-static ubyte w_ilbrok[2] = {
+static uint8_t w_ilbrok[2] = {
   W_ILLEGAL, W_BROKEN
 };
 
-static ubyte w_skip[14];
+static uint8_t w_skip[14];
 
 // no DTZ value required for:
 // WDL_ERROR, WDL_DRAW, WDL_DRAW_C, WDL_CWIN_C, WDL_WIN_C, WDL_ILLEGAL, WDL_BROKEN
@@ -84,7 +84,7 @@ static ubyte w_skip[14];
 #define WDL_BROKEN 13
 
 // really a 5x7 matrix
-static ubyte wdl_matrix[256][8] = {
+static uint8_t wdl_matrix[256][8] = {
   { WDL_LOSS, WDL_MATE, WDL_CAPT_LOSS, WDL_CAPT_CLOSS, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
   { WDL_CLOSS, WDL_ERROR, WDL_CLOSS, WDL_CAPT_CLOSS, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
   { WDL_DRAW, WDL_ERROR, WDL_DRAW, WDL_DRAW, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
@@ -92,13 +92,13 @@ static ubyte wdl_matrix[256][8] = {
   { WDL_WIN, WDL_ERROR, WDL_WIN, WDL_WIN, WDL_WIN, WDL_WIN, WDL_CAPT_WIN, 0 }
 };
 
-static ubyte wdl_pawn[6][16];
+static uint8_t wdl_pawn[6][16];
 
 static char wdl_to_pawn[16] = {
   2, 2, 2, 1, 1, -1, -2, -3, 0, 0, -1, -2, -3, -3
 };
 
-static ubyte pawn_skip[16];
+static uint8_t pawn_skip[16];
 
 static int wdl_tbl_to_wdl[] = {
   1, 1, 1, 3, 3, 2, 0
@@ -123,18 +123,18 @@ int max_dtz_cursed;
 int opp_capt_cwin, opp_base_cwin, opp_draw, opp_capt_draw;
 int opp_capt_closs, opp_base_closs;
 
-static ubyte wdl_to_dtz_c[8];
+static uint8_t wdl_to_dtz_c[8];
 
-static ubyte wdl_to_dtz[8][256];
-static ubyte dtz_to_opp[14][256];
-static ubyte dtz_matrix[256][256];
+static uint8_t wdl_to_dtz[8][256];
+static uint8_t dtz_to_opp[14][256];
+static uint8_t dtz_matrix[256][256];
 
-static ubyte w_matrix[16][16];
+static uint8_t w_matrix[16][16];
 
 static char dtz_to_wdl[256];
-//static ubyte pawn_to_dtz[6];
+//static uint8_t pawn_to_dtz[6];
 
-static ubyte dtz_matrix[256][256];
+static uint8_t dtz_matrix[256][256];
 
 void init_wdl_matrix(void)
 {
@@ -601,10 +601,10 @@ int is_attacked(int sq, int *pcs, bitboard occ, int *p)
 }
 
 // captures should be taken care of already
-int check_mate_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_mate_pieces(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
 
   do {
@@ -622,11 +622,11 @@ int check_mate_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
   return 1;
 }
 
-int check_mate_pawns_w(long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_mate_pawns_w(uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int i;
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
 
   for (i = 0; i < numpawns; i++) {
     if (!pw[i]) continue;
@@ -634,16 +634,16 @@ int check_mate_pawns_w(long64 idx0, ubyte *table, bitboard occ, int *p)
     if (bit[sq + 8] & occ) continue;
     if (sq >= 0x30) {
       if (!is_attacked(p[white_king], black_all, occ ^ bit[sq] ^ bit[sq + 8], p))
-	return 0;
+        return 0;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((long64)((p[i] + 0x08) ^ 0x38) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
       else idx2 = idx | piv_idx[p[i] + 0x08];
       if (table[idx2] < WDL_ILLEGAL) return 0;
       if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-	if (i) idx2 = idx | ((long64)((p[i] + 0x10) ^ 0x38) << shift[i]);
-	else idx2 = idx | piv_idx[p[i] + 0x10];
-	if (table[idx2] < WDL_ILLEGAL) return 0;
+        if (i) idx2 = idx | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
+        else idx2 = idx | piv_idx[p[i] + 0x10];
+        if (table[idx2] < WDL_ILLEGAL) return 0;
       }
     }
   }
@@ -651,11 +651,11 @@ int check_mate_pawns_w(long64 idx0, ubyte *table, bitboard occ, int *p)
   return 1;
 }
 
-int check_mate_pawns_b(long64 idx0, ubyte *table, bitboard occ, int *p)
+int check_mate_pawns_b(uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int i;
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
 
   for (i = 0; i < numpawns; i++) {
     if (pw[i]) continue;
@@ -663,16 +663,16 @@ int check_mate_pawns_b(long64 idx0, ubyte *table, bitboard occ, int *p)
     if (bit[sq - 8] & occ) continue;
     if (sq < 0x10) {
       if (!is_attacked(p[black_king], white_all, occ ^ bit[sq] ^ bit[sq - 8], p))
-	return 0;
+        return 0;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((long64)(p[i] - 0x08) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)(p[i] - 0x08) << shift[i]);
       else idx2 = idx | piv_idx[p[i] - 0x08];
       if (table[idx2] < WDL_ILLEGAL) return 0;
       if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-	if (i) idx2 = idx | ((long64)(p[i] - 0x10) << shift[i]);
-	else idx2 = idx | piv_idx[p[i] - 0x10];
-	if (table[idx2] < WDL_ILLEGAL) return 0;
+        if (i) idx2 = idx | ((uint64_t)(p[i] - 0x10) << shift[i]);
+        else idx2 = idx | piv_idx[p[i] - 0x10];
+        if (table[idx2] < WDL_ILLEGAL) return 0;
       }
     }
   }
@@ -683,80 +683,80 @@ int check_mate_pawns_b(long64 idx0, ubyte *table, bitboard occ, int *p)
 #if 1
 void calc_broken(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
   for (idx = thread->begin; idx < end; idx += 64) {
     FILL_OCC64_cheap {
       for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	if (occ & bb)
-	  table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
-	else
-	  table_w[idx + i] = table_b[idx + i] = 0;
+        if (occ & bb)
+          table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+        else
+          table_w[idx + i] = table_b[idx + i] = 0;
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
     }
   }
 }
 #else
 void calc_broken(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int p[MAX_PIECES];
 
   for (idx = thread->begin; idx < end; idx += 64) {
     FILL_OCC64 {
       if (n == numpawns) { // FIXME: only possible in suicide?
-	for (i = 0; i < 8; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
-	for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	    p[n -1] = i; 
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = WDL_ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = WDL_ILLEGAL;
-	  }
-	for (; i < 64; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
+        for (i = 0; i < 8; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
+        for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+            p[n -1] = i; 
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = WDL_ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = WDL_ILLEGAL;
+          }
+        for (; i < 64; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
       } else {
-	for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	    p[n - 1] = i;
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = WDL_ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = WDL_ILLEGAL;
-	  }
+        for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+            p[n - 1] = i;
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = WDL_ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = WDL_ILLEGAL;
+          }
       }
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++) {
-	table_w[idx + i] = WDL_BROKEN;
-	table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = WDL_BROKEN;
+        table_b[idx + i] = WDL_BROKEN;
       }
     }
   }
@@ -766,12 +766,12 @@ void calc_broken(struct thread_data *thread)
 #if 1
 void calc_broken_pp(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 //  int p[MAX_PIECES];
 
   for (idx = thread->begin; idx < end; idx += 64) {
@@ -782,7 +782,7 @@ void calc_broken_pp(struct thread_data *thread)
     bit_set(bb, piv_sq[idx2]);
     if (bb & pp_mask) {
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
       continue;
     }
     occ = 0;
@@ -800,7 +800,7 @@ void calc_broken_pp(struct thread_data *thread)
     bit_set_test(bb, piv_sq[idx2], c);
     if ((bb & pp_mask) || c) {
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
       continue;
     }
     occ = 0;
@@ -812,35 +812,35 @@ void calc_broken_pp(struct thread_data *thread)
       occ |= bb;
 #endif
       if (n == numpawns) { // FIXME: only possible in suicide?
-	for (i = 0; i < 8; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
-	for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	  }
-	for (; i < 64; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
+        for (i = 0; i < 8; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
+        for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+          }
+        for (; i < 64; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
       } else {
-	for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	  }
+        for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+          }
       }
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++) {
-	table_w[idx + i] = WDL_BROKEN;
-	table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = WDL_BROKEN;
+        table_b[idx + i] = WDL_BROKEN;
       }
     }
   }
@@ -848,12 +848,12 @@ void calc_broken_pp(struct thread_data *thread)
 #else
 void calc_broken_pp(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int p[MAX_PIECES];
 
   for (idx = thread->begin; idx < end; idx += 64) {
@@ -863,7 +863,7 @@ void calc_broken_pp(struct thread_data *thread)
     bb |= bit[p[0] = piv_sq[idx2]];
     if (bb & pp_mask) {
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = table_b[idx + i] = WDL_BROKEN;
       continue;
     }
     occ = 0;
@@ -874,45 +874,45 @@ void calc_broken_pp(struct thread_data *thread)
     occ |= bb;
     if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK)) {
       if (n == numpawns) { // FIXME: only possible in suicide?
-	for (i = 0; i < 8; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
-	for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	    p[n - 1] = i; 
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = WDL_ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = WDL_ILLEGAL;
-	  }
-	for (; i < 64; i++) {
-	  table_w[idx + i] = WDL_BROKEN;
-	  table_b[idx + i] = WDL_BROKEN;
-	}
+        for (i = 0; i < 8; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
+        for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+            p[n - 1] = i; 
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = WDL_ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = WDL_ILLEGAL;
+          }
+        for (; i < 64; i++) {
+          table_w[idx + i] = WDL_BROKEN;
+          table_b[idx + i] = WDL_BROKEN;
+        }
       } else {
-	for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = WDL_BROKEN;
-	    table_b[idx + i] = WDL_BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = 0;
-	    p[n - 1] = i;
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = WDL_ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = WDL_ILLEGAL;
-	  }
+        for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = WDL_BROKEN;
+            table_b[idx + i] = WDL_BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = 0;
+            p[n - 1] = i;
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = WDL_ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = WDL_ILLEGAL;
+          }
       }
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++) {
-	table_w[idx + i] = WDL_BROKEN;
-	table_b[idx + i] = WDL_BROKEN;
+        table_w[idx + i] = WDL_BROKEN;
+        table_b[idx + i] = WDL_BROKEN;
       }
     }
   }
@@ -921,13 +921,13 @@ void calc_broken_pp(struct thread_data *thread)
 
 void calc_mates(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ;
   int *p = thread->p;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
   for (idx = thread->begin; idx < end; idx++) {
     if (table_w[idx] == WDL_BROKEN) continue;
@@ -937,12 +937,12 @@ void calc_mates(struct thread_data *thread)
     FILL_OCC;
     if (chk_w) {
       if (!table_w[idx] && check_mate_pieces(white_pcs, idx, table_b, occ, p)
-			&& check_mate_pawns_w(idx, table_b, occ, p))
-	table_w[idx] = CAPT_MATE;
+                        && check_mate_pawns_w(idx, table_b, occ, p))
+        table_w[idx] = CAPT_MATE;
     } else {
       if (!table_b[idx] && check_mate_pieces(black_pcs, idx, table_w, occ, p)
-			&& check_mate_pawns_b(idx, table_w, occ, p))
-	table_b[idx] = CAPT_MATE;
+                        && check_mate_pawns_b(idx, table_w, occ, p))
+        table_b[idx] = CAPT_MATE;
     }
   }
 }
@@ -1029,23 +1029,23 @@ void probe_captures_w(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_WHITE_PIECES(mark_capt_wins);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_wins);
+        break;
       case -1:
-	LOOP_WHITE_PIECES(mark_capt_cursed_wins);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_WHITE_PIECES(mark_capt_draws);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_draws);
+        break;
       case 1:
-	LOOP_WHITE_PIECES(mark_capt_cursed_losses);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_WHITE_PIECES(mark_capt_losses);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_losses);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -1064,23 +1064,23 @@ void probe_captures_b(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_BLACK_PIECES(mark_capt_wins);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_wins);
+        break;
       case -1:
-	LOOP_BLACK_PIECES(mark_capt_cursed_wins);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_BLACK_PIECES(mark_capt_draws);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_draws);
+        break;
       case 1:
-	LOOP_BLACK_PIECES(mark_capt_cursed_losses);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_BLACK_PIECES(mark_capt_losses);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_losses);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -1098,23 +1098,23 @@ void probe_pivot_captures(struct thread_data *thread)
       MAKE_IDX2_PIVOT;
       switch (v) {
       case -2:
-	LOOP_PIECES_PIVOT(mark_capt_wins);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_wins);
+        break;
       case -1:
-	LOOP_PIECES_PIVOT(mark_capt_cursed_wins);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_PIECES_PIVOT(mark_capt_draws);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_draws);
+        break;
       case 1:
-	LOOP_PIECES_PIVOT(mark_capt_cursed_losses);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_PIECES_PIVOT(mark_capt_losses);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_losses);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -1170,7 +1170,7 @@ void calc_captures_w(void)
     if (!(pt[i] & 0x08) || i == black_king) continue;
     for (k = 0, j = 0; black_all[k] >= 0; k++)
       if (black_all[k] != i)
-	pcs2[j++] = black_all[k];
+        pcs2[j++] = black_all[k];
     pcs2[j] = -1;
     if (i) {
       captured_piece = i;
@@ -1210,7 +1210,7 @@ void calc_captures_b(void)
   }
 }
 
-int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitboard occ, int *p)
+int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr, int wtm, bitboard occ, int *p)
 {
   int i, m;
   int v;
@@ -1228,13 +1228,13 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitbo
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && ((pt[i] & 0x08) != clr))
-	  pcs[m++] = i;
+        if (i != t && ((pt[i] & 0x08) != clr))
+          pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pt2[t] = 0;
       pos[k] = sq2;
@@ -1249,20 +1249,20 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm, bitbo
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && (pt[i] & 0x08) != clr) pcs[m++] = i;
+        if (i != t && (pt[i] & 0x08) != clr) pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pt2[t] = 0;
       pos[k] = sq2;
       for (m = QUEEN; m >= KNIGHT; m--) {
-	pt2[k] = m | (pt[k] & 0x08);
-	v = -probe_tb(pt2, pos, wtm, occ, -2, 2);
-	if (v > 1) return v;
-	if (v > best) best = v;
+        pt2[k] = m | (pt[k] & 0x08);
+        v = -probe_tb(pt2, pos, wtm, occ, -2, 2);
+        if (v > 1) return v;
+        if (v > best) best = v;
       }
     }
   }
@@ -1311,17 +1311,17 @@ void calc_pawn_captures_b(struct thread_data *thread)
 #if 1
 void load_wdl(struct thread_data *thread)
 {
-  long64 idx, idx2, idx_p, idx2_p;
+  uint64_t idx, idx2, idx_p, idx2_p;
   int i, v1, v2, v1_p;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
-  ubyte *table = load_table;
-  ubyte *src = tb_table;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
   int *perm = tb_perm;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int pos[MAX_PIECES];
-  ubyte *norm = load_entry->file[file].norm[load_bside];
-  long64 *factor = load_entry->file[file].factor[load_bside];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   v1_p = 0; // suppress bogus warning
@@ -1360,17 +1360,17 @@ void load_wdl(struct thread_data *thread)
 #else
 void load_wdl(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, v1, v2;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
-  ubyte *table = load_table;
-  ubyte *src = tb_table;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
   int *perm = tb_perm;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int pos[MAX_PIECES];
-  ubyte *norm = load_entry->file[file].norm[load_bside];
-  long64 *factor = load_entry->file[file].factor[load_bside];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {
@@ -1390,17 +1390,17 @@ void load_wdl(struct thread_data *thread)
 
 void load_dtz(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, v1, v2;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
-  ubyte *table = load_table;
-  ubyte *src = tb_table;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
   int *perm = tb_perm;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int pos[MAX_PIECES];
-  ubyte *norm = load_entry->file[file].norm[load_bside];
-  long64 *factor = load_entry->file[file].factor[load_bside];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {
@@ -1422,19 +1422,19 @@ error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx, v1, v2, idx
 
 void load_dtz_mapped(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, v1, v2;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
-  ubyte *table = load_table;
-  ubyte *src = tb_table;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
   int *perm = tb_perm;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int pos[MAX_PIECES];
-  ubyte *norm = load_entry->file[file].norm[load_bside];
-  long64 *factor = load_entry->file[file].factor[load_bside];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
-  ubyte (*map)[256] = load_map;
+  uint8_t (*map)[256] = load_map;
 
   for (idx = thread->begin; idx < end; idx++) {
     v1 = table[idx];
@@ -1454,10 +1454,10 @@ error("DTZ_ERROR: idx = %llu, v1 = %d, v2 = %d, idx2 = %llu\n", idx, v1, v2, idx
   }
 }
 
-static int has_moves_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+static int has_moves_pieces(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
 
   do {
@@ -1475,12 +1475,12 @@ static int has_moves_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, i
   return 0;
 }
 
-int has_moves_pawns_w(long64 idx0, bitboard occ, int *p)
+int has_moves_pawns_w(uint64_t idx0, bitboard occ, int *p)
 {
   int i;
   int sq;
-  long64 idx, idx2;
-  ubyte *table = table_b;
+  uint64_t idx, idx2;
+  uint8_t *table = table_b;
 
   for (i = 0; i < numpawns; i++) {
     if (!pw[i]) continue;
@@ -1488,16 +1488,16 @@ int has_moves_pawns_w(long64 idx0, bitboard occ, int *p)
     if (bit[sq + 8] & occ) continue;
     if (sq >= 0x30) {
       if (!is_attacked(p[white_king], black_all, occ ^ bit[sq] ^ bit[sq + 8], p))
-	return 1;
+        return 1;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((long64)((p[i] + 0x08) ^ 0x38) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
       else idx2 = idx | piv_idx[p[i] + 0x08];
       if (table[idx2] != WDL_ILLEGAL) return 1;
       if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-	if (i) idx2 = idx | ((long64)((p[i] + 0x10) ^ 0x38) << shift[i]);
-	else idx2 = idx | piv_idx[p[i] + 0x10];
-	if (table[idx2] != WDL_ILLEGAL) return 1;
+        if (i) idx2 = idx | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
+        else idx2 = idx | piv_idx[p[i] + 0x10];
+        if (table[idx2] != WDL_ILLEGAL) return 1;
       }
     }
   }
@@ -1505,12 +1505,12 @@ int has_moves_pawns_w(long64 idx0, bitboard occ, int *p)
   return 0;
 }
 
-int has_moves_pawns_b(long64 idx0, bitboard occ, int *p)
+int has_moves_pawns_b(uint64_t idx0, bitboard occ, int *p)
 {
   int i;
   int sq;
-  long64 idx, idx2;
-  ubyte *table = table_w;
+  uint64_t idx, idx2;
+  uint8_t *table = table_w;
 
   for (i = 0; i < numpawns; i++) {
     if (pw[i]) continue;
@@ -1518,16 +1518,16 @@ int has_moves_pawns_b(long64 idx0, bitboard occ, int *p)
     if (bit[sq - 8] & occ) continue;
     if (sq < 0x10) {
       if (!is_attacked(p[black_king], white_all, occ ^ bit[sq] ^ bit[sq - 8], p))
-	return 1;
+        return 1;
     } else {
       idx = idx0 & ~mask[i];
-      if (i) idx2 = idx | ((long64)(p[i] - 0x08) << shift[i]);
+      if (i) idx2 = idx | ((uint64_t)(p[i] - 0x08) << shift[i]);
       else idx2 = idx | piv_idx[p[i] - 0x08];
       if (table[idx2] != WDL_ILLEGAL) return 1;
       if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-	if (i) idx2 = idx | ((long64)(p[i] - 0x10) << shift[i]);
-	else idx2 = idx | piv_idx[p[i] - 0x10];
-	if (table[idx2] != WDL_ILLEGAL) return 1;
+        if (i) idx2 = idx | ((uint64_t)(p[i] - 0x10) << shift[i]);
+        else idx2 = idx | piv_idx[p[i] - 0x10];
+        if (table[idx2] != WDL_ILLEGAL) return 1;
       }
     }
   }
@@ -1535,10 +1535,10 @@ int has_moves_pawns_b(long64 idx0, bitboard occ, int *p)
   return 0;
 }
 
-static int compute_pieces(int *pcs, long64 idx0, ubyte *table, bitboard occ, int *p)
+static int compute_pieces(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
   int best = DTZ_ILLEGAL; // equal to W_ILLEGAL
 
@@ -1586,7 +1586,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bit
 // FIXME: WDL_ILLEGAL, so does not work for W_ILLEGAL
 void calc_pawn_moves_w(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, k;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
@@ -1594,7 +1594,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *p = thread->p;
-  long64 end = begin + thread->end;
+  uint64_t end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
 
@@ -1607,53 +1607,53 @@ void calc_pawn_moves_w(struct thread_data *thread)
       sq = p[i];
       if (bit[sq + 8] & occ) continue;
       if (sq >= 0x30) {
-	bitboard bb = occ ^ bit[sq] ^ bit[sq + 8];
-	if (is_attacked(p[white_king], black_all, bb, p))
-	  continue;
-	for (k = 0; k < n; k++) {
-	  pos[k] = p[k];
-	  pt2[k] = pt[k];
-	}
-	pos[i] = sq + 8;
-	if (best < -2) best = -2;
-	for (k = WQUEEN; k >= WKNIGHT; k--) {
-	  pt2[i] = k;
-	  int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
-	  if (v > best) {
-	    best = v;
-	    if (best == 2) goto lab;
-	  }
-	}
+        bitboard bb = occ ^ bit[sq] ^ bit[sq + 8];
+        if (is_attacked(p[white_king], black_all, bb, p))
+          continue;
+        for (k = 0; k < n; k++) {
+          pos[k] = p[k];
+          pt2[k] = pt[k];
+        }
+        pos[i] = sq + 8;
+        if (best < -2) best = -2;
+        for (k = WQUEEN; k >= WKNIGHT; k--) {
+          pt2[i] = k;
+          int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
+          if (v > best) {
+            best = v;
+            if (best == 2) goto lab;
+          }
+        }
       } else {
-	long64 idx0 = idx & ~mask[i];
-	if (i) idx2 = idx0 | ((long64)((p[i] + 0x08) ^ 0x38) << shift[i]);
-	else idx2 = idx0 | piv_idx[p[i] + 0x08];
-	if (wdl_to_pawn[table_b[idx2]] > best) best = wdl_to_pawn[table_b[idx2]];
-	if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-	  if (i) idx2 = idx0 | ((long64)((p[i] + 0x10) ^ 0x38) << shift[i]);
-	  else idx2 = idx0 | piv_idx[p[i] + 0x10];
-	  if (table_b[idx2] == WDL_ILLEGAL) continue;
-	  int v0, v1 = 3;
-	  bitboard bits = sides_mask[p[i] + 0x10] & bb;
-	  while (bits) {
-	    int sq2 = FirstOne(bits);
-	    for (k = 0; p[k] != sq2; k++);
-	    if (pt[k] == BPAWN) {
-	      v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
-	      if (v0 < v1) v1 = v0;
-	    }
-	    ClearFirst(bits);
-	  }
-	  int v = wdl_to_pawn[table_b[idx2]];
-	  if (v1 < 3) {
-	    if (v1 < v || (table_b[idx2] == WDL_DRAW &&
-	      !has_moves_pieces(black_pcs, idx2, table_w,
-				occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p) &&
-	      !has_moves_pawns_b(idx2, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
-	      v = v1;
-	  }
-	  if (v > best) best = v;
-	}
+        uint64_t idx0 = idx & ~mask[i];
+        if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
+        else idx2 = idx0 | piv_idx[p[i] + 0x08];
+        if (wdl_to_pawn[table_b[idx2]] > best) best = wdl_to_pawn[table_b[idx2]];
+        if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
+          if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
+          else idx2 = idx0 | piv_idx[p[i] + 0x10];
+          if (table_b[idx2] == WDL_ILLEGAL) continue;
+          int v0, v1 = 3;
+          bitboard bits = sides_mask[p[i] + 0x10] & bb;
+          while (bits) {
+            int sq2 = FirstOne(bits);
+            for (k = 0; p[k] != sq2; k++);
+            if (pt[k] == BPAWN) {
+              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
+              if (v0 < v1) v1 = v0;
+            }
+            ClearFirst(bits);
+          }
+          int v = wdl_to_pawn[table_b[idx2]];
+          if (v1 < 3) {
+            if (v1 < v || (table_b[idx2] == WDL_DRAW &&
+              !has_moves_pieces(black_pcs, idx2, table_w,
+                                occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p) &&
+              !has_moves_pawns_b(idx2, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
+              v = v1;
+          }
+          if (v > best) best = v;
+        }
       }
     }
 lab:
@@ -1665,7 +1665,7 @@ lab:
 
 void calc_pawn_moves_b(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, k;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
@@ -1673,7 +1673,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *p = thread->p;
-  long64 end = begin + thread->end;
+  uint64_t end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
 
@@ -1686,53 +1686,53 @@ void calc_pawn_moves_b(struct thread_data *thread)
       sq = p[i];
       if (bit[sq - 8] & occ) continue;
       if (sq < 0x10) {
-	bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
-	if (is_attacked(p[black_king], white_all, bb, p))
-	  continue;
-	for (k = 0; k < n; k++) {
-	  pos[k] = p[k];
-	  pt2[k] = pt[k];
-	}
-	pos[i] = sq - 8;
-	if (best < -2) best = -2;
-	for (k = BQUEEN; k >= BKNIGHT; k--) {
-	  pt2[i] = k;
-	  int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
-	  if (v > best) {
-	    best = v;
-	    if (best == 2) goto lab;
-	  }
-	}
+        bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
+        if (is_attacked(p[black_king], white_all, bb, p))
+          continue;
+        for (k = 0; k < n; k++) {
+          pos[k] = p[k];
+          pt2[k] = pt[k];
+        }
+        pos[i] = sq - 8;
+        if (best < -2) best = -2;
+        for (k = BQUEEN; k >= BKNIGHT; k--) {
+          pt2[i] = k;
+          int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
+          if (v > best) {
+            best = v;
+            if (best == 2) goto lab;
+          }
+        }
       } else {
-	long64 idx0 = idx & ~mask[i];
-	if (i) idx2 = idx0 | ((long64)(p[i] - 0x08) << shift[i]);
-	else idx2 = idx0 | piv_idx[p[i] - 0x08];
-	if (wdl_to_pawn[table_w[idx2]] > best) best = wdl_to_pawn[table_w[idx2]];
-	if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-	  if (i) idx2 = idx0 | ((long64)(p[i] - 0x10) << shift[i]);
-	  else idx2 = idx0 | piv_idx[p[i] - 0x10];
-	  if (table_w[idx2] == WDL_ILLEGAL) continue;
-	  int v0, v1 = 3;
-	  bitboard bits = sides_mask[p[i] - 0x10] & bb;
-	  while (bits) {
-	    int sq2 = FirstOne(bits);
-	    for (k = 0; p[k] != sq2; k++);
-	    if (pt[k] == WPAWN) {
-	      v0 = eval_ep(i, k, sq2, p[i] - 0x08, white_king, 0, 0, occ, p);
-	      if (v0 < v1) v1 = v0;
-	    }
-	    ClearFirst(bits);
-	  }
-	  int v = wdl_to_pawn[table_w[idx2]];
-	  if (v1 < 3) {
-	    if (v1 < v || (table_w[idx2] == WDL_DRAW &&
-	      !has_moves_pieces(white_pcs, idx2, table_b,
-				occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p) &&
-	      !has_moves_pawns_w(idx2, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))
-	      v = v1;
-	  }
-	  if (v > best) best = v;
-	}
+        uint64_t idx0 = idx & ~mask[i];
+        if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x08) << shift[i]);
+        else idx2 = idx0 | piv_idx[p[i] - 0x08];
+        if (wdl_to_pawn[table_w[idx2]] > best) best = wdl_to_pawn[table_w[idx2]];
+        if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
+          if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x10) << shift[i]);
+          else idx2 = idx0 | piv_idx[p[i] - 0x10];
+          if (table_w[idx2] == WDL_ILLEGAL) continue;
+          int v0, v1 = 3;
+          bitboard bits = sides_mask[p[i] - 0x10] & bb;
+          while (bits) {
+            int sq2 = FirstOne(bits);
+            for (k = 0; p[k] != sq2; k++);
+            if (pt[k] == WPAWN) {
+              v0 = eval_ep(i, k, sq2, p[i] - 0x08, white_king, 0, 0, occ, p);
+              if (v0 < v1) v1 = v0;
+            }
+            ClearFirst(bits);
+          }
+          int v = wdl_to_pawn[table_w[idx2]];
+          if (v1 < 3) {
+            if (v1 < v || (table_w[idx2] == WDL_DRAW &&
+              !has_moves_pieces(white_pcs, idx2, table_b,
+                                occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p) &&
+              !has_moves_pawns_w(idx2, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))
+              v = v1;
+          }
+          if (v > best) best = v;
+        }
       }
     }
 lab:
@@ -1745,8 +1745,8 @@ lab:
 void verify_opp(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *opp_table = load_opp_table;
-  ubyte *dtz_table = load_table;
+  uint8_t *opp_table = load_opp_table;
+  uint8_t *dtz_table = load_table;
   int *opp_pieces = load_opp_pieces;
 
   LOOP_ITER_ALL {
@@ -1754,7 +1754,7 @@ void verify_opp(struct thread_data *thread)
     if (v >= WDL_ILLEGAL) {
       opp_table[idx] = wdl_to_dtz_c[v - WDL_ERROR];
       if (unlikely(v == WDL_ERROR))
-	error("ERROR: opp table, idx = %llu, v = WDL_ERROR\n", idx);
+        error("ERROR: opp table, idx = %llu, v = WDL_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
@@ -1769,15 +1769,15 @@ void verify_opp(struct thread_data *thread)
 void verify_dtz(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *dtz_table = load_table;
-  ubyte *opp_table = load_opp_table;
+  uint8_t *dtz_table = load_table;
+  uint8_t *opp_table = load_opp_table;
   int *dtz_pieces = load_pieces;
 
   LOOP_ITER_ALL {
     int v = dtz_table[idx];
     if (v == DTZ_ILLEGAL || v >= DTZ_ERROR) {
       if (unlikely(v == DTZ_ERROR))
-	error("ERROR: dtz table, idx = %llu, v = DTZ_ERROR\n", idx);
+        error("ERROR: dtz table, idx = %llu, v = DTZ_ERROR\n", idx);
       continue;
     }
     FILL_OCC;
@@ -1790,8 +1790,8 @@ void verify_dtz(struct thread_data *thread)
 void verify_wdl_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *table = load_table;
-  ubyte *opp_table = load_opp_table;
+  uint8_t *table = load_table;
+  uint8_t *opp_table = load_opp_table;
   int *pieces = load_pieces;
 
   LOOP_ITER_ALL {
@@ -1807,8 +1807,8 @@ void verify_wdl_w(struct thread_data *thread)
 void verify_wdl_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *table = load_table;
-  ubyte *opp_table = load_opp_table;
+  uint8_t *table = load_table;
+  uint8_t *opp_table = load_opp_table;
   int *pieces = load_pieces;
 
   LOOP_ITER_ALL {
@@ -1823,17 +1823,17 @@ void verify_wdl_b(struct thread_data *thread)
 
 void wdl_load_wdl(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, v1, v2;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
-  ubyte *table = load_table;
-  ubyte *src = tb_table;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
   int *perm = tb_perm;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int pos[MAX_PIECES];
-  ubyte *norm = load_entry->file[file].norm[load_bside];
-  long64 *factor = load_entry->file[file].factor[load_bside];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
   struct TBEntry_pawn *entry = load_entry;
 
   for (idx = thread->begin; idx < end; idx++) {

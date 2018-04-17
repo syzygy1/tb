@@ -25,14 +25,14 @@ struct tb_handle;
 void decomp_init_piece(int *pcs);
 struct tb_handle *open_tb(char *tablename, int wdl);
 void decomp_init_table(struct tb_handle *H);
-ubyte *decompress_table(struct tb_handle *H, int bside, int f);
+uint8_t *decompress_table(struct tb_handle *H, int bside, int f);
 void close_tb(struct tb_handle *H);
 void set_perm(struct tb_handle *H, int bside, int f, int *perm, int *pt);
 struct TBEntry *get_entry(struct tb_handle *H);
 int get_ply_accurate_win(struct tb_handle *H, int f);
 int get_ply_accurate_loss(struct tb_handle *H, int f);
 int get_dtz_side(struct tb_handle *H, int f);
-ubyte (*get_dtz_map(struct tb_handle *H, int f))[256];
+uint8_t (*get_dtz_map(struct tb_handle *H, int f))[256];
 
 void error(char *str, ...);
 
@@ -43,28 +43,28 @@ extern struct thread_data thread_data[];
 extern int numthreads;
 extern struct timeval start_time, cur_time;
 
-static long64 *work_g;
+static uint64_t *work_g;
 #ifndef SMALL
-static long64 *work_piv;
+static uint64_t *work_piv;
 #else
-static long64 *work_piv0, *work_piv1;
+static uint64_t *work_piv0, *work_piv1;
 #endif
 
-ubyte *table_w, *table_b;
+uint8_t *table_w, *table_b;
 int numpcs;
 int numpawns = 0;
 int ply_accurate_win, ply_accurate_loss;
 //int dtz_side;
-ubyte *load_table;
+uint8_t *load_table;
 int load_bside;
 struct TBEntry_piece *load_entry;
-ubyte *load_opp_table;
+uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
-ubyte (*load_map)[256];
-ubyte *tb_table;
+uint8_t (*load_map)[256];
+uint8_t *tb_table;
 int tb_perm[MAXPIECES];
 
-static long64 size;
+static uint64_t size;
 
 #ifndef SUICIDE
 static int white_king, black_king;
@@ -270,9 +270,9 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     for (j = i + 1; j < numpcs; j++)
       if (piece_order[pt[i]] > piece_order[pt[j]]) {
-	int tmp = pt[i];
-	pt[i] = pt[j];
-	pt[j] = tmp;
+        int tmp = pt[i];
+        pt[i] = pt[j];
+        pt[j] = tmp;
       }
 
   for (i = 0, j = 0; i < numpcs; i++)

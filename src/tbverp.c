@@ -27,14 +27,14 @@ struct tb_handle;
 void decomp_init_pawn(int *pcs, int *pt);
 struct tb_handle *open_tb(char *tablename, int wdl);
 void decomp_init_table(struct tb_handle *H);
-ubyte *decompress_table(struct tb_handle *H, int bside, int f);
+uint8_t *decompress_table(struct tb_handle *H, int bside, int f);
 void close_tb(struct tb_handle *H);
 void set_perm(struct tb_handle *H, int bside, int f, int *perm, int *pt);
 struct TBEntry *get_entry(struct tb_handle *H);
 int get_ply_accurate_win(struct tb_handle *H, int f);
 int get_ply_accurate_loss(struct tb_handle *H, int f);
 int get_dtz_side(struct tb_handle *H, int f);
-ubyte (*get_dtz_map(struct tb_handle *H, int f))[256];
+uint8_t (*get_dtz_map(struct tb_handle *H, int f))[256];
 
 void error(char *str, ...);
 
@@ -47,12 +47,12 @@ extern struct timeval start_time, cur_time;
 
 extern struct TBEntry entry;
 
-static long64 *work_g, *work_piv, *work_p, *work_part;
+static uint64_t *work_g, *work_piv, *work_p, *work_part;
 
-ubyte *table_w, *table_b;
+uint8_t *table_w, *table_b;
 
-static long64 size, pawnsize;
-static long64 begin;
+static uint64_t size, pawnsize;
+static uint64_t begin;
 static int slice_threading_low, slice_threading_high;
 
 static int file;
@@ -60,15 +60,15 @@ static int file;
 int numpcs;
 int numpawns;
 int pp_num, pp_shift;
-long64 pp_mask;
+uint64_t pp_mask;
 int ply_accurate_win, ply_accurate_loss;
-ubyte *load_table;
+uint8_t *load_table;
 int load_bside;
 struct TBEntry_pawn *load_entry;
-ubyte *load_opp_table;
+uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
-ubyte (*load_map)[256];
-ubyte *tb_table;
+uint8_t (*load_map)[256];
+uint8_t *tb_table;
 int tb_perm[MAXPIECES];
 
 int has_white_pawns, has_black_pawns;
@@ -133,8 +133,8 @@ void error(char *str, ...)
 
 void calc_pawn_table_unthreaded(void)
 {
-  long64 idx, idx2;
-  long64 size_p;
+  uint64_t idx, idx2;
+  uint64_t size_p;
   int i;
   int cnt = 0, cnt2 = 0;
   bitboard occ;
@@ -159,9 +159,9 @@ void calc_pawn_table_unthreaded(void)
     FILL_OCC_PAWNS {
       thread_data[0].occ = occ;
       if (has_white_pawns)
-	run_single(calc_pawn_moves_w, work_p, 0);
+        run_single(calc_pawn_moves_w, work_p, 0);
       if (has_black_pawns)
-	run_single(calc_pawn_moves_b, work_p, 0);
+        run_single(calc_pawn_moves_b, work_p, 0);
     }
   }
   printf("\n");
@@ -170,8 +170,8 @@ void calc_pawn_table_unthreaded(void)
 
 void calc_pawn_table_threaded(void)
 {
-  long64 idx, idx2;
-  long64 size_p;
+  uint64_t idx, idx2;
+  uint64_t size_p;
   int i;
   int cnt = 0, cnt2 = 0;
   bitboard occ;
@@ -192,13 +192,13 @@ void calc_pawn_table_threaded(void)
     cnt--;
     FILL_OCC_PAWNS {
       for (i = 0; i < numthreads; i++)
-	thread_data[i].occ = occ;
+        thread_data[i].occ = occ;
       for (i = 0; i < numthreads; i++)
-	memcpy(thread_data[i].p, p, MAX_PIECES * sizeof(int));
+        memcpy(thread_data[i].p, p, MAX_PIECES * sizeof(int));
       if (has_white_pawns)
-	run_threaded(calc_pawn_moves_w, work_p, 0);
+        run_threaded(calc_pawn_moves_w, work_p, 0);
       if (has_black_pawns)
-	run_threaded(calc_pawn_moves_b, work_p, 0);
+        run_threaded(calc_pawn_moves_b, work_p, 0);
     }
   }
   printf("\n");
@@ -363,9 +363,9 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     for (j = i + 1; j < numpcs; j++)
       if (piece_order[pt[i]] > piece_order[pt[j]]) {
-	int tmp = pt[i];
-	pt[i] = pt[j];
-	pt[j] = tmp;
+        int tmp = pt[i];
+        pt[i] = pt[j];
+        pt[j] = tmp;
       }
 #endif
 
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
 
   for (i = 0; i < numpcs; i++)
     pw_capt_mask[i] = ((pw_mask & idx_mask1[i]) >> 6)
-				    | (pw_mask & idx_mask2[i]);
+                                    | (pw_mask & idx_mask2[i]);
 
 #ifndef SUICIDE
   for (i = 0; i < numpcs; i++)
@@ -512,15 +512,15 @@ int main(int argc, char **argv)
     memset(piv_valid, 0, 64);
     for (j = 0; j < 6; j++) {
       piv_sq[j] = ((j + 1) << 3 | file) ^ pw[0];
-      piv_idx[piv_sq[j]] = ((long64)j) << shift[0];
+      piv_idx[piv_sq[j]] = ((uint64_t)j) << shift[0];
       piv_valid[piv_sq[j]] = 1;
     }
 
     if (pp_num > 0) {
-      pp_mask =	0xff000000000000ffULL;
+      pp_mask = 0xff000000000000ffULL;
       for (j = 0; j < file; j++) {
-	pp_mask |= (0x0101010101010101ULL << j)
-		    | (0x0101010101010101ULL << (7 - j));
+        pp_mask |= (0x0101010101010101ULL << j)
+                    | (0x0101010101010101ULL << (7 - j));
       }
     }
 
@@ -589,9 +589,9 @@ int main(int argc, char **argv)
       init_wdl_dtz();
 
       if (slice_threading_low)
-	calc_pawn_table_threaded();
+        calc_pawn_table_threaded();
       else
-	calc_pawn_table_unthreaded();
+        calc_pawn_table_unthreaded();
 
       printf("Loading dtz, %s.\n", dtz_side == 0 ? "white" : "black");
       tb_table = decompress_table(H, 0, file);
@@ -600,20 +600,20 @@ int main(int argc, char **argv)
       load_bside = dtz_side;
       load_opp_table = dtz_side == 0 ? table_b : table_w;
       if (load_map)
-	run_threaded(load_dtz_mapped, work_g, 1);
+        run_threaded(load_dtz_mapped, work_g, 1);
       else
-	run_threaded(load_dtz, work_g, 1);
+        run_threaded(load_dtz, work_g, 1);
 
       if (dtz_side == 0) {
-	load_table = table_w;
-	load_opp_table = table_b;
-	load_pieces = white_pcs;
-	load_opp_pieces = black_pcs;
+        load_table = table_w;
+        load_opp_table = table_b;
+        load_pieces = white_pcs;
+        load_opp_pieces = black_pcs;
       } else {
-	load_table = table_b;
-	load_opp_table = table_w;
-	load_pieces = black_pcs;
-	load_opp_pieces = white_pcs;
+        load_table = table_b;
+        load_opp_table = table_w;
+        load_pieces = black_pcs;
+        load_opp_pieces = white_pcs;
       }
 
       init_pawn_dtz(0);

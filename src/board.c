@@ -81,4 +81,3 @@ void set_up_tables(void)
 
   set_up_move_gen();
 }
-

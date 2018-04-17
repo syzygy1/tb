@@ -83,50 +83,63 @@ struct TBHashEntry;
 struct PairsData;
 
 struct TBEntry {
-  char *data;
-  uint32 key;
-  ubyte ready;
-  ubyte num;
-  ubyte symmetric;
-  ubyte has_pawns;
+  uint8_t *data;
+  uint32_t key;
+  uint8_t ready;
+  uint8_t num;
+  uint8_t symmetric;
+  uint8_t has_pawns;
 } __attribute__((__may_alias__));
 
 struct TBEntry_piece {
-  char *data;
-  uint32 key;
-  ubyte ready;
-  ubyte num;
-  ubyte symmetric;
-  ubyte has_pawns;
-  ubyte enc_type;
+  uint8_t *data;
+  uint32_t key;
+  uint8_t ready;
+  uint8_t num;
+  uint8_t symmetric;
+  uint8_t has_pawns;
+  uint8_t enc_type;
   struct PairsData *precomp[2];
-  long64 factor[2][TBPIECES];
-  ubyte pieces[2][TBPIECES];
-  ubyte norm[2][TBPIECES];
-  ubyte order[2];
+  uint64_t factor[2][TBPIECES];
+  uint8_t pieces[2][TBPIECES];
+  uint8_t norm[2][TBPIECES];
+  uint8_t order[2];
 };
 
 struct TBEntry_pawn {
-  char *data;
-  uint32 key;
-  ubyte ready;
-  ubyte num;
-  ubyte symmetric;
-  ubyte has_pawns;
-  ubyte pawns[2];
+  uint8_t *data;
+  uint32_t key;
+  uint8_t ready;
+  uint8_t num;
+  uint8_t symmetric;
+  uint8_t has_pawns;
+  uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    long64 factor[2][TBPIECES];
-    ubyte pieces[2][TBPIECES];
-    ubyte norm[2][TBPIECES];
-    ubyte order[2];
-    ubyte order2[2];
+    uint64_t factor[2][TBPIECES];
+    uint8_t pieces[2][TBPIECES];
+    uint8_t norm[2][TBPIECES];
+    uint8_t order[2];
+    uint8_t order2[2];
   } file[4];
 };
 
 struct TBHashEntry {
-  long64 key;
+  uint64_t key;
   struct TBEntry *ptr;
 };
-#endif
 
+uint64_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos, uint64_t *factor);
+void decode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos, uint64_t *factor, int *order, uint64_t idx);
+uint64_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, uint64_t *factor);
+void decode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, uint64_t *factor, int *order, uint64_t idx, int file);
+
+void set_norm_piece(struct TBEntry_piece *ptr, uint8_t *norm, uint8_t *pieces, int order);
+void set_norm_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, uint8_t *pieces, int order, int order2);
+uint64_t calc_factors_piece(uint64_t *factor, int num, int order, uint8_t *norm, uint8_t enc_type);
+uint64_t calc_factors_pawn(uint64_t *factor, int num, int order, int order2, uint8_t *norm, int file);
+
+void calc_order_piece(int num, int ord, int *order, uint8_t *norm);
+void calc_order_pawn(int num, int ord, int ord2, int *order, uint8_t *norm);
+
+#endif
