@@ -288,10 +288,6 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
     for (j = 0; j < num_syms; j++)
       pairfreq[i][j] = 0;
 
-  if (num_syms > 255) {
-    fprintf(stderr, "error\n");
-    exit(1);
-  }
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
