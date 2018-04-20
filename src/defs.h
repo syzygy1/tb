@@ -18,7 +18,7 @@
 #if TBPIECES < 7
 #define MAX_STATS 1536
 #else
-#define MAX_STATS 2560
+#define MAX_STATS 8192
 #endif
 
 #define MAX_VALS (((MAX_STATS / 2) - DRAW_RULE) / 2)

@@ -784,8 +784,8 @@ void init_indices(void)
 // binomial[k-1][n] = Bin(n, k)
   for (i = 0; i < 6; i++)
     for (j = 0; j < 64; j++) {
-      int f = j;
-      int l = 1;
+      uint64_t f = j;
+      uint64_t l = 1;
       for (k = 1; k <= i; k++) {
         f *= (j - k);
         l *= (k + 1);
