@@ -25,6 +25,9 @@
 
 enum { MAXSYMB = 4095 + 8 };
 
+#define LOOKUP
+#define LUBITS 12
+
 // GIVEAWAY is a variation on SUICIDE
 #ifdef GIVEAWAY
 #define SUICIDE

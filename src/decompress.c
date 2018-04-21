@@ -75,19 +75,6 @@ void decomp_init_pawn(int *pcs, int *pt)
   }
 }
 
-struct PairsData {
-  char *indextable;
-  uint16_t *sizetable;
-  uint8_t *data;
-  uint16_t *offset;
-  uint8_t *symlen;
-  uint8_t *sympat;
-  int blocksize;
-  int idxbits;
-  int min_len;
-  uint64_t base[];
-};
-
 static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {
   int s1, s2;
@@ -142,6 +129,7 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, uint64_t tb_size, uint
   memcpy(d->offset, &data[10], 2 * h);
   d->symlen = ((unsigned char *)d) + sizeof(struct PairsData) + h * sizeof(uint64_t);
   d->sympat = malloc(3 * num_syms + (num_syms & 1));
+  d->max_len = max_len; // to allow checking max_len with rtbver/rtbverp
   d->min_len = min_len;
   fread(d->sympat, 1, 3 * num_syms + (num_syms & 1), F);
 
@@ -261,7 +249,7 @@ void decomp_init_table(struct tb_handle *H)
   fread(&magic, 1, 4, F);
   if (magic != (H->wdl ? WDL_MAGIC : DTZ_MAGIC)) {
     fprintf(stderr, "Corrupted table.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   fread(&byte, 1, 1, F);
@@ -454,9 +442,10 @@ static void decompress_worker(struct thread_data *thread)
     int size = d->sizetable[block] + 1;
     while (idx + size > idx2) {
       if (*(uint32_t *)(d->indextable + 6 * mainidx) != block
-              || *((uint16_t *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx) {
+          || *((uint16_t *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx)
+      {
         fprintf(stderr, "ERROR in main index!!\n");
-        exit(1);
+        exit(EXIT_FAILURE);
       }
       idx2 += 1ULL << d->idxbits;
       mainidx++;
@@ -524,7 +513,7 @@ struct tb_handle *open_tb(char *tablename, int wdl)
   strcat(name, wdl ? WDLSUFFIX : DTZSUFFIX);
   if (!(H->F = fopen(name, "rb"))) {
     fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   H->data = (uint8_t *)map_file(name, 1, &(H->data_size));
   H->wdl = wdl;

@@ -12,6 +12,7 @@
 #include <sys/time.h>
 
 #include "board.h"
+#include "decompress.h"
 #include "defs.h"
 #include "threads.h"
 #include "util.h"
@@ -120,13 +121,39 @@ void error(char *str, ...)
   num_errors++;
   if (num_errors == 10) {
     if (log) fclose(L);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
+}
+
+static void check_huffman_tb(int wdl)
+{
+  struct tb_handle *F = open_tb(tablename, wdl);
+  decomp_init_table(F);
+  struct TBEntry_piece *entry = &(F->entry_piece);
+  printf("%s%s:", tablename, wdl ? WDLSUFFIX : DTZSUFFIX);
+  int m0 = entry->precomp[0]->max_len;
+  printf(" %d", m0);
+  int m1 = 0;
+  if (F->split) {
+    m1 = entry->precomp[1]->max_len;
+    printf(" %d", m1);
+  }
+  if (m0 >= 32 || m1 >= 32)
+    printf("WARNING!!!!!");
+  printf("\n");
+  close_tb(F);
+}
+
+static void check_huffman()
+{
+  check_huffman_tb(1);
+  check_huffman_tb(0);
 }
 
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
   { "log", 0, NULL, 'l' },
+  { "huffman", 0, NULL, 'h' },
 //  { "wdl", 0, NULL, 'w' },
   { 0, 0, NULL, 0 }
 };
@@ -138,6 +165,7 @@ int main(int argc, char **argv)
   int val, longindex;
   int pcs[16];
   int wdl_only = 0;
+  int check_huff = 0;
 #ifdef SUICIDE
   int switched = 0;
 #endif
@@ -146,7 +174,7 @@ int main(int argc, char **argv)
 
   do {
 //    val = getopt_long(argc, argv, "t:lwc", options, &longindex);
-    val = getopt_long(argc, argv, "t:ld", options, &longindex);
+    val = getopt_long(argc, argv, "t:ldh", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -160,16 +188,17 @@ int main(int argc, char **argv)
     case 'd':
       use_envdirs = 1;
       break;
+    case 'h':
+      check_huff = 1;
+      break;
     }
   } while (val != EOF);
 
   if (optind >= argc) {
     fprintf(stderr, "No tablebase specified.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   tablename = argv[optind];
-
-  init_tablebases();
 
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
@@ -204,18 +233,25 @@ int main(int argc, char **argv)
       pt[j++] = KING | color;
       break;
     case 'v':
-      if (color) exit(1);
+      if (color) exit(EXIT_FAILURE);
       color = 0x08;
       break;
     default:
-      exit(1);
+      exit(EXIT_FAILURE);
     }
-  if (!color) exit(1);
+  if (!color) exit(EXIT_FAILURE);
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
     fprintf(stderr, "Can't handle pawns.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
+
+  if (check_huff) {
+    check_huffman();
+    return 0;
+  }
+
+  init_tablebases();
 
   if (numthreads < 1) numthreads = 1;
 
@@ -451,4 +487,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-

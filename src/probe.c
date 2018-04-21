@@ -12,10 +12,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define LOOKUP
-#define LUBITS 12
-
 #include "board.h"
+#include "defs.h"
 #include "probe.h"
 #include "util.h"
 
@@ -1969,23 +1967,6 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
   set_norm_pawn(ptr, ptr->file[f].norm[1], ptr->file[f].pieces[1], order, order2);
   tb_size[1] = calc_factors_pawn(ptr->file[f].factor[1], ptr->num, order, order2, ptr->file[f].norm[1], f);
 }
-
-struct PairsData {
-  char *indextable;
-  uint16_t *sizetable;
-  uint8_t *data;
-  uint16_t *offset;
-  uint8_t *symlen;
-  uint8_t *sympat;
-#ifdef LOOKUP
-  uint16_t *lookup_len;
-  uint8_t *lookup_bits;
-#endif
-  int blocksize;
-  int idxbits;
-  int min_len;
-  uint64_t base[];
-};
 
 static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {

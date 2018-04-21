@@ -5,6 +5,10 @@
 #include "huffman.h"
 #include "types.h"
 
+#ifdef DECOMPRESS_H
+#error compress.h conflicts with decompress.h
+#endif
+
 struct tb_handle {
   char name[64];
   int num_tables;

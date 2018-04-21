@@ -4,12 +4,12 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/time.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 #include "compress.h"
 #include "defs.h"
