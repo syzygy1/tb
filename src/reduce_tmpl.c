@@ -223,6 +223,8 @@ void NAME(load_table)(T *table, char color)
   char name[64];
 
   char *lz4_buf = get_lz4_buf();
+  if (!copybuf)
+    copybuf = malloc(COPYSIZE);
 
   sprintf(name, "%s.%c", tablename, color);
 

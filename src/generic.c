@@ -4,9 +4,9 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-//static long64 mask_a1h1, mask_a1a8, mask_a1h8;
-static long64 mask_a1h8;
-static long64 idx_mask1[8], idx_mask2[8];
+//static uint64_t mask_a1h1, mask_a1a8, mask_a1h8;
+static uint64_t mask_a1h8;
+static uint64_t idx_mask1[8], idx_mask2[8];
 
 static const char mirror[] = {
   0, 1, 1, 1, 1, 1, 1, 0,
@@ -23,13 +23,13 @@ static const int inv_tri0x40[] = {
   1, 2, 3, 10, 11, 19, 0, 9, 18, 27
 };
 
-static long64 mask[MAX_PIECES];
+static uint64_t mask[MAX_PIECES];
 static int shift[MAX_PIECES];
 
-long64 tri0x40[64];
-long64 sq_mask[64];
+uint64_t tri0x40[64];
+uint64_t sq_mask[64];
 
-static const ubyte tri0x40_init[32] = {
+static const uint8_t tri0x40_init[32] = {
   6, 0, 1, 2, 0, 0, 0, 0,
   0, 7, 3, 4, 0, 0, 0, 0,
   0, 0, 8, 5, 0, 0, 0, 0,
@@ -42,7 +42,7 @@ void init_tables(void)
 {
   int i, sq;
 
-  long64 mask_a1h1, mask_a1a8;
+  uint64_t mask_a1h1, mask_a1a8;
   mask_a1h1 = mask_a1a8 = mask_a1h8 = 0;
   for (i = 1; i < numpcs; i++) {
     mask_a1h1 = (mask_a1h1 << 6) | 0x07;
@@ -58,11 +58,11 @@ void init_tables(void)
       sq ^= 0x38;
     if ((sq >> 3) > (sq & 7))
       sq = ((sq & 7) << 3) | (sq >> 3);
-    tri0x40[i] = (long64)tri0x40_init[sq] << shift[0];
+    tri0x40[i] = (uint64_t)tri0x40_init[sq] << shift[0];
   }
 
   for (sq = 0; sq < 64; sq++) {
-    long64 mask = 0;
+    uint64_t mask = 0;
     if (sq & 0x04) mask ^= mask_a1h1;
     if (sq & 0x20) mask ^= mask_a1a8;
     sq_mask[sq] = mask;
@@ -75,21 +75,21 @@ void init_tables(void)
 //#define MIRROR_A1A8(x) ((x) ^ mask_a1a8)
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
-static long64 __inline__ MakeMove0(long64 idx, int sq)
+static uint64_t __inline__ MakeMove0(uint64_t idx, int sq)
 {
   idx ^= sq_mask[sq];
   if (mirror[sq] < 0) idx = MIRROR_A1H8(idx);
   return idx | tri0x40[sq];
 }
 
-static long64 __inline__ MakeMove1(long64 idx, int k, int sq)
+static uint64_t __inline__ MakeMove1(uint64_t idx, int k, int sq)
 {
-  return idx | ((long64)sq << shift[k]);
+  return idx | ((uint64_t)sq << shift[k]);
 }
 
-static long64 __inline__ MakeMove(long64 idx, int k, int sq)
+static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
 {
-  if (k) return idx | ((long64)sq << shift[k]);
+  if (k) return idx | ((uint64_t)sq << shift[k]);
   idx ^= sq_mask[sq];
   if (mirror[sq] < 0) idx = MIRROR_A1H8(idx);
   return idx | tri0x40[sq];
@@ -102,17 +102,17 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 // use bit_set
 #if 1
 
-#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
-#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define jump_bit_set(x,y,lab) \
-  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jc %l[lab]" : : "r" (x), "r" ((uint64_t)(y)) : : lab);
 
 #define jump_bit_clear(x,y,lab) \
-  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bt %1, %0; jnc %l[lab]" : : "r" (x), "r" ((uint64_t)(y)) : : lab);
 
 #define bit_set_jump_set(x,y,lab) \
-  __asm__ goto ("bts %1, %0; jc %l[lab]" : "+r" (x) : "r" ((long64)(y)) : : lab);
+  __asm__ goto ("bts %1, %0; jc %l[lab]" : "+r" (x) : "r" ((uint64_t)(y)) : : lab);
 
 #define FILL_OCC64_cheap \
   occ = 0; \
@@ -146,7 +146,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   bit_set(occ, p[0] = inv_tri0x40[idx2])
 
 #define FILL_OCC_CAPTS \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--) \
     if (k != i) { \
@@ -157,7 +157,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1)
 
 #define FILL_OCC_CAPTS_PIVOT \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
@@ -179,7 +179,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   occ |= bit[p[0] = inv_tri0x40[idx2]]
 
 #define FILL_OCC_CAPTS \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--) \
     if (k != i) { \
@@ -190,7 +190,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1)
 
 #define FILL_OCC_CAPTS_PIVOT \
-  long64 idx2 = idx; \
+  uint64_t idx2 = idx; \
   occ = 0; \
   for (k = n - 1; k > 0; k--, idx2 >>= 6) \
     occ |= bit[p[k] = idx2 & 0x3f]; \
@@ -205,14 +205,14 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   idx2 = idx
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func(int k, uint8_t *table, uint64_t idx, bitboard occ, int *p, ##__VA_ARGS__)
 
 #define MARK_PIVOT(func, ...) \
-static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_ARGS__)
+static void func##_pivot(uint8_t *table, uint64_t idx, bitboard occ, int *p, ##__VA_ARGS__)
 
 #define MARK_BEGIN_PIVOT \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb; \
   CHECK_DIAG; \
   bb = PieceMoves(p[0], pt[0], occ); \
@@ -222,7 +222,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 
 #define MARK_BEGIN \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb; \
   bb = PieceMoves(p[k], pt[k], occ); \
   while (bb) { \
@@ -235,57 +235,57 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 
 #ifndef ATOMIC
 #define BEGIN_CAPTS \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
   int n = numpcs; \
-  long64 end = thread->end >> 6; \
+  uint64_t end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[i] = 0
 #else
 #define BEGIN_CAPTS \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
   int n = numpcs; \
-  long64 end = thread->end >> 6
+  uint64_t end = thread->end >> 6
 #endif
 
 #define BEGIN_CAPTS_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
-  long64 end = thread->end >> 6
+  uint64_t end = thread->end >> 6
 
 #define BEGIN_CAPTS_PIVOT \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
   int n = numpcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   for (k = 1; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[0] = 0
 
 #define BEGIN_CAPTS_PIVOT_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   bitboard occ; \
   int j, k; \
   int p[MAX_PIECES]; \
   int n = numpcs; \
-  long64 end = thread->end
+  uint64_t end = thread->end
 
 #define LOOP_CAPTS \
   for (idx = thread->begin >> 6; idx < end; idx++)
@@ -296,11 +296,11 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #ifndef ATOMIC
 #define LOOP_WHITE_PIECES(func, ...) \
   do { \
-    long64 idx3 = idx2 | ((long64)p[0] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[0] << shift[i]); \
     func##_pivot(table_w, idx3 & ~mask[0], occ, p, ##__VA_ARGS__); \
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -311,7 +311,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -321,7 +321,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #define LOOP_WHITE_PIECES(func, ...) \
   do { for (j = 0; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
-    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
@@ -330,7 +330,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
 #define LOOP_BLACK_PIECES(func, ...) \
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
-    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -340,7 +340,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
@@ -357,7 +357,7 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
     if ((p[k] & 0x24) || mirror[p[k]] < 0) continue; \
-    long64 idx3 = idx2 | tri0x40[p[k]]; \
+    uint64_t idx3 = idx2 | tri0x40[p[k]]; \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -368,18 +368,18 @@ static void func##_pivot(ubyte *table, long64 idx, bitboard occ, int *p, ##__VA_
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
       if ((p[k] & 0x24) || mirror[p[k]] < 0) continue; \
-      long64 idx3 = idx2 | tri0x40[p[k]]; \
+      uint64_t idx3 = idx2 | tri0x40[p[k]]; \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
 
 #define BEGIN_ITER \
-  long64 idx, idx2; \
+  uint64_t idx, idx2; \
   bitboard occ; \
   int i; \
   int n = numpcs; \
   int p[MAX_PIECES]; \
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
 #define LOOP_ITER \
   for (idx = thread->begin; idx < end; idx++)

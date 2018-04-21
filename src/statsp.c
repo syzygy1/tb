@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2016, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -76,29 +76,47 @@ void find_loop(struct thread_data *thread)
 
 uint64_t find_val(uint8_t *table, uint8_t v, uint64_t *work)
 {
-  found_idx = 0xffffffffffffffffULL;
+  found_idx = UINT64_MAX;
   find_val_table = table;
   find_val_v = v;
 
   run_threaded(find_loop, work, 0);
 
-  if (found_idx == 0xffffffffffffffffULL)
+  if (found_idx == UINT64_MAX) {
     fprintf(stderr, "find_val: not found!\n");
+    exit(EXIT_FAILURE);
+  }
 
   return found_idx;
 }
 
-void count_stats(struct thread_data *thread)
+uint8_t *count_stats_table_u8;
+
+void count_stats_u8(struct thread_data *thread)
 {
   uint64_t idx;
   uint64_t end = begin + thread->end;
   uint64_t *stats = thread->stats;
-  uint8_t *table = count_stats_table;
+  uint8_t *table = count_stats_table_u8;
 
   for (idx = begin + thread->begin; idx < end; idx++)
     stats[table[idx]]++;
 }
 
+uint16_t *count_stats_table_u16;
+
+void count_stats_u16(struct thread_data *thread)
+{
+  uint64_t idx;
+  uint64_t end = begin + thread->end;
+  uint64_t *stats = thread->stats;
+  uint16_t *table = count_stats_table_u16;
+
+  for (idx = begin + thread->begin; idx < end; idx++)
+    stats[table[idx]]++;
+}
+
+uint64_t *thread_stats = NULL;
 int lw_ply = -1;
 int lb_ply = -1;
 int lcw_ply = -1;
@@ -114,7 +132,10 @@ char glb_fen[128];
 char glcw_fen[128];
 char glcb_fen[128];
 
-void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm, int phase, int local, uint64_t *work)
+static int stats_val[];
+
+static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
+    int phase, int local, uint64_t *work)
 {
   int i, j;
   int n;
@@ -122,11 +143,11 @@ void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm, int pha
 
   sval = (local == 0) ? 0 : stats_val[local - 1];
 
-  for (i = 0; i < 256 * numthreads; i++)
+  for (i = 0; i < MAX_VALS * numthreads; i++)
     thread_stats[i] = 0;
 
-  count_stats_table = table;
-  run_threaded(count_stats, work, 0);
+  count_stats_table_u8 = table;
+  run_threaded(count_stats_u8, work, 0);
 
   if (local == 0)
     n = REDUCE_PLY - 2;
@@ -320,9 +341,9 @@ void collect_stats(uint64_t *work, int phase, int local)
   }
 
   if (thread_stats == NULL) {
-    thread_stats = (uint64_t *)alloc_aligned(8 * 256 * numthreads, 64);
+    thread_stats = (uint64_t *)alloc_aligned(8 * MAX_VALS * numthreads, 64);
     for (i = 0; i < numthreads; i++)
-      thread_data[i].stats = thread_stats + i * 256;
+      thread_data[i].stats = thread_stats + i * MAX_VALS;
   }
 
   collect_stats_table(total_stats_w, table_w, 1, phase, local, work);

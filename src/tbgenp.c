@@ -9,25 +9,31 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <inttypes.h>
+
+#include "compress.h"
 #include "defs.h"
+#include "permute.h"
 #include "threads.h"
+#include "util.h"
 
 #define HAS_PAWNS
 
 #include "board.h"
+
+#ifndef SUICIDE
+static int white_king, black_king;
+#endif
+
 #include "probe.c"
 #include "board.c"
 
 #define MAX_PIECES 8
 
-extern int total_work;
-extern struct thread_data *thread_data;
-extern int numthreads;
-extern int thread_affinity;
-extern struct timeval start_time, cur_time;
+//#define MAX_NARROW 50
+#define MAX_NARROW 240
 
-static uint64_t *restrict work_g, *restrict work_piv;
-static uint64_t *restrict work_p, *restrict work_part;
+static uint64_t *work_g, *work_piv;
+static uint64_t *work_p, *work_part;
 
 uint8_t *restrict table_w, *restrict table_b;
 
@@ -44,9 +50,6 @@ int last_w, last_b;
 #endif
 int symmetric, split;
 
-#ifndef SUICIDE
-static int white_king, black_king;
-#endif
 static int white_pcs[MAX_PIECES], black_pcs[MAX_PIECES];
 static int white_all[MAX_PIECES], black_all[MAX_PIECES];
 static int pt[MAX_PIECES], pw[MAX_PIECES];
@@ -77,9 +80,6 @@ static uint64_t total_stats_b[MAX_STATS];
 static uint64_t global_stats_w[MAX_STATS];
 static uint64_t global_stats_b[MAX_STATS];
 
-#define COPYSIZE 10*1024*1024
-uint8_t *restrict copybuf = NULL;
-
 #include "genericp.c"
 
 #if defined(REGULAR)
@@ -94,31 +94,6 @@ uint8_t *restrict copybuf = NULL;
 
 #define HUGEPAGESIZE 2*1024*1024
 
-struct tb_handle;
-
-struct dtz_map {
-  ushort map[4][MAX_VALS];
-  ushort inv_map[4][MAX_VALS];
-  ushort num[4];
-  ushort max_num;
-  uint8_t side;
-  uint8_t ply_accurate_win;
-  uint8_t ply_accurate_loss;
-  uint8_t high_freq_max;
-};
-
-void init_permute_pawn(int *pcs, int *pt);
-uint8_t *init_permute_file(int *pcs, int file, uint8_t *tb_table);
-void *permute_pawn_wdl(uint8_t *tb_table, int *pcs, int *pt, uint8_t *table, uint8_t *best, int file, uint8_t *v);
-uint64_t estimate_pawn_dtz(int *pcs, int *pt, uint8_t *table, uint8_t *best, int *bestp, int file, uint8_t *v);
-void permute_pawn_dtz(uint8_t *tb_table, int *pcs, uint8_t *table, int bestp, int file, uint8_t *v);
-struct tb_handle *create_tb(char *tablename, int wdl, int blocksize);
-void compress_tb(struct tb_handle *F, uint8_t *restrict data, uint8_t *restrict perm, int minfreq);
-void merge_tb(struct tb_handle *F);
-void compress_alloc(void);
-void compress_init_wdl(int *vals, int flags);
-void compress_init_dtz(struct dtz_map *map);
-
 static int minfreq = 8;
 static int only_generate = 0;
 static int generate_dtz = 1;
@@ -126,14 +101,19 @@ static int generate_wdl = 1;
 
 static char *tablename;
 
-uint8_t *transform_v;
-uint8_t *transform_tbl;
+#include "statsp.c"
+
+u8 *transform_v_u8;
+u8 *transform_tbl_u8;
+
+u16 *transform_v_u16;
+u16 *transform_tbl_u16;
 
 void transform(struct thread_data *thread)
 {
   uint64_t idx;
   uint64_t end = begin + thread->end;
-  uint8_t *restrict v = transform_v;
+  uint8_t *restrict v = transform_v_u8;
 
   for (idx = begin + thread->begin; idx < end; idx++) {
     table_w[idx] = v[table_w[idx]];
@@ -141,22 +121,29 @@ void transform(struct thread_data *thread)
   }
 }
 
-void transform_table(struct thread_data *thread)
+void transform_table_u8(struct thread_data *thread)
 {
   uint64_t idx;
   uint64_t end = thread->end;
-  uint8_t *restrict v = transform_v;
-  uint8_t *restrict table = transform_tbl;
+  uint8_t *restrict v = transform_v_u8;
+  uint8_t *restrict table = transform_tbl_u8;
 
   for (idx = thread->begin; idx < end; idx++)
     table[idx] = v[table[idx]];
 }
 
-uint64_t *restrict thread_stats = NULL;
-uint8_t *restrict count_stats_table;
+void transform_table_u16(struct thread_data *thread)
+{
+  uint64_t idx;
+  uint64_t end = thread->end;
+  uint16_t *restrict v = transform_v_u16;
+  uint16_t *restrict table = transform_tbl_u16;
+
+  for (idx = thread->begin; idx < end; idx++)
+    table[idx] = v[table[idx]];
+}
 
 #include "reducep.c"
-#include "statsp.c"
 
 void calc_pawn_table_unthreaded(void)
 {
@@ -471,7 +458,7 @@ void prepare_wdl_map(uint64_t *stats, uint8_t *v, int pa_w, int pa_l)
 struct dtz_map map_w[4];
 struct dtz_map map_b[4];
 
-int sort_list(uint64_t *freq, ushort *map, ushort *inv_map)
+int sort_list(uint64_t *freq, uint16_t *map, uint16_t *inv_map)
 {
   int i, j;
   int num;
@@ -484,7 +471,7 @@ int sort_list(uint64_t *freq, ushort *map, ushort *inv_map)
   for (i = 0; i < num; i++)
     for (j = i + 1; j < num; j++)
       if (freq[map[i]] < freq[map[j]]) {
-        ushort tmp = map[i];
+        uint16_t tmp = map[i];
         map[i] = map[j];
         map[j] = tmp;
       }
@@ -498,8 +485,8 @@ void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w, in
 {
   int i, j;
   uint64_t freq[4][MAX_VALS];
-  ushort (*map)[MAX_VALS] = dtzmap->map;
-  ushort (*inv_map)[MAX_VALS] = dtzmap->inv_map;
+  uint16_t (*map)[MAX_VALS] = dtzmap->map;
+  uint16_t (*inv_map)[MAX_VALS] = dtzmap->inv_map;
 
   dtzmap->side = side;
   dtzmap->ply_accurate_win = pa_w;
@@ -561,7 +548,7 @@ void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w, in
 void prepare_dtz_map(uint8_t *v, struct dtz_map *map)
 {
   int i;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
   int num = map->max_num;
 
   if (num_saves == 0) {
@@ -931,8 +918,6 @@ int main(int argc, char **argv)
   table_w = alloc_huge(2 * size);
   table_b = table_w + size;
 
-  compress_alloc();
-
   init_threads(1);
   init_tables();
 
@@ -981,7 +966,7 @@ int main(int argc, char **argv)
     memset(piv_valid, 0, 64);
     for (j = 0; j < 6; j++) {
       piv_sq[j] = ((j + 1) << 3 | file) ^ pw[0];
-      piv_idx[piv_sq[j]] = ((uint64_t)j) << shift[0];
+      piv_idx[piv_sq[j]] = (uint64_t)j << shift[0];
       piv_valid[piv_sq[j]] = 1;
     }
 
@@ -1037,8 +1022,18 @@ int main(int argc, char **argv)
     fprintf(F, "\n");
 
     tb_table = NULL;
+    uint64_t tb_size = 0;
 
     if (G || H) {
+
+      ply_accurate_w = 0;
+      if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
+        ply_accurate_w = 1;
+
+      ply_accurate_b = 0;
+      if (total_stats_b[DRAW_RULE] || total_stats_w[STAT_MATE - DRAW_RULE])
+        ply_accurate_b = 1;
+
 #ifndef SUICIDE
       reset_piece_captures();
       if (cursed_pawn_capt_w) {
@@ -1051,11 +1046,24 @@ int main(int argc, char **argv)
       }
 #endif
 
+      sort_values(total_stats_w, &map_w[file], 0, ply_accurate_w, ply_accurate_b);
+      if (!symmetric)
+        sort_values(total_stats_b, &map_b[file], 1, ply_accurate_b, ply_accurate_w);
+
+      int wide = (   map_w[file].max_num >= MAX_NARROW
+                  || map_b[file].max_num >= MAX_NARROW) && H;
+      if (wide) {
+        fprintf(stderr, "Very large DTZ not yet supported.");
+      }
+      compress_alloc_wdl();
+
+      tb_size = init_permute_file(pcs, file);
 #ifndef SUICIDE
       if (save_to_disk || !G
                 || (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
         tb_table = table_b;
-      tb_table = init_permute_file(pcs, file, tb_table);
+      else if (!tb_table)
+        tb_table = malloc(tb_size + 1);
       if (save_to_disk && G && !symmetric) {
         store_table(table_w, 'w');
         store_table(table_b, 'b');
@@ -1065,46 +1073,42 @@ int main(int argc, char **argv)
 #else
       if (save_to_disk || !G || symmetric)
         tb_table = table_b;
-      tb_table = init_permute_file(pcs, file, tb_table);
+      else if (!tb_table)
+        tb_table = malloc(tb_size + 1);
       if (save_to_disk && G && !symmetric) {
         store_table(table_w, 'w');
         store_table(table_b, 'b');
       }
 #endif
 
-      ply_accurate_w = 0;
-      if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
-        ply_accurate_w = 1;
-
-      ply_accurate_b = 0;
-      if (total_stats_b[DRAW_RULE] || total_stats_w[STAT_MATE - DRAW_RULE])
-        ply_accurate_b = 1;
     }
 
     // wdl
     if (G) {
+
 #ifndef SUICIDE
       test_closs(total_stats_w, table_w, to_fix_w);
 #endif
       prepare_wdl_map(total_stats_w, v, ply_accurate_w, ply_accurate_b);
-      printf("find optimal permutation for file wtm / wdl, file %c\n", 'a' + file);
+      printf("find optimal permutation for file wtm/wdl, file %c\n", 'a' + file);
       permute_pawn_wdl(tb_table, pcs, pt, table_w, best_w, file, v);
-      printf("compressing data for wtm / wdl, file %c\n", 'a' + file);
-      compress_tb(G, tb_table, best_w, minfreq);
+      printf("compressing data for wtm/wdl, file %c\n", 'a' + file);
+      compress_tb_u8(G, tb_table, tb_size, best_w, minfreq);
 
       if (!symmetric) {
         if (save_to_disk) {
-          load_table(table_b, 'b');
+          load_table_u8(table_b, 'b');
+          unlink_table('b');
           tb_table = table_w;
         }
 #ifndef SUICIDE
         test_closs(total_stats_b, table_b, to_fix_b);
 #endif
         prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
-        printf("find optimal permutation for file btm / wdl, file %c\n", 'a' + file);
+        printf("find optimal permutation for file btm/wdl, file %c\n", 'a' + file);
         permute_pawn_wdl(tb_table, pcs, pt, table_b, best_b, file, v);
-        printf("compressing data for btm / wdl, file %c\n", 'a' + file);
-        compress_tb(G, tb_table, best_b, minfreq);
+        printf("compressing data for btm/wdl, file %c\n", 'a' + file);
+        compress_tb_u8(G, tb_table, tb_size, best_b, minfreq);
       }
     }
 
@@ -1114,57 +1118,61 @@ int main(int argc, char **argv)
     // dtz
     if (H) {
 #ifndef SUICIDE
-      if (tb_table == table_w)
-        load_table(table_w, 'w');
-      else if (tb_table == table_b && G && (to_fix_w || cursed_pawn_capt_w))
-        load_table(table_b, 'b');
+      if (tb_table == table_w) {
+        load_table_u8(table_w, 'w');
+        unlink_table('w');
+      } else if (tb_table == table_b && G && (to_fix_w || cursed_pawn_capt_w)) {
+        load_table_u8(table_b, 'b');
+        unlink_table('b');
+      }
       if (symmetric)
         to_fix_b = cursed_pawn_capt_b = 0;
 #else
-      if (tb_table == table_w)
-        load_table(table_w, 'w');
+      if (tb_table == table_w) {
+        load_table_u8(table_w, 'w');
+        unlink_table('w');
+      }
 #endif
 
 #if defined(REGULAR) || defined(ATOMIC)
       fix_closs();
 #endif
 
-      sort_values(total_stats_w, &map_w[file], 0, ply_accurate_w, ply_accurate_b);
-      if (!symmetric)
-        sort_values(total_stats_b, &map_b[file], 1, ply_accurate_b, ply_accurate_w);
-
       if (num_saves > 0) {
-        reconstruct_table(table_w, 'w', &map_w[file]);
-        if (!symmetric)
-          reconstruct_table(table_b, 'b', &map_b[file]);
+        reconstruct_table_u8(table_w, 'w', &map_w[file]);
+        unlink_saves('w');
+        if (!symmetric) {
+          reconstruct_table_u8(table_b, 'b', &map_b[file]);
+          unlink_saves('b');
+        }
       }
 
       uint64_t estimate_w, estimate_b;
 
       prepare_dtz_map(v, &map_w[file]);
-      printf("find optimal permutation for wtm / dtz, file %c\n", 'a' + file);
-      estimate_w = estimate_pawn_dtz(pcs, pt, table_w, best_w, &bestp_w, file, v);
+      printf("find optimal permutation for wtm/dtz, file %c\n", 'a' + file);
+      estimate_w = estimate_pawn_dtz_u8(pcs, pt, table_w, best_w, &bestp_w, file, v);
       if (!symmetric) {
         prepare_dtz_map(v, &map_b[file]);
-        printf("find optimal permutation for btm / dtz, file %c\n", 'a' + file);
-        estimate_b = estimate_pawn_dtz(pcs, pt, table_b, best_b, &bestp_b, file, v);
+        printf("find optimal permutation for btm/dtz, file %c\n", 'a' + file);
+        estimate_b = estimate_pawn_dtz_u8(pcs, pt, table_b, best_b, &bestp_b, file, v);
       } else
         estimate_b = UINT64_MAX;
 
       if (estimate_w <= estimate_b) {
         tb_table = table_b;
         prepare_dtz_map(v, &map_w[file]);
-        printf("permute table for wtm / dtz, file %c\n", 'a' + file);
-        permute_pawn_dtz(tb_table, pcs, table_w, bestp_w, file, v);
+        printf("permute table for wtm/dtz, file %c\n", 'a' + file);
+        permute_pawn_dtz_u8(tb_table, pcs, table_w, bestp_w, file, v);
         printf("compressing data for wtm/dtz, file %c\n", 'a' + file);
-        compress_tb(H, tb_table, best_w, minfreq);
+        compress_tb_u8(H, tb_table, tb_size, best_w, minfreq);
       } else {
         tb_table = table_w;
         prepare_dtz_map(v, &map_b[file]);
-        printf("permute table for btm / dtz, file %c\n", 'a' + file);
-        permute_pawn_dtz(tb_table, pcs, table_b, bestp_b, file, v);
+        printf("permute table for btm/dtz, file %c\n", 'a' + file);
+        permute_pawn_dtz_u8(tb_table, pcs, table_b, bestp_b, file, v);
         printf("compressing data for btm/dtz, file %c\n", 'a' + file);
-        compress_tb(H, tb_table, best_b, minfreq);
+        compress_tb_u8(H, tb_table, tb_size, best_b, minfreq);
       }
     }
 

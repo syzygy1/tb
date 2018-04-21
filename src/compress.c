@@ -724,8 +724,8 @@ lab:
   return c;
 }
 
-struct HuffCode *construct_pairs_u8(u8 *restrict data, uint64_t size,
-                                 int minfreq, int maxsymbols, int wdl)
+struct HuffCode *construct_pairs_u8(u8 *data, uint64_t size, int minfreq,
+    int maxsymbols, int wdl)
 {
   if (wdl)
     return construct_pairs_wdl(data, size, minfreq, maxsymbols);
@@ -733,8 +733,8 @@ struct HuffCode *construct_pairs_u8(u8 *restrict data, uint64_t size,
     return construct_pairs_dtz_u8(data, size, minfreq, maxsymbols);
 }
 
-struct HuffCode *construct_pairs_u16(u16 *restrict data,
-    uint64_t size, int minfreq, int maxsymbols, int wdl)
+struct HuffCode *construct_pairs_u16(u16 *data, uint64_t size, int minfreq,
+    int maxsymbols, int wdl)
 {
   assert(!wdl);
   return construct_pairs_dtz_u16(data, size, minfreq, maxsymbols);

@@ -147,7 +147,8 @@ static int lcb_ply = -1;
 static int lw_clr, lb_clr, lcw_clr, lcb_clr;
 static uint64_t lw_idx, lb_idx, lcw_idx, lcb_idx;
 
-static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm, int phase)
+static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
+    int phase)
 {
   int i, j, n;
 

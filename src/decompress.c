@@ -77,9 +77,9 @@ void decomp_init_pawn(int *pcs, int *pt)
 
 struct PairsData {
   char *indextable;
-  ushort *sizetable;
+  uint16_t *sizetable;
   uint8_t *data;
-  ushort *offset;
+  uint16_t *offset;
   uint8_t *symlen;
   uint8_t *sympat;
   int blocksize;
@@ -420,7 +420,7 @@ static void decompress_worker(struct thread_data *thread)
 
   int l;
   int m = d->min_len;
-  ushort *offset = d->offset;
+  uint16_t *offset = d->offset;
   uint64_t *base = d->base - m;
   uint8_t *symlen = d->symlen;
   uint8_t *sympat = d->sympat;
@@ -429,7 +429,7 @@ static void decompress_worker(struct thread_data *thread)
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) -1)) - (1 << (d->idxbits - 1));
   uint32_t block = *(uint32_t *)(d->indextable + 6 * mainidx);
-  litidx += *(ushort *)(d->indextable + 6 * mainidx + 4);
+  litidx += *(uint16_t *)(d->indextable + 6 * mainidx + 4);
   if (litidx < 0) {
     do {
       litidx += d->sizetable[--block] + 1;
@@ -454,7 +454,7 @@ static void decompress_worker(struct thread_data *thread)
     int size = d->sizetable[block] + 1;
     while (idx + size > idx2) {
       if (*(uint32_t *)(d->indextable + 6 * mainidx) != block
-              || *((ushort *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx) {
+              || *((uint16_t *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx) {
         fprintf(stderr, "ERROR in main index!!\n");
         exit(1);
       }

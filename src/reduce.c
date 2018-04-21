@@ -9,7 +9,7 @@
 
 static int reduce_cnt;
 
-void save_table(u8 *table, char color)
+void save_table(uint8_t *table, char color)
 {
   int i;
   FILE *F;

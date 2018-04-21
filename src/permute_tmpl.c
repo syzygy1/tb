@@ -177,7 +177,7 @@ void NAME(convert_est_data_piece)(struct thread_data *thread)
   uint8_t norm[TBPIECES];
 
   uint64_t idx_cache[MAX_CANDS];
-  
+
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
@@ -280,7 +280,7 @@ void NAME(convert_est_data_pawn)(struct thread_data *thread)
   uint8_t norm[TBPIECES];
 
   uint64_t idx_cache[MAX_CANDS];
-  
+
   for (i = thread->begin, k = i * seg_size; i < thread->end; i++, k += seg_size) {
     for (p = 0; p < num_cands;) {
       for (q = p + 1; q < num_cands; q++) {
@@ -505,7 +505,8 @@ void NAME(permute_piece_dtz)(T *tb_table, int *pcs, T *table, int bestp, T *v)
   run_threaded(NAME(convert_data_piece), work_convert, 1);
 }
 
-uint64_t NAME(estimate_pawn_dtz)(int *pcs, int *pt, T *table, uint8_t *best, int *bestp, int file, T *v)
+uint64_t NAME(estimate_pawn_dtz)(int *pcs, int *pt, T *table, uint8_t *best,
+    int *bestp, int file, T *v)
 {
   int i;
 
@@ -528,7 +529,8 @@ uint64_t NAME(estimate_pawn_dtz)(int *pcs, int *pt, T *table, uint8_t *best, int
   return estim;
 }
 
-void NAME(permute_pawn_dtz)(T *tb_table, int *pcs, T *table, int bestp, int file, T *v)
+void NAME(permute_pawn_dtz)(T *tb_table, int *pcs, T *table, int bestp,
+    int file, T *v)
 {
   NAME(permute_v) = v;
 

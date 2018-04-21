@@ -39,7 +39,7 @@ void error(char *str, ...);
 extern int use_envdirs;
 
 extern int total_work;
-extern struct thread_data thread_data[];
+extern struct thread_data *thread_data;
 extern int numthreads;
 extern struct timeval start_time, cur_time;
 

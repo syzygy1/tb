@@ -434,12 +434,6 @@ uint64_t init_permute_piece(int *pcs, int *pt)
   printf("tb_size = %"PRIu64"\n", tb_size);
 
   generate_test_list(tb_size, entry_piece.num);
-/*
-  if (!tb_table && !(tb_table = malloc(TB_SIZE(*tb_table)))) {
-    fprintf(stderr, "Out of memory.\n");
-    exit(1);
-  }
-*/
 
   init_0x40(entry_piece.num);
   work_convert = create_work(total_work, tb_size, 0);
@@ -691,6 +685,9 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
     fprintf(stderr, "Could not open %s for reading.\n", name);
     exit(EXIT_FAILURE);
   }
+
+  if (!copybuf)
+    copybuf = malloc(COPYSIZE);
 
   begin = 0;
   uint16_t *ptr = table;

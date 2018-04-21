@@ -745,12 +745,12 @@ uint8_t PP_sq[278][2];
 uint8_t invmtwist[64];
 #endif
 
-static int binomial[6][64];
-static int pawnidx[6][24];
-static int pfactor[6][4];
+static uint64_t binomial[6][64];
+static uint64_t pawnidx[6][24];
+static uint64_t pfactor[6][4];
 #ifdef CONNECTED_KINGS
-static int multidx[6][10];
-static int mfactor[6];
+static uint64_t multidx[6][10];
+static uint64_t mfactor[6];
 #endif
 
 void init_indices(void)
@@ -784,8 +784,8 @@ void init_indices(void)
 // binomial[k-1][n] = Bin(n, k)
   for (i = 0; i < 6; i++)
     for (j = 0; j < 64; j++) {
-      int f = j;
-      int l = 1;
+      uint64_t f = j;
+      uint64_t l = 1;
       for (k = 1; k <= i; k++) {
         f *= (j - k);
         l *= (k + 1);
@@ -794,7 +794,7 @@ void init_indices(void)
     }
 
   for (i = 0; i < 6; i++) {
-    int s = 0;
+    uint64_t s = 0;
     for (j = 0; j < 6; j++) {
       pawnidx[i][j] = s;
       s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
@@ -823,7 +823,7 @@ void init_indices(void)
 //#ifdef SUICIDE
 #ifdef CONNECTED_KINGS
   for (i = 0; i < 6; i++) {
-    int s = 0;
+    uint64_t s = 0;
     for (j = 0; j < 10; j++) {
       multidx[i][j] = s;
       s += (i == 0) ? 1 : binomial[i - 1][mtwist[invtriangle[j]]];
@@ -904,14 +904,14 @@ uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    int s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
         j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1024,14 +1024,14 @@ uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    int s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
         j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1147,7 +1147,7 @@ uint64_t encode_piece(struct TBEntry *ptr, int *pos, uint64_t *factor)
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    int s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (j = m; j > 0; j--)
@@ -1157,7 +1157,7 @@ uint64_t encode_piece(struct TBEntry *ptr, int *pos, uint64_t *factor)
       sort[j] = p;
       s += binomial[m - i][p - j + m - i];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1234,7 +1234,7 @@ uint64_t encode_K3(struct TBEntry *ptr, int *pos, uint64_t *factor)
 
   for (; i < n;) {
     int t = ptr->norm[i];
-    int s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       p = pos[m];
       for (j = m; j > 0; j--)
@@ -1251,7 +1251,7 @@ uint64_t encode_K3(struct TBEntry *ptr, int *pos, uint64_t *factor)
       }
       s += l / f;
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1565,7 +1565,7 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
                      int *restrict pos, uint64_t *restrict factor)
 {
   uint64_t idx;
-  int i, j, k, m, s, t;
+  int i, j, k, m, t;
   int n = ptr->num;
 
   if (pos[0] & 0x04)
@@ -1590,14 +1590,14 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
     for (j = i; j < t; j++)
       for (k = j + 1; k < t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    s = 0;
+    uint64_t s = 0;
     for (m = i; m < t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i = t;
   }
 
@@ -1606,14 +1606,14 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1626,7 +1626,7 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
                          uint64_t *restrict factor)
 {
   uint64_t idx;
-  int i, j, k, m, s, t;
+  int i, j, k, m, t;
   int n = ptr->num;
 
   for (i = 1; i < ptr->pawns[0]; i++)
@@ -1655,14 +1655,14 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
     for (j = i; j < t; j++)
       for (k = j + 1; k < t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    s = 0;
+    uint64_t s = 0;
     for (m = i; m < t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i = t;
   }
 
@@ -1671,14 +1671,14 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
         if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
-    s = 0;
+    uint64_t s = 0;
     for (m = i; m < i + t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += (uint64_t)s * factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -1923,7 +1923,8 @@ void set_norm_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, uint8_t *pieces,
       norm[i]++;
 }
 
-void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data, uint64_t *tb_size)
+void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data,
+    uint64_t *tb_size)
 {
   int i;
   int order;
@@ -1944,7 +1945,7 @@ void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data, uint64_t *tb_s
 }
 
 void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
-                       uint64_t *tb_size, int f)
+    uint64_t *tb_size, int f)
 {
   int i, j;
   int order, order2;
@@ -2005,7 +2006,7 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
 
 #ifdef LOOKUP
 static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
-                                     uint64_t *size, uint8_t **next)
+    uint64_t *size, uint8_t **next)
 {
   struct PairsData *d;
   int i;
@@ -2094,7 +2095,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
 }
 #else
 static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
-                                     uint64_t *size, uint8_t **next)
+    uint64_t *size, uint8_t **next)
 {
   struct PairsData *d;
   int i;
