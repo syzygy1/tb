@@ -90,7 +90,7 @@ static const int16_t KK_init[10][64] = {
     -1, -1, -1, -1, -1, -1, -1,461 }
 };
 
-short KK_map[64][64];
+int16_t KK_map[64][64];
 static uint8_t KK_inv[462][2];
 
 int8_t mirror[64][64];

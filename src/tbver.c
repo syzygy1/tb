@@ -1,19 +1,24 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
+#include <getopt.h>
+#include <inttypes.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <getopt.h>
-#include <stdarg.h>
-#include <inttypes.h>
+
+#include "board.h"
 #include "defs.h"
 #include "threads.h"
-#include "board.h"
 #include "util.h"
+
+#ifndef SUICIDE
+static int white_king, black_king;
+#endif
 
 #include "probe.c"
 #include "board.c"
@@ -66,9 +71,6 @@ int tb_perm[MAXPIECES];
 
 static uint64_t size;
 
-#ifndef SUICIDE
-static int white_king, black_king;
-#endif
 static int white_pcs[MAX_PIECES], black_pcs[MAX_PIECES];
 static int pt[MAX_PIECES];
 #ifndef SUICIDE

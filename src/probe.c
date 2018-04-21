@@ -549,7 +549,7 @@ static const uint8_t file_to_file[] = {
 };
 
 #ifndef CONNECTED_KINGS
-static const short KK_idx[10][64] = {
+static const int16_t KK_idx[10][64] = {
   { -1, -1, -1,  0,  1,  2,  3,  4,
     -1, -1, -1,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17,
@@ -632,7 +632,7 @@ static const short KK_idx[10][64] = {
     -1, -1, -1, -1, -1, -1, -1,461 }
 };
 #else
-static const short PP_idx[10][64] = {
+static const int16_t PP_idx[10][64] = {
   {  0, -1,  1,  2,  3,  4,  5,  6,
      7,  8,  9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22,
@@ -1972,13 +1972,13 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
 
 struct PairsData {
   char *indextable;
-  ushort *sizetable;
+  uint16_t *sizetable;
   uint8_t *data;
-  ushort *offset;
+  uint16_t *offset;
   uint8_t *symlen;
   uint8_t *sympat;
 #ifdef LOOKUP
-  ushort *lookup_len;
+  uint16_t *lookup_len;
   uint8_t *lookup_bits;
 #endif
   int blocksize;
@@ -2028,8 +2028,8 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
-  int num_syms = *(ushort *)(&data[10 + 2 * h]);
-  ushort *offset = (ushort *)(&data[10]);
+  int num_syms = *(uint16_t *)(&data[10 + 2 * h]);
+  uint16_t *offset = (uint16_t *)(&data[10]);
 
   int hh = h;
   if (max_len < LUBITS)
@@ -2053,7 +2053,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
   d->offset = offset;
   d->blocksize = blocksize;
   d->idxbits = idxbits;
-  d->lookup_len = (ushort *)((uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t));
+  d->lookup_len = (uint16_t *)((uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t));
   d->lookup_bits = (uint8_t *)((uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t) + num_lu * 2);
   d->symlen = (uint8_t *)d + sizeof(struct PairsData) + hh * sizeof(uint64_t) + num_lu * 3;
   d->sympat = &data[12 + 2 * h];
@@ -2117,9 +2117,9 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
-  int num_syms = *(ushort *)(&data[10 + 2 * h]);
+  int num_syms = *(uint16_t *)(&data[10 + 2 * h]);
   d = malloc(sizeof(struct PairsData) + h * sizeof(uint64_t) + num_syms);
-  d->offset = (ushort *)(&data[10]);
+  d->offset = (uint16_t *)(&data[10]);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->symlen = (uint8_t *)d + sizeof(struct PairsData) + h * sizeof(uint64_t);
@@ -2262,10 +2262,10 @@ static void init_table(struct TBEntry *entry, uint64_t key)
       data += size[3];
     }
 
-    ptr->precomp[0]->sizetable = (ushort *)data;
+    ptr->precomp[0]->sizetable = (uint16_t *)data;
     data += size[1];
     if (split) {
-      ptr->precomp[1]->sizetable = (ushort *)data;
+      ptr->precomp[1]->sizetable = (uint16_t *)data;
       data += size[4];
     }
 
@@ -2311,10 +2311,10 @@ static void init_table(struct TBEntry *entry, uint64_t key)
     }
 
     for (f = 0; f < files; f++) {
-      ptr->file[f].precomp[0]->sizetable = (ushort *)data;
+      ptr->file[f].precomp[0]->sizetable = (uint16_t *)data;
       data += size[6 * f + 1];
       if (split) {
-        ptr->file[f].precomp[1]->sizetable = (ushort *)data;
+        ptr->file[f].precomp[1]->sizetable = (uint16_t *)data;
         data += size[6 * f + 4];
       }
     }
@@ -2342,7 +2342,7 @@ uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
   uint32_t block = *(uint32_t *)(d->indextable + 6 * mainidx);
-  litidx += *(ushort *)(d->indextable + 6 * mainidx + 4);
+  litidx += *(uint16_t *)(d->indextable + 6 * mainidx + 4);
   if (litidx < 0) {
     do {
       litidx += d->sizetable[--block] + 1;
@@ -2355,7 +2355,7 @@ uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
   uint32_t *ptr = (uint32_t *)(d->data + (block << d->blocksize));
 
   int m = d->min_len;
-  ushort *offset = d->offset;
+  uint16_t *offset = d->offset;
   uint64_t *base = d->base - m;
   uint8_t *symlen = d->symlen;
   int sym, bitcnt;

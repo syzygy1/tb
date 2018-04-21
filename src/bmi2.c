@@ -8,7 +8,7 @@
 
 #ifdef BMI2
 
-static ushort attacks_table[107648];
+static uint16_t attacks_table[107648];
 struct BMI2Info bishop_bmi2[64];
 struct BMI2Info rook_bmi2[64];
 

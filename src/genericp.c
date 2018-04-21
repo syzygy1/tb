@@ -14,7 +14,7 @@ uint64_t sq_mask[64];
 
 #ifdef SMALL
 uint64_t diagonal;
-short KK_map[64][64];
+int16_t KK_map[64][64];
 char mirror[64][64];
 #endif
 

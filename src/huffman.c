@@ -1,7 +1,104 @@
+#include <stdlib.h>
+
 #include "defs.h"
 #include "huffman.h"
 
+struct List {
+  uint64_t w[8192];
+  int p[8192];
+  int len;
+};
+
+static void package_merge(struct HuffCode *c, int num, int *a)
+{
+  struct List *lists = malloc(32 * sizeof(struct List));
+
+  for (int m = 0; m < 32; m++) {
+    int prev_len = m == 0 ? 0 : lists[m - 1].len;
+    int i = 0, j = 0, k = 1;
+    while (i < 2 * num - 2 && j < num && k < prev_len) {
+      if (c->freq[c->map[j]] < lists[m - 1].w[k - 1] + lists[m - 1].w[k]) {
+        lists[m].w[i] = c->freq[c->map[j]];
+        lists[m].p[i] = 0;
+        j++;
+      } else {
+        lists[m].w[i] = lists[m - 1].w[k - 1] + lists[m - 1].w[k];
+        lists[m].p[i] = k;
+        k += 2;
+      }
+      i++;
+    }
+    while (i < 2 * num - 2 && j < num) {
+      lists[m].w[i] = c->freq[c->map[j]];
+      lists[m].p[i] = 0;
+      j++;
+      i++;
+    }
+    while (i < 2 * num - 2 && k < prev_len) {
+      lists[m].w[i] = lists[m - 1].w[k - 1] + lists[m - 1].w[k];
+      lists[m].p[i] = k;
+      k += 2;
+      i++;
+    }
+    lists[m].len = i;
+  }
+
+  int k = lists[31].len;
+  for (int m = 31; m >= 0; m--) {
+    int l = 0;
+    int n = 0;
+    for (int i = 0; i < k; i++) {
+      if (lists[m].p[i])
+        n = lists[m].p[i] + 1;
+      else
+        l++;
+    }
+    a[31 - m] = l;
+    k = n;
+  }
+
+  for (int l = 0; l < 31; l++)
+    a[l] -= a[l + 1];
+
+  free(lists);
+}
+
+static void create_code_old(struct HuffCode *c, int num_syms);
+static int sort_code(struct HuffCode *c);
+
 void create_code(struct HuffCode *c, int num_syms)
+{
+  create_code_old(c, num_syms);
+  if (sort_code(c)) return;
+
+  int a[32];
+
+  c->num_syms = num_syms;
+
+  int num = 0;
+  for (int i = 0; i < num_syms; i++)
+    if (c->freq[i])
+      c->map[num++] = i;
+
+  for (int i = 0; i < num; i++)
+    for (int j = i + 1; j < num; j++)
+      if (c->freq[c->map[i]] > c->freq[c->map[j]]) {
+        int tmp = c->map[i];
+        c->map[i] = c->map[j];
+        c->map[j] = tmp;
+      }
+
+  package_merge(c, num, a);
+
+  int k = 0;
+  for (int l = 31; l >= 0; l--)
+    for (int i = 0; i < a[l]; i++)
+      c->length[c->map[k++]] = l + 1;
+
+  sort_code(c);
+}
+
+void create_code_old(struct HuffCode *c, int num_syms)
 {
   int i, num;
   int idx1, idx2;
@@ -59,10 +156,8 @@ void create_code(struct HuffCode *c, int num_syms)
   }
 }
 
-void sort_code(struct HuffCode *c)
+int sort_code(struct HuffCode *c)
 {
-  int max_len;
-
   int num = c->num_syms;
 
   for (int i = 0; i < num; i++) {
@@ -85,8 +180,11 @@ void sort_code(struct HuffCode *c)
   for (int i = 0; i < num; i++)
     c->inv[c->map[i]] = i;
 
+  int max_len = c->length[c->map[0]];
+  if (max_len > 32) return 0;
+
   c->num = num;
-  c->max_len = max_len = c->length[c->map[0]];
+  c->max_len = max_len;
   c->offset[max_len] = 0;
   c->base[max_len] = 0;
   int k = max_len - 1;
@@ -97,6 +195,8 @@ void sort_code(struct HuffCode *c)
       k--;
     }
   c->min_len = k + 1;
+
+  return 1;
 }
 
 uint64_t calc_size(struct HuffCode *c)

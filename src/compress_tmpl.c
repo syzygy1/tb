@@ -473,7 +473,6 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
 
   struct HuffCode *c = NAME(setup_code)(data, size);
   create_code(c, num_syms);
-  sort_code(c);
 
   return c;
 }

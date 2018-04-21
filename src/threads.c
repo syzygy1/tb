@@ -38,8 +38,8 @@ int barrier_init(barrier_t *barrier, int needed)
 {
   barrier->needed = needed;
   barrier->called = 0;
-  pthread_mutex_init(&barrier->mutex,NULL);
-  pthread_cond_init(&barrier->cond,NULL);
+  pthread_mutex_init(&barrier->mutex, NULL);
+  pthread_cond_init(&barrier->cond, NULL);
   return 0;
 }
 

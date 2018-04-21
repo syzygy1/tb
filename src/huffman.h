@@ -12,12 +12,11 @@ struct HuffCode {
   int inv[MAXSYMB];
   int length[MAXSYMB];
   int num_syms, num, max_len, min_len;
-  int base[32];
-  int offset[32];
+  int base[33];
+  int offset[33];
 };
 
 void create_code(struct HuffCode *c, int num_syms);
-void sort_code(struct HuffCode *c);
 uint64_t calc_size(struct HuffCode *c);
 
 #endif
