@@ -329,7 +329,7 @@ void NAME(estimate_compression_piece)(T *restrict table,
   int i, p;
 
   uint32_t dsize = num_segs * seg_size;
-  T *restrict dst = malloc(num_cands * dsize * sizeof(T) + 1);
+  T *restrict dst = malloc((num_cands * dsize + 1) * sizeof(T));
   NAME(est_data).table = table;
   NAME(est_data).pcs = pcs;
   NAME(est_data).dst = dst;
@@ -365,7 +365,7 @@ void NAME(estimate_compression_pawn)(T *restrict table, int *restrict pcs,
   int i, p;
 
   uint32_t dsize = num_segs * seg_size;
-  T *restrict dst = malloc(num_cands * dsize * sizeof(T) + 1);
+  T *restrict dst = malloc((num_cands * dsize + 1) * sizeof(T));
   NAME(est_data).table = table;
   NAME(est_data).pcs = pcs;
   NAME(est_data).dst = dst;
