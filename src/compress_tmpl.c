@@ -33,7 +33,6 @@ void NAME(compress_init_dtz)(struct dtz_map *map)
 
 void NAME(compress_alloc_dtz)(void)
 {
-  free(countfreq);
   NAME(countfreq_dtz) = malloc(numthreads * sizeof(*NAME(countfreq_dtz)));
 }
 
