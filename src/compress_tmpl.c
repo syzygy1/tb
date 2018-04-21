@@ -8,6 +8,29 @@
 
 static struct HuffCode *NAME(setup_code)(T *data, uint64_t size);
 
+void NAME(compress_init_dtz)(struct dtz_map *map)
+{
+  int i, j;
+
+  dtz_map = map;
+
+  num_vals = map->max_num;
+
+  if (sizeof(T) == 1) {
+    for (i = 0; i < num_vals; i++) {
+      symtable[i].pattern[0] = i;
+      symtable[i].len = 1;
+      for (j = 0; j < 256; j++)
+        symcode[i][j] = i;
+    }
+  }
+
+  compress_type = 0;
+  if (num_vals == 1)
+    compress_type = 1;
+}
+
+
 void NAME(compress_alloc_dtz)(void)
 {
   free(countfreq);
@@ -338,9 +361,11 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
       for (j = 0; j < num_syms; j++)
         pairfreq[i][j] += NAME(countfreq_dtz)[t][i][j];
 
-  for (i = 0; i < num_syms; i++)
-    for (j = 0; j < 256; j++)
-      symcode[i][j] = i;
+  if (sizeof(T) == 1) {
+    for (i = 0; i < num_syms; i++)
+      for (j = 0; j < 256; j++)
+        symcode[i][j] = i;
+  }
 
   while (num_syms < maxsymbols) {
 

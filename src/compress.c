@@ -155,26 +155,6 @@ void compress_init_wdl(int *vals, int flags)
     compress_type = 1;
 }
 
-void compress_init_dtz(struct dtz_map *map)
-{
-  int i, j;
-
-  dtz_map = map;
-
-  num_vals = map->max_num;
-
-  for (i = 0; i < num_vals; i++) {
-    symtable[i].pattern[0] = i;
-    symtable[i].len = 1;
-    for (j = 0; j < 256; j++)
-      symcode[i][j] = i;
-  }
-
-  compress_type = 0;
-  if (num_vals == 1)
-    compress_type = 1;
-}
-
 #if 0
 // only used for dtz
 void adjust_work_dontcares(uint64_t *restrict work1, uint64_t *restrict work2)

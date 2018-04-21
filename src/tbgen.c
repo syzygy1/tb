@@ -514,7 +514,7 @@ void prepare_dtz_map_u8(u8 *v, struct dtz_map *map)
       v[i] = i;
   }
 
-  compress_init_dtz(map);
+  compress_init_dtz_u8(map);
 }
 
 void prepare_dtz_map_u16(u16 *v, struct dtz_map *map)
@@ -579,7 +579,7 @@ void prepare_dtz_map_u16(u16 *v, struct dtz_map *map)
       v[i] = i;
   }
 
-  compress_init_dtz(map);
+  compress_init_dtz_u16(map);
 }
 
 extern char *optarg;

@@ -31,7 +31,8 @@ void compress_alloc_wdl(void);
 void compress_alloc_dtz_u8(void);
 void compress_alloc_dtz_u16(void);
 void compress_init_wdl(int *vals, int flags);
-void compress_init_dtz(struct dtz_map *map);
+void compress_init_dtz_u8(struct dtz_map *map);
+void compress_init_dtz_u16(struct dtz_map *map);
 void compress_tb_u8(struct tb_handle *F, u8 *data, uint64_t tb_size,
     uint8_t *perm, int minfreq);
 void compress_tb_u16(struct tb_handle *F, u16 *data, uint64_t tb_size,
