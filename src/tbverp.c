@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -10,6 +10,8 @@
 #include <getopt.h>
 #include <stdarg.h>
 #include <inttypes.h>
+
+#include "decompress.h"
 #include "defs.h"
 #include "threads.h"
 
@@ -17,12 +19,15 @@
 #define VERIFICATION
 
 #include "board.h"
+
+#ifndef SUICIDE
+static int white_king, black_king;
+#endif
+
 #include "probe.c"
 #include "board.c"
 
-#define MAXPIECES 8
-
-struct tb_handle;
+#define MAX_PIECES 8
 
 void decomp_init_pawn(int *pcs, int *pt);
 struct tb_handle *open_tb(char *tablename, int wdl);
@@ -69,7 +74,7 @@ uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
 uint8_t (*load_map)[256];
 uint8_t *tb_table;
-int tb_perm[MAXPIECES];
+int tb_perm[MAX_PIECES];
 
 int has_white_pawns, has_black_pawns;
 #ifdef SUICIDE
@@ -78,9 +83,6 @@ int last_w, last_b;
 #endif
 int symmetric, split;
 
-#ifndef SUICIDE
-static int white_king, black_king;
-#endif
 static int white_pcs[MAX_PIECES], black_pcs[MAX_PIECES];
 static int white_all[MAX_PIECES], black_all[MAX_PIECES];
 static int pt[MAX_PIECES], pw[MAX_PIECES];
@@ -204,9 +206,40 @@ void calc_pawn_table_threaded(void)
   printf("\n");
 }
 
+static void check_huffman_tb(int wdl)
+{
+  struct tb_handle *F = open_tb(tablename, wdl);
+  decomp_init_table(F);
+  struct TBEntry_pawn *entry = &(F->entry_pawn);
+  printf("%s%s:", tablename, wdl ? WDLSUFFIX : DTZSUFFIX);
+  int warning = 0;
+  for (int f = 0; f < 4; f++) {
+    int m0 = entry->file[f].precomp[0]->max_len;
+    printf(" %d", m0);
+    int m1 = 0;
+    if (F->split) {
+      m1 = entry->file[f].precomp[1]->max_len;
+      printf(" %d", m1);
+    }
+    if (m0 >= 32 || m1 >= 32)
+      warning = 1;
+  }
+  if (warning)
+    printf(" ----- WARNING!!!!!");
+  printf("\n");
+  close_tb(F);
+}
+
+static void check_huffman()
+{
+  check_huffman_tb(1);
+  check_huffman_tb(0);
+}
+
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
   { "log", 0, NULL, 'l' },
+  { "huffman", 0, NULL, 'h' },
 //  { "wdl", 0, NULL, 'w' },
   { 0, 0, NULL, 0 }
 };
@@ -218,11 +251,12 @@ int main(int argc, char **argv)
   int val, longindex;
   int pcs[16];
   int wdl_only = 0;
+  int check_huff = 0;
 
   numthreads = 1;
   do {
 //    val = getopt_long(argc, argv, "t:lwc", options, &longindex);
-    val = getopt_long(argc, argv, "t:ld", options, &longindex);
+    val = getopt_long(argc, argv, "t:ldh", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -236,6 +270,9 @@ int main(int argc, char **argv)
     case 'd':
       use_envdirs = 1;
       break;
+    case 'h':
+      check_huff = 1;
+      break;
     }
   } while (val != EOF);
 
@@ -244,8 +281,6 @@ int main(int argc, char **argv)
     exit(1);
   }
   tablename = argv[optind];
-
-  init_tablebases();
 
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
@@ -314,6 +349,13 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  decomp_init_pawn(pcs, pt);
+
+  if (check_huff) {
+    check_huffman();
+    return 0;
+  }
+
   for (i = 0; i < numpcs - 2; i++)
     if (pt[i + 1] != pt[0])
       break;
@@ -328,6 +370,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Can't handle symmetric tables.\n");
     exit(1);
   }
+
+  init_tablebases();
 
   if (numthreads < 1) numthreads = 1;
 
@@ -490,8 +534,6 @@ int main(int argc, char **argv)
 
   gettimeofday(&start_time, NULL);
   cur_time = start_time;
-
-  decomp_init_pawn(pcs, pt);
 
   struct tb_handle *G = open_tb(tablename, 1);
   decomp_init_table(G);

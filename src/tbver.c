@@ -139,7 +139,7 @@ static void check_huffman_tb(int wdl)
     printf(" %d", m1);
   }
   if (m0 >= 32 || m1 >= 32)
-    printf("WARNING!!!!!");
+    printf(" ----- WARNING!!!!!");
   printf("\n");
   close_tb(F);
 }
@@ -245,6 +245,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Can't handle pawns.\n");
     exit(EXIT_FAILURE);
   }
+
+  decomp_init_piece(pcs);
 
   if (check_huff) {
     check_huffman();
@@ -378,8 +380,6 @@ int main(int argc, char **argv)
   iter_pcs_opp = black_pcs;
   run_threaded(calc_threats, work_g, 1);
 #endif
-
-  decomp_init_piece(pcs);
 
   // open wdl table
   struct tb_handle *H = open_tb(tablename, 1);

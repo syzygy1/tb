@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2016, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -610,7 +610,7 @@ void prepare_dtz_map(uint8_t *v, struct dtz_map *map)
       v[i] = i;
   }
 
-  compress_init_dtz(map);
+  compress_init_dtz_u8(map);
 }
 
 extern char *optarg;

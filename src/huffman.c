@@ -9,11 +9,13 @@ struct List {
   int len;
 };
 
+#define L 32
+
 static void package_merge(struct HuffCode *c, int num, int *a)
 {
-  struct List *lists = malloc(32 * sizeof(struct List));
+  struct List *lists = malloc(L * sizeof(struct List));
 
-  for (int m = 0; m < 32; m++) {
+  for (int m = 0; m < L; m++) {
     int prev_len = m == 0 ? 0 : lists[m - 1].len;
     int i = 0, j = 0, k = 1;
     while (i < 2 * num - 2 && j < num && k < prev_len) {
@@ -43,8 +45,8 @@ static void package_merge(struct HuffCode *c, int num, int *a)
     lists[m].len = i;
   }
 
-  int k = lists[31].len;
-  for (int m = 31; m >= 0; m--) {
+  int k = lists[L - 1].len;
+  for (int m = L - 1; m >= 0; m--) {
     int l = 0;
     int n = 0;
     for (int i = 0; i < k; i++) {
@@ -53,11 +55,11 @@ static void package_merge(struct HuffCode *c, int num, int *a)
       else
         l++;
     }
-    a[31 - m] = l;
+    a[L - 1 - m] = l;
     k = n;
   }
 
-  for (int l = 0; l < 31; l++)
+  for (int l = 0; l < L - 1; l++)
     a[l] -= a[l + 1];
 
   free(lists);
@@ -71,7 +73,7 @@ void create_code(struct HuffCode *c, int num_syms)
   create_code_old(c, num_syms);
   if (sort_code(c)) return;
 
-  int a[32];
+  int a[L];
 
   c->num_syms = num_syms;
 
@@ -91,7 +93,7 @@ void create_code(struct HuffCode *c, int num_syms)
   package_merge(c, num, a);
 
   int k = 0;
-  for (int l = 31; l >= 0; l--)
+  for (int l = L - 1; l >= 0; l--)
     for (int i = 0; i < a[l]; i++)
       c->length[c->map[k++]] = l + 1;
 
@@ -181,7 +183,7 @@ int sort_code(struct HuffCode *c)
     c->inv[c->map[i]] = i;
 
   int max_len = c->length[c->map[0]];
-  if (max_len > 32) return 0;
+  if (max_len > L) return 0;
 
   c->num = num;
   c->max_len = max_len;

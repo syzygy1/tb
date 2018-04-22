@@ -104,6 +104,7 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, uint64_t tb_size, uint
   if (*flags & 0x80) {
     d = malloc(sizeof(struct PairsData));
     d->idxbits = 0;
+    d->max_len = 0;
     if (H->wdl)
       d->min_len = data[1];
     else
