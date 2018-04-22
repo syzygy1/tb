@@ -176,9 +176,8 @@ void calc_pawn_table_worker(struct thread_data *thread)
   thread->p = p;
 
   for (uint64_t f_idx = thread->begin; f_idx < thread->end; f_idx++) {
-    idx = _pdep_u64(f_idx, pmask_file);
     for (uint64_t r_idx = 0; r_idx < rank_size; r_idx++) {
-      idx |= _pdep_u64(r_idx, pmask_rank);
+      idx = _pdep_u64(f_idx, pmask_file) | _pdep_u64(r_idx, pmask_rank);
       FILL_OCC_PAWNS {
         thread->occ = occ;
         thread->slice = idx << shift[numpawns - 1];
@@ -872,7 +871,7 @@ int main(int argc, char **argv)
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
 //  work_p = create_work(total_work, 1ULL << shift[numpawns - 1], 0x3f);
 //  work_part = alloc_work(total_work);
-  work_f = create_work(total_work, 1ULL << (3 * (numpcs - numpawns)), 0);
+  work_f = create_work(total_work, 1ULL << (3 * (numpawns - 1)), 0);
 
 #if 1
   static int piece_order[16] = {
