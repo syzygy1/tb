@@ -496,10 +496,10 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   assume(n >= 2 && n <= TBPIECES); \
   bitboard occ, bb = thread->occ; \
   int *p = thread->p; \
-  uint64_t end = begin + thread->end
+  uint64_t end = thread->slice + slice_size;
 
 #define LOOP_ITER \
-  for (idx = begin + thread->begin; idx < end; idx++)
+  for (idx = thread->slice; idx < end; idx++)
 
 #define BEGIN_ITER_ALL \
   uint64_t idx, idx2; \
@@ -538,4 +538,3 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
     } \
   } while (0)
 #endif
-

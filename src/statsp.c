@@ -56,8 +56,8 @@ uint8_t find_val_v;
 
 void find_loop(struct thread_data *thread)
 {
-  uint64_t idx = begin + thread->begin;
-  uint64_t end = begin + thread->end;
+  uint64_t idx = thread->begin;
+  uint64_t end = thread->end;
   uint8_t *table = find_val_table;
   uint8_t v = find_val_v;
 
@@ -95,11 +95,11 @@ uint8_t *count_stats_table_u8;
 void count_stats_u8(struct thread_data *thread)
 {
   uint64_t idx;
-  uint64_t end = begin + thread->end;
+  uint64_t end = thread->end;
   uint64_t *stats = thread->stats;
   uint8_t *table = count_stats_table_u8;
 
-  for (idx = begin + thread->begin; idx < end; idx++)
+  for (idx = thread->begin; idx < end; idx++)
     stats[table[idx]]++;
 }
 
@@ -108,11 +108,11 @@ uint16_t *count_stats_table_u16;
 void count_stats_u16(struct thread_data *thread)
 {
   uint64_t idx;
-  uint64_t end = begin + thread->end;
+  uint64_t end = thread->end;
   uint64_t *stats = thread->stats;
   uint16_t *table = count_stats_table_u16;
 
-  for (idx = begin + thread->begin; idx < end; idx++)
+  for (idx = thread->begin; idx < end; idx++)
     stats[table[idx]]++;
 }
 
@@ -132,7 +132,7 @@ char glb_fen[128];
 char glcw_fen[128];
 char glcb_fen[128];
 
-static int stats_val[];
+//static int stats_val[];
 
 static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     int phase, int local, uint64_t *work)
@@ -141,7 +141,10 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
   int n;
   int sval;
 
+#if 0
   sval = (local == 0) ? 0 : stats_val[local - 1];
+#endif
+  sval = 0;
 
   for (i = 0; i < MAX_VALS * numthreads; i++)
     thread_stats[i] = 0;
@@ -333,12 +336,14 @@ void collect_stats(uint64_t *work, int phase, int local)
 {
   int i;
 
+#if 0
   if (local == num_saves) {
     if (num_saves == 0)
       stats_val[0] = REDUCE_PLY - 2;
     else
       stats_val[num_saves] = stats_val[num_saves - 1] + REDUCE_PLY_RED;
   }
+#endif
 
   if (thread_stats == NULL) {
     thread_stats = (uint64_t *)alloc_aligned(8 * MAX_VALS * numthreads, 64);

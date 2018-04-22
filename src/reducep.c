@@ -98,7 +98,7 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin,
   }
 }
 
-void reduce_tables(int local)
+void reduce_tables(int local, int ply)
 {
   int i;
   uint8_t v[256];

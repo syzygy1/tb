@@ -33,12 +33,12 @@ static int white_king, black_king;
 #define MAX_NARROW 240
 
 static uint64_t *work_g, *work_piv;
-static uint64_t *work_p, *work_part;
+//static uint64_t *work_p, *work_part;
+static uint64_t *work_f;
 
 uint8_t *restrict table_w, *restrict table_b;
 
-static uint64_t size, pawnsize;
-static uint64_t begin;
+static uint64_t size, rank_size, slice_size;
 static int slice_threading_low, slice_threading_high;
 
 int numpcs;
@@ -57,7 +57,6 @@ static int pt[MAX_PIECES], pw[MAX_PIECES];
 static int pcs2[MAX_PIECES];
 #endif
 
-static int ply;
 static int finished;
 static int ply_accurate_w, ply_accurate_b;
 
@@ -66,7 +65,7 @@ static int file;
 static int num_saves;
 static int cursed_capt[MAX_PIECES];
 static int cursed_pawn_capt_w, cursed_pawn_capt_b;
-static int has_cursed_capts, has_cursed_pawn_moves;
+static int has_cursed_capts;
 #ifndef SUICIDE
 static int to_fix_w, to_fix_b;
 #endif
@@ -99,23 +98,24 @@ static int only_generate = 0;
 static int generate_dtz = 1;
 static int generate_wdl = 1;
 
-static char *tablename;
+char *tablename;
 
 #include "statsp.c"
 
+#if 0
 u8 *transform_v_u8;
 u8 *transform_tbl_u8;
 
 u16 *transform_v_u16;
 u16 *transform_tbl_u16;
 
-void transform(struct thread_data *thread)
+void transform2(struct thread_data *thread)
 {
   uint64_t idx;
-  uint64_t end = begin + thread->end;
+  uint64_t end = thread->slice + slice_size;
   uint8_t *restrict v = transform_v_u8;
 
-  for (idx = begin + thread->begin; idx < end; idx++) {
+  for (idx = thread->slice; idx < end; idx++) {
     table_w[idx] = v[table_w[idx]];
     table_b[idx] = v[table_b[idx]];
   }
@@ -142,9 +142,87 @@ void transform_table_u16(struct thread_data *thread)
   for (idx = thread->begin; idx < end; idx++)
     table[idx] = v[table[idx]];
 }
+#endif
 
+#if 0
 #include "reducep.c"
+#endif
 
+#ifndef BMI2
+static inline uint64_t _pdep_u64(uint64_t val, uint64_t mask)
+{
+  uint64_t res = 0;
+  int i = 0;
+
+  while (mask) {
+    if (val & bit[i++])
+      res |= mask & -mask;
+    mask &= mask - 1;
+  }
+
+  return res;
+}
+#endif
+
+static uint64_t pmask_file, pmask_rank;
+
+void calc_pawn_table_worker(struct thread_data *thread)
+{
+  uint64_t idx, idx2;
+  int i;
+  bitboard occ;
+  int p[MAX_PIECES];
+
+  thread->p = p;
+
+  for (uint64_t f_idx = thread->begin; f_idx < thread->end; f_idx++) {
+    idx = _pdep_u64(f_idx, pmask_file);
+    for (uint64_t r_idx = 0; r_idx < rank_size; r_idx++) {
+      idx |= _pdep_u64(r_idx, pmask_rank);
+      FILL_OCC_PAWNS {
+        thread->occ = occ;
+        thread->slice = idx << shift[numpawns - 1];
+        thread->has_cursed_pawn_moves = 0;
+        if (has_white_pawns)
+          calc_pawn_moves_w(thread);
+        if (has_black_pawns)
+          calc_pawn_moves_b(thread);
+#ifndef SUICIDE
+        calc_mates(thread);
+#endif
+        iterate(thread);
+      } else {
+#if 0
+        int local;
+        for (local = 0; local < num_saves; local++)
+          reduce_tables(local);
+#endif
+      }
+    }
+  }
+
+#if 0
+  if (generate_dtz)
+    for (i = 0; i < num_saves; i++) {
+      fclose(tmp_table[i][0]);
+      if (!symmetric)
+        fclose(tmp_table[i][1]);
+    }
+#endif
+
+#ifdef SUICIDE
+  set_draw_threats();
+#endif
+}
+
+void calc_pawn_table(void)
+{
+  set_tbl_to_wdl(0);
+
+  run_threaded(calc_pawn_table_worker, work_f, 1);
+}
+
+#if 0
 void calc_pawn_table_unthreaded(void)
 {
   uint64_t idx, idx2;
@@ -162,7 +240,6 @@ void calc_pawn_table_unthreaded(void)
   int *old_p = thread_data[0].p;
   thread_data[0].p = p;
 
-  // first perform 50 iterations for each slice
   for (idx = 0; idx < pawnsize*6/6; idx++, begin += size_p) {
     if (!cnt) {
       printf("%c%c ", 'a' + file, '2' + (pw[0] ? 5-cnt2 : cnt2));
@@ -194,7 +271,8 @@ void calc_pawn_table_unthreaded(void)
   if (generate_dtz)
     for (i = 0; i < num_saves; i++) {
       fclose(tmp_table[i][0]);
-      fclose(tmp_table[i][1]);
+      if (!symmetric)
+        fclose(tmp_table[i][1]);
     }
 
 #ifdef SUICIDE
@@ -258,6 +336,7 @@ void calc_pawn_table_threaded(void)
   set_draw_threats();
 #endif
 }
+#endif
 
 #ifndef SUICIDE
 static LOCK_T tc_mutex;
@@ -633,7 +712,9 @@ int main(int argc, char **argv)
   int pcs[16];
   uint8_t v[256];
   int save_stats = 0;
+#if 0
   int save_to_disk = 0;
+#endif
 
   numthreads = 1;
   thread_affinity = 0;
@@ -660,7 +741,9 @@ int main(int argc, char **argv)
       save_stats = 1;
       break;
     case 'd':
+#if 0
       save_to_disk = 1;
+#endif
       break;
     }
   } while (val != EOF);
@@ -769,18 +852,27 @@ int main(int argc, char **argv)
   slice_threading_low = (numthreads > 1) && (numpcs - numpawns) >= 2;
   slice_threading_high = (numthreads > 1) && (numpcs - numpawns) >= 3;
 
-  size = 6ULL << (6 * (numpcs-1));
-  pawnsize = 6ULL << (6 * (numpawns - 1));
+  size = 6ULL << (6 * (numpcs - 1));
+  rank_size = 6ULL << (3 * (numpawns - 1));
+  slice_size = 1ULL << (6 * (numpcs - numpawns));
 
   for (i = 0; i < numpcs; i++) {
     shift[i] = (numpcs - i - 1) * 6;
     mask[i] = 0x3fULL << shift[i];
   }
 
+  pmask_file = 0;
+  pmask_rank = 0x07;
+  for (i = 0; i < numpawns - 1; i++) {
+    pmask_file = (pmask_file << 6) | 0x07;
+    pmask_rank = (pmask_rank << 6) | 0x38;
+  }
+
   work_g = create_work(total_work, size, 0x3f);
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
-  work_p = create_work(total_work, 1ULL << shift[numpawns - 1], 0x3f);
-  work_part = alloc_work(total_work);
+//  work_p = create_work(total_work, 1ULL << shift[numpawns - 1], 0x3f);
+//  work_part = alloc_work(total_work);
+  work_f = create_work(total_work, 1ULL << (3 * (numpcs - numpawns)), 0);
 
 #if 1
   static int piece_order[16] = {
@@ -1005,12 +1097,8 @@ int main(int argc, char **argv)
     if (cursed_pawn_capt_w || cursed_pawn_capt_b)
       has_cursed_capts = 1;
     printf("Calculating pawn table.\n");
-    if (slice_threading_low)
-      calc_pawn_table_threaded();
-    else
-      calc_pawn_table_unthreaded();
+    calc_pawn_table();
 
-    begin = 0;
     collect_stats(work_g, 1, num_saves);
 
     FILE *F = stdout;
@@ -1058,6 +1146,7 @@ int main(int argc, char **argv)
       compress_alloc_wdl();
 
       tb_size = init_permute_file(pcs, file);
+#if 0
 #ifndef SUICIDE
       if (save_to_disk || !G
                 || (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
@@ -1080,6 +1169,7 @@ int main(int argc, char **argv)
         store_table(table_b, 'b');
       }
 #endif
+#endif
 
     }
 
@@ -1096,11 +1186,13 @@ int main(int argc, char **argv)
       compress_tb_u8(G, tb_table, tb_size, best_w, minfreq);
 
       if (!symmetric) {
+#if 0
         if (save_to_disk) {
           load_table_u8(table_b, 'b');
           unlink_table('b');
           tb_table = table_w;
         }
+#endif
 #ifndef SUICIDE
         test_closs(total_stats_b, table_b, to_fix_b);
 #endif
@@ -1117,6 +1209,7 @@ int main(int argc, char **argv)
 
     // dtz
     if (H) {
+#if 0
 #ifndef SUICIDE
       if (tb_table == table_w) {
         load_table_u8(table_w, 'w');
@@ -1133,11 +1226,13 @@ int main(int argc, char **argv)
         unlink_table('w');
       }
 #endif
+#endif
 
 #if defined(REGULAR) || defined(ATOMIC)
       fix_closs();
 #endif
 
+#if 0
       if (num_saves > 0) {
         reconstruct_table_u8(table_w, 'w', &map_w[file]);
         unlink_saves('w');
@@ -1146,6 +1241,7 @@ int main(int argc, char **argv)
           unlink_saves('b');
         }
       }
+#endif
 
       uint64_t estimate_w, estimate_b;
 

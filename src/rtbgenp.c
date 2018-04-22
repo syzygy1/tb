@@ -37,7 +37,7 @@
 #define CAPT_CWIN_RED (WIN_RED + 1)
 
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(int local);
+//void reduce_tables(int local, int ply);
 
 #define SET_CHANGED(x) \
 { uint8_t dummy = CHANGED; \
@@ -69,8 +69,6 @@ __asm__( \
 "1:" \
 : "+m" (x), "+r" (dummy) : : "eax"); }
 
-uint8_t win_loss[256];
-uint8_t loss_win[256];
 char tbl_to_wdl[256];
 uint8_t wdl_to_tbl[8] = {
   0xff, 0xff, CHANGED, CAPT_CLOSS, CAPT_DRAW, CAPT_CWIN, CAPT_WIN, 0xff
@@ -109,7 +107,7 @@ static void set_tbl_to_wdl(int saves)
 // check whether all moves end up in wins for the opponent
 // we already know there are no legal captures
 int check_loss(int *restrict pcs, uint64_t idx0, uint8_t *restrict table,
-                bitboard occ, int *restrict p)
+                bitboard occ, int *restrict p, uint8_t *win_loss)
 {
   int sq;
   uint64_t idx, idx2;
@@ -245,15 +243,9 @@ void calc_broken(struct thread_data *thread)
 
 void calc_mates(struct thread_data *thread)
 {
-  uint64_t idx, idx2;
-  int i;
-  int n = numpcs;
-  assume(n >= 3 && n <= TBPIECES);
-  bitboard occ, bb = thread->occ;
-  int *p = thread->p;
-  uint64_t end = begin + thread->end;
+  BEGIN_ITER;
 
-  for (idx = begin + thread->begin; idx < end; idx++) {
+  LOOP_ITER {
     if (table_w[idx] == BROKEN) continue;
     int chk_b = (table_w[idx] == ILLEGAL);
     int chk_w = (table_b[idx] == ILLEGAL);
@@ -560,19 +552,17 @@ void calc_captures_b(void)
   }
 }
 
-uint8_t *iter_table, *iter_table_opp;
-int *iter_pcs;
-int *iter_pcs_opp;
-uint8_t tbl[256];
-
 void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
-  uint8_t *restrict table = iter_table;
-  uint8_t *restrict table_opp = iter_table_opp;
-  int *restrict pcs = iter_pcs;
-  int *restrict pcs_opp = iter_pcs_opp;
+  uint8_t *restrict table = thread->iter_table;
+  uint8_t *restrict table_opp = thread->iter_table_opp;
+  int *pcs = thread->iter_pcs;
+  int *pcs_opp = thread->iter_pcs_opp;
+  uint8_t *tbl = thread->tbl;
+  uint8_t *win_loss = thread->win_loss;
+  uint8_t *loss_win = thread->loss_win;
 
   LOOP_ITER {
     int v = table[idx];
@@ -582,7 +572,7 @@ void iter(struct thread_data *thread)
     not_fin = 1;
     switch (w) {
     case 1: /* CHANGE */
-      v = check_loss(pcs, idx, table_opp, occ, p);
+      v = check_loss(pcs, idx, table_opp, occ, p, win_loss);
       if (v) {
         table[idx] = v;
         RETRO(mark_wins, loss_win[v]);
@@ -597,7 +587,7 @@ void iter(struct thread_data *thread)
       RETRO(mark_win_in_1);
       break;
     case 4: /* CAPT_CLOSS */
-      v  = check_loss(pcs, idx, table_opp, occ, p);
+      v  = check_loss(pcs, idx, table_opp, occ, p, win_loss);
       if (v) {
         if (v > LOSS_IN_ONE - DRAW_RULE)
           v = LOSS_IN_ONE - DRAW_RULE;
@@ -617,33 +607,35 @@ void iter(struct thread_data *thread)
     finished = 0;
 }
 
-static int iter_wtm;
-
-void run_iter(void)
+void run_iter(struct thread_data *thread)
 {
-  if (iter_wtm) {
-    iter_table = table_w;
-    iter_table_opp = table_b;
-    iter_pcs = white_pcs;
-    iter_pcs_opp = black_pcs;
+  if (thread->iter_wtm) {
+    thread->iter_table = table_w;
+    thread->iter_table_opp = table_b;
+    thread->iter_pcs = white_pcs;
+    thread->iter_pcs_opp = black_pcs;
   } else {
-    iter_table = table_b;
-    iter_table_opp = table_w;
-    iter_pcs = black_pcs;
-    iter_pcs_opp = white_pcs;
+    thread->iter_table = table_b;
+    thread->iter_table_opp = table_w;
+    thread->iter_pcs = black_pcs;
+    thread->iter_pcs_opp = white_pcs;
   }
-  if (slice_threading_high)
-    run_threaded(iter, work_p, 0);
-  else
-    run_single(iter, work_p, 0);
-  iter_wtm ^= 1;
+  iter(thread);
+  thread->iter_wtm ^= 1;
 }
 
-void iterate()
+void iterate(struct thread_data *thread)
 {
   int i;
-  iter_wtm = 0;
-  int local_num_saves = 0;
+//  int local_num_saves = 0;
+  uint8_t tbl[256];
+  uint8_t win_loss[256];
+  uint8_t loss_win[256];
+
+  thread->iter_wtm = 0;
+  thread->tbl = tbl;
+  thread->win_loss = win_loss;
+  thread->loss_win = loss_win;
 
   // FIXME: replace by something more incremental
   for (i = 0; i < 256; i++)
@@ -651,9 +643,9 @@ void iterate()
 
   // ply = n -> find all wins in n, n+1 and potential losses in n, n+1
 
-  ply = 0;
+  int ply = 0;
   tbl[MATE] = 3;
-  run_iter();
+  run_iter(thread);
 
   // ply = 1
   ply++;
@@ -661,7 +653,7 @@ void iterate()
   tbl[CAPT_WIN] = tbl[PAWN_WIN] = tbl[WIN_IN_ONE] = 2;
   win_loss[ILLEGAL] = 0xff;
   loss_win[LOSS_IN_ONE] = WIN_IN_ONE + 1;
-  run_iter();
+  run_iter(thread);
 
   // ply = 2
   ply++;
@@ -671,7 +663,7 @@ void iterate()
   win_loss[PAWN_WIN] = LOSS_IN_ONE - 1;
   win_loss[WIN_IN_ONE] = LOSS_IN_ONE - 1;
   loss_win[LOSS_IN_ONE - 1] = WIN_IN_ONE + 2;
-  run_iter();
+  run_iter(thread);
 
   tbl[CAPT_WIN] = tbl[PAWN_WIN] = 0;
   finished = 0;
@@ -682,7 +674,7 @@ void iterate()
     tbl[WIN_IN_ONE + ply - 1] = 2;
     win_loss[WIN_IN_ONE + ply - 2] = LOSS_IN_ONE - ply + 1;
     loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply;
-    run_iter();
+    run_iter(thread);
   }
 
   tbl[WIN_IN_ONE + ply - 2] = 0;
@@ -695,12 +687,12 @@ void iterate()
     // skip WIN_IN_ONE + 100, which is CAPT_CWIN
     // and skip WIN_IN_ONE + 101, which is PAWN_CWIN
     loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 2;
-    run_iter();
+    run_iter(thread);
     tbl[WIN_IN_ONE + ply - 2] = 0;
   }
   tbl[WIN_IN_ONE + ply - 1] = 0;
 
-  if (!finished || has_cursed_capts || has_cursed_pawn_moves) {
+  if (!finished || has_cursed_capts || thread->has_cursed_pawn_moves) {
     finished = 1;
     ply = DRAW_RULE + 1;
     tbl[WIN_IN_ONE + ply - 2] = 2;
@@ -709,7 +701,7 @@ void iterate()
     win_loss[WIN_IN_ONE + ply - 2] = LOSS_IN_ONE - ply + 1;
     loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 2;
     tbl[CAPT_CLOSS] = 4;
-    run_iter();
+    run_iter(thread);
 
     // ply = 102
     ply++;
@@ -718,7 +710,7 @@ void iterate()
     win_loss[CAPT_CWIN] = win_loss[PAWN_CWIN] = LOSS_IN_ONE - ply + 1;
     win_loss[WIN_IN_ONE + ply] = LOSS_IN_ONE - ply + 1;
     loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 2;
-    run_iter();
+    run_iter(thread);
 
     tbl[CAPT_CWIN] = tbl[PAWN_CWIN] = 0;
 
@@ -729,16 +721,19 @@ void iterate()
       tbl[WIN_IN_ONE + ply + 1] = 2;
       win_loss[WIN_IN_ONE + ply] = LOSS_IN_ONE - ply + 1;
       loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 2;
-      run_iter();
+      run_iter(thread);
     }
 
     tbl[WIN_IN_ONE + ply] = 0;
     tbl[WIN_IN_ONE + ply + 1] = 0;
 
     while (!finished) {
+      fprintf(stderr, "Table reductions not yet supported.\n");
+      exit(EXIT_FAILURE);
+#if 0
       if (num_saves == 0)
         set_tbl_to_wdl(1);
-      reduce_tables(local_num_saves);
+      reduce_tables(local_num_saves, ply);
       local_num_saves++;
 
       for (i = 0; i < 256; i++)
@@ -758,18 +753,21 @@ void iterate()
         tbl[CAPT_CWIN_RED + ply + 3] = 2;
         win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
         loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
-        run_iter();
+        run_iter(thread);
       }
 
       tbl[CAPT_CWIN_RED + ply + 2] = 0;
       tbl[CAPT_CWIN_RED + ply + 3] = 0;
+#endif
     }
   }
 
+#if 0
   while (local_num_saves < num_saves) {
-    reduce_tables(local_num_saves);
+    reduce_tables(local_num_saves, ply);
     local_num_saves++;
   }
+#endif
 }
 
 // returns -4, -2, -1, 0, 1, 2
@@ -946,12 +944,12 @@ void calc_pawn_moves_w(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *restrict p = thread->p;
-  uint64_t end = begin + thread->end;
+  uint64_t end = thread->slice + slice_size;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
   int has_cursed = 0;
 
-  for (idx = begin + thread->begin; idx < end; idx++) {
+  LOOP_ITER {
     if (table_w[idx] == ILLEGAL || table_w[idx] == BROKEN || table_w[idx] == CAPT_WIN) continue;
     FILL_OCC_PIECES;
     best = -4;
@@ -1014,7 +1012,7 @@ lab:
   }
 
   if (has_cursed & 1)
-    has_cursed_pawn_moves = 1;
+    thread->has_cursed_pawn_moves = 1;
 }
 
 void calc_pawn_moves_b(struct thread_data *thread)
@@ -1027,12 +1025,12 @@ void calc_pawn_moves_b(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *restrict p = thread->p;
-  uint64_t end = begin + thread->end;
+  uint64_t end = thread->slice + slice_size;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
   int has_cursed = 0;
 
-  for (idx = begin + thread->begin; idx < end; idx++) {
+  LOOP_ITER {
     if (table_b[idx] == ILLEGAL || table_b[idx] == BROKEN || table_b[idx] == CAPT_WIN) continue;
     FILL_OCC_PIECES;
     best = -4;
@@ -1095,7 +1093,7 @@ lab:
   }
 
   if (has_cursed & 1)
-    has_cursed_pawn_moves = 1;
+    thread->has_cursed_pawn_moves = 1;
 }
 
 static uint8_t reset_v[256];
@@ -1308,6 +1306,8 @@ void reset_pawn_captures_b(struct thread_data *thread)
   }
 }
 
+uint8_t g_win_loss[256];
+
 int compute_capt_closs(int *restrict pcs, uint64_t idx0,
                        uint8_t *restrict table, bitboard occ, int *restrict p)
 {
@@ -1340,7 +1340,7 @@ void fix_closs_w(struct thread_data *thread)
     if (table_w[idx] != CAPT_CLOSS) continue;
     FILL_OCC;
     int v = compute_capt_closs(white_pcs, idx, table_b, occ, p);
-    table_w[idx] = win_loss[v];
+    table_w[idx] = g_win_loss[v];
   }
 }
 
@@ -1352,7 +1352,7 @@ void fix_closs_b(struct thread_data *thread)
     if (table_b[idx] != CAPT_CLOSS) continue;
     FILL_OCC;
     int v = compute_capt_closs(black_pcs, idx, table_w, occ, p);
-    table_b[idx] = win_loss[v];
+    table_b[idx] = g_win_loss[v];
   }
 }
 
@@ -1363,21 +1363,21 @@ void fix_closs(void)
   if (!to_fix_w && !to_fix_b && !cursed_pawn_capt_w && !cursed_pawn_capt_b) return;
 
   for (i = 0; i < 256; i++)
-    win_loss[i] = 0;
+    g_win_loss[i] = 0;
   if (num_saves == 0) {
     // if no legal moves or all moves lose, then CLOSS capture was best
     for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    win_loss[PAWN_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
+      g_win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
+    g_win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
+    g_win_loss[PAWN_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
     for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
+      g_win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED + 2; i++)
-      win_loss[i] = CAPT_CLOSS;
+      g_win_loss[i] = CAPT_CLOSS;
     for (i = 0; i < REDUCE_PLY_RED; i++)
-      win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
+      g_win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
   }
 
   if (to_fix_w || cursed_pawn_capt_w) {
@@ -1389,4 +1389,3 @@ void fix_closs(void)
     run_threaded(fix_closs_b, work_g, 1);
   }
 }
-

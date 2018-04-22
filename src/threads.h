@@ -31,8 +31,14 @@ struct thread_data {
   uint64_t begin;
   uint64_t end;
   bitboard occ;
+  uint64_t slice;
   uint64_t *stats;
   int *p;
+  uint8_t *iter_table, *iter_table_opp;
+  int *iter_pcs, *iter_pcs_opp;
+  uint8_t *tbl, *win_loss, *loss_win;
+  int has_cursed_pawn_moves;
+  int iter_wtm;
   int thread;
   uint8_t dummy[64 - 2*sizeof(uint64_t) - 2*sizeof(void *) - sizeof(bitboard) - sizeof(int)];
 };
