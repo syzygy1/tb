@@ -7,6 +7,7 @@
 #include "lz4.h"
 #include "util.h"
 
+#if 0
 #define MAX_SAVES 32
 
 void reduce_tables(int local);
@@ -228,6 +229,7 @@ void reduce_tables(int local, int ply)
     num_saves++;
   }
 }
+#endif
 
 void store_table(uint8_t *table, char color)
 {
@@ -266,6 +268,7 @@ void unlink_table(char color)
   unlink(name);
 }
 
+#if 0
 void unlink_saves(char color)
 {
   char name[64];
@@ -275,6 +278,7 @@ void unlink_saves(char color)
     unlink(name);
   }
 }
+#endif
 
 #define MAX_STAT(x) _Generic((x), \
   u8: 256, \

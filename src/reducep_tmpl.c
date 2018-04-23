@@ -6,6 +6,7 @@
 
 #define NAME(f) EVALUATOR(f,T)
 
+#if 0
 void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
 {
   int i;
@@ -207,6 +208,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     NAME(verify_stats)(table, total_stats_b, map);
   }
 }
+#endif
 
 void NAME(load_table)(T *table, char color)
 {
