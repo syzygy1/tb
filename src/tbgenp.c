@@ -99,7 +99,7 @@ static int only_generate = 0;
 static int generate_dtz = 1;
 static int generate_wdl = 1;
 
-static char *tablename;
+char *tablename;
 
 #include "statsp.c"
 
@@ -954,6 +954,12 @@ int main(int argc, char **argv)
   if (G || H)
     init_permute_pawn(pcs, pt);
 
+  if (G)
+    compress_alloc_wdl();
+
+  if (H)
+    compress_alloc_dtz_u8();
+
   for (file = 0; file < 4; file++) {
     printf("Generating the %c-file.\n", 'a' + file);
 
@@ -1055,7 +1061,6 @@ int main(int argc, char **argv)
       if (wide) {
         fprintf(stderr, "Very large DTZ not yet supported.");
       }
-      compress_alloc_wdl();
 
       tb_size = init_permute_file(pcs, file);
 #ifndef SUICIDE
@@ -1090,7 +1095,7 @@ int main(int argc, char **argv)
       test_closs(total_stats_w, table_w, to_fix_w);
 #endif
       prepare_wdl_map(total_stats_w, v, ply_accurate_w, ply_accurate_b);
-      printf("find optimal permutation for file wtm/wdl, file %c\n", 'a' + file);
+      printf("find optimal permutation for wtm/wdl, file %c\n", 'a' + file);
       permute_pawn_wdl(tb_table, pcs, pt, table_w, best_w, file, v);
       printf("compressing data for wtm/wdl, file %c\n", 'a' + file);
       compress_tb_u8(G, tb_table, tb_size, best_w, minfreq);
@@ -1105,7 +1110,7 @@ int main(int argc, char **argv)
         test_closs(total_stats_b, table_b, to_fix_b);
 #endif
         prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
-        printf("find optimal permutation for file btm/wdl, file %c\n", 'a' + file);
+        printf("find optimal permutation for btm/wdl, file %c\n", 'a' + file);
         permute_pawn_wdl(tb_table, pcs, pt, table_b, best_b, file, v);
         printf("compressing data for btm/wdl, file %c\n", 'a' + file);
         compress_tb_u8(G, tb_table, tb_size, best_b, minfreq);
@@ -1117,6 +1122,7 @@ int main(int argc, char **argv)
 
     // dtz
     if (H) {
+
 #ifndef SUICIDE
       if (tb_table == table_w) {
         load_table_u8(table_w, 'w');
