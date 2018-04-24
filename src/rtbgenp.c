@@ -604,7 +604,7 @@ void iter(struct thread_data *thread)
   }
 
   if (not_fin)
-    finished = 0;
+    thread->finished = 0;
 }
 
 void run_iter(struct thread_data *thread)
@@ -666,9 +666,9 @@ void iterate(struct thread_data *thread)
   run_iter(thread);
 
   tbl[CAPT_WIN] = tbl[PAWN_WIN] = 0;
-  finished = 0;
-  while (!finished && ply < DRAW_RULE - 1) {
-    finished = 1;
+  thread->finished = 0;
+  while (!thread->finished && ply < DRAW_RULE - 1) {
+    thread->finished = 1;
     ply++;
     tbl[WIN_IN_ONE + ply - 3] = 0;
     tbl[WIN_IN_ONE + ply - 1] = 2;
@@ -678,8 +678,8 @@ void iterate(struct thread_data *thread)
   }
 
   tbl[WIN_IN_ONE + ply - 2] = 0;
-  if (!finished) {
-    finished = 1;
+  if (!thread->finished) {
+    thread->finished = 1;
     // ply = 100
     ply++;
     tbl[WIN_IN_ONE + ply - 1] = 2;
@@ -692,8 +692,8 @@ void iterate(struct thread_data *thread)
   }
   tbl[WIN_IN_ONE + ply - 1] = 0;
 
-  if (!finished || has_cursed_capts || thread->has_cursed_pawn_moves) {
-    finished = 1;
+  if (!thread->finished || has_cursed_capts || thread->has_cursed_pawn_moves) {
+    thread->finished = 1;
     ply = DRAW_RULE + 1;
     tbl[WIN_IN_ONE + ply - 2] = 2;
     tbl[CAPT_CWIN] = tbl[PAWN_CWIN] = 2;
@@ -714,8 +714,8 @@ void iterate(struct thread_data *thread)
 
     tbl[CAPT_CWIN] = tbl[PAWN_CWIN] = 0;
 
-    while (!finished && ply < REDUCE_PLY) {
-      finished = 1;
+    while (!thread->finished && ply < REDUCE_PLY) {
+      thread->finished = 1;
       ply++;
       tbl[WIN_IN_ONE + ply - 1] = 0;
       tbl[WIN_IN_ONE + ply + 1] = 2;
@@ -727,7 +727,7 @@ void iterate(struct thread_data *thread)
     tbl[WIN_IN_ONE + ply] = 0;
     tbl[WIN_IN_ONE + ply + 1] = 0;
 
-    while (!finished) {
+    while (!thread->finished) {
       fprintf(stderr, "Table reductions not yet supported.\n");
       exit(EXIT_FAILURE);
 #if 0
@@ -746,8 +746,8 @@ void iterate(struct thread_data *thread)
       win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
       loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
 
-      while (ply < REDUCE_PLY_RED && !finished) {
-        finished = 1;
+      while (ply < REDUCE_PLY_RED && !thread->finished) {
+        thread->finished = 1;
         ply++;
         tbl[CAPT_CWIN_RED + ply + 1] = 0;
         tbl[CAPT_CWIN_RED + ply + 3] = 2;

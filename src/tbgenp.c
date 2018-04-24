@@ -57,7 +57,6 @@ static int pt[MAX_PIECES], pw[MAX_PIECES];
 static int pcs2[MAX_PIECES];
 #endif
 
-static int finished;
 static int ply_accurate_w, ply_accurate_b;
 
 static int file;
