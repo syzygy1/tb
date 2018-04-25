@@ -758,7 +758,8 @@ static void NAME(compress_data)(struct tb_handle *F, int num, FILE *G, T *data,
     F->map[num] = dtz_map;
     F->flags[num] = dtz_map->side
                           | (dtz_map->ply_accurate_win << 2)
-                          | (dtz_map->ply_accurate_loss << 3);
+                          | (dtz_map->ply_accurate_loss << 3)
+                          | (dtz_map->wide << 4);
     for (i = 0; i < 4; i++)
       if (dtz_map->num[i] == num_vals)
         break;

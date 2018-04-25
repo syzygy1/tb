@@ -734,10 +734,20 @@ void write_final(struct tb_handle *F, FILE *G)
     for (i = 0; i < F->num_tables; i++) {
 //      if (F->flags[i] & 0x80) continue;
       if (F->flags[i] & 2) {
-        for (j = 0; j < 4; j++) {
-          write_u8(G, F->map[i]->num[j]);
-          for (k = 0; k < F->map[i]->num[j]; k++)
-            write_u8(G, F->map[i]->map[j][k]);
+        if (!(F->flags[i] & 16)) {
+          for (j = 0; j < 4; j++) {
+            write_u8(G, F->map[i]->num[j]);
+            for (k = 0; k < F->map[i]->num[j]; k++)
+              write_u8(G, F->map[i]->map[j][k]);
+          }
+        } else {
+          if (ftell(G) & 0x01)
+            write_u8(G, 0);
+          for (j = 0; j < 4; j++) {
+            write_u16(G, F->map[i]->num[j]);
+            for (k = 0; k < F->map[i]->num[j]; k++)
+              write_u16(G, F->map[i]->map[j][k]);
+          }
         }
       }
     }

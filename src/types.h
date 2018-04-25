@@ -25,6 +25,7 @@ struct dtz_map {
   uint8_t side;
   uint8_t ply_accurate_win;
   uint8_t ply_accurate_loss;
+  uint8_t wide;
   uint8_t high_freq_max;
 };
 

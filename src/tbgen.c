@@ -367,7 +367,8 @@ int sort_list(uint64_t *freq, uint16_t *map, uint16_t *inv_map)
   return num;
 }
 
-void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w, int pa_l)
+void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w,
+    int pa_l)
 {
   int i, j;
   uint64_t freq[4][MAX_VALS];
@@ -450,6 +451,16 @@ void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w, in
     if (f < tot) break;
   }
   dtzmap->high_freq_max = i;
+
+  dtzmap->wide = 0;
+  if (num >= 256)
+    dtzmap->wide = 1;
+  else {
+    for (j = 0; j < 4; j++)
+      for (i = 0; i < dtzmap->num[j]; i++)
+        if (dtzmap->map[j][i] >= 256)
+          dtzmap->wide = 1;
+  }
 }
 
 void prepare_dtz_map_u8(u8 *v, struct dtz_map *map)
