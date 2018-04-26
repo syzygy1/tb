@@ -24,21 +24,7 @@ static int white_king, black_king;
 #include "probe.c"
 #include "board.c"
 
-#define MAXPIECES 8
-
-struct tb_handle;
-
-void decomp_init_piece(int *pcs);
-struct tb_handle *open_tb(char *tablename, int wdl);
-void decomp_init_table(struct tb_handle *H);
-uint8_t *decompress_table(struct tb_handle *H, int bside, int f);
-void close_tb(struct tb_handle *H);
-void set_perm(struct tb_handle *H, int bside, int f, int *perm, int *pt);
-struct TBEntry *get_entry(struct tb_handle *H);
-int get_ply_accurate_win(struct tb_handle *H, int f);
-int get_ply_accurate_loss(struct tb_handle *H, int f);
-int get_dtz_side(struct tb_handle *H, int f);
-uint8_t (*get_dtz_map(struct tb_handle *H, int f))[256];
+#define MAX_PIECES 8
 
 void error(char *str, ...);
 
@@ -68,7 +54,7 @@ uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
 uint8_t (*load_map)[256];
 uint8_t *tb_table;
-int tb_perm[MAXPIECES];
+int tb_perm[MAX_PIECES];
 
 static uint64_t size;
 

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -11,31 +11,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include "decompress.h"
 #include "defs.h"
 #include "probe.h"
 #include "threads.h"
 #include "util.h"
-
-struct tb_handle {
-  FILE *F;
-  uint8_t *data;
-  uint64_t data_size;
-  int wdl;
-  int num_files;
-  int split;
-  int has_pawns;
-  struct {
-    uint64_t idx[2];
-    uint64_t size[2];
-  } file[4];
-  union {
-    struct TBEntry entry;
-    struct TBEntry_piece entry_piece;
-    struct TBEntry_pawn entry_pawn;
-  };
-  uint8_t dtz_flags[4];
-  uint8_t (*map[4])[256];
-};
 
 extern int total_work;
 extern int numthreads;
@@ -277,12 +258,22 @@ void decomp_init_table(struct tb_handle *H)
 
     if (!H->wdl) {
       if (H->dtz_flags[0] & 2) {
-        int i;
-        uint8_t num;
-        H->map[0] = malloc(4 * 256);
-        for (i = 0; i < 4; i++) {
-          fread(&num, 1, 1, F);
-          fread(H->map[0][i], 1, num, F);
+        if (!(H->dtz_flags[0] & 16)) {
+          int i;
+          uint8_t num;
+          H->map[0] = malloc(4 * 256);
+          for (i = 0; i < 4; i++) {
+            fread(&num, 1, 1, F);
+            fread(H->map[0][i], 1, num, F);
+          }
+        } else {
+          int i;
+          uint16_t num;
+          H->map16[0] = malloc(4 * MAX_VALS * 2);
+          for (i = 0; i < 4; i++) {
+            fread(&num, 2, 1, F);
+            fread(H->map16[0][i], 2, num, F);
+          }
         }
       }
       if (ftell(F) & 0x01) fgetc(F);
