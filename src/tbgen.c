@@ -940,7 +940,7 @@ int main(int argc, char **argv)
 
   if ((save_to_disk && !symmetric && generate_wdl) || wide) {
     store_table(table_w, 'w');
-    if (wide && !symmetric)
+    if (!symmetric)
       store_table(table_b, 'b');
   }
 
