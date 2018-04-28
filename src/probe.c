@@ -2333,7 +2333,7 @@ uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
       litidx -= d->sizetable[block++] + 1;
   }
 
-  uint32_t *ptr = (uint32_t *)(d->data + (block << d->blocksize));
+  uint32_t *ptr = (uint32_t *)(d->data + ((uint64_t)block << d->blocksize));
 
   int m = d->min_len;
   uint16_t *offset = d->offset;
