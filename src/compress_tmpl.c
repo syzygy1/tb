@@ -16,10 +16,10 @@ void NAME(compress_init_dtz)(struct dtz_map *map)
 
   num_vals = map->max_num;
 
-  if (sizeof(T) == 1) {
-    for (i = 0; i < num_vals; i++) {
-      symtable[i].pattern[0] = i;
-      symtable[i].len = 1;
+  for (i = 0; i < num_vals; i++) {
+    symtable[i].pattern[0] = i;
+    symtable[i].len = 1;
+    if (sizeof(T) == 1) {
       for (j = 0; j < 256; j++)
         symcode[i][j] = i;
     }
