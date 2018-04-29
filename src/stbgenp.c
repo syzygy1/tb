@@ -1,3 +1,9 @@
+/*
+  Copyright (c) 2011-2013, 2018 Ronald de Man
+
+  This file is distributed under the terms of the GNU GPL, version 2.
+*/
+
 #define REDUCE_PLY 108
 #define REDUCE_PLY_RED 116
 //#define REDUCE_PLY 30
@@ -52,9 +58,6 @@
 
 #define BASE_LOSS_RED 0xf9
 #define BASE_CLOSS_RED 0xf8
-
-int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(int local);
 
 #define SET_CHANGED(x) \
 { uint8_t dummy = CHANGED; \
@@ -226,7 +229,7 @@ static void set_tbl_to_wdl(int saves)
   }
 }
 
-void calc_broken(struct thread_data *thread)
+static void calc_broken(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i;
@@ -269,7 +272,8 @@ void calc_broken(struct thread_data *thread)
   }
 }
 
-int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
+static int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -330,7 +334,7 @@ MARK(mark_capt_losses)
 
 static int captured_piece;
 
-void probe_last_capture_w(struct thread_data *thread)
+static void probe_last_capture_w(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -342,7 +346,7 @@ void probe_last_capture_w(struct thread_data *thread)
   }
 }
 
-void probe_captures_w(struct thread_data *thread)
+static void probe_captures_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -381,7 +385,7 @@ void probe_captures_w(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void probe_last_capture_b(struct thread_data *thread)
+static void probe_last_capture_b(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -393,7 +397,7 @@ void probe_last_capture_b(struct thread_data *thread)
   }
 }
 
-void probe_captures_b(struct thread_data *thread)
+static void probe_captures_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -432,7 +436,7 @@ void probe_captures_b(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void probe_last_pivot_capture(struct thread_data *thread)
+static void probe_last_pivot_capture(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT_NOPROBE;
 
@@ -444,7 +448,7 @@ void probe_last_pivot_capture(struct thread_data *thread)
   }
 }
 
-void probe_pivot_captures(struct thread_data *thread)
+static void probe_pivot_captures(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT;
   int has_cursed = 0;
@@ -482,7 +486,7 @@ void probe_pivot_captures(struct thread_data *thread)
   if (has_cursed) cursed_capt[0] |= has_cursed;
 }
 
-void calc_captures_w(void)
+static void calc_captures_w(void)
 {
   int i;
   int n = numpcs;
@@ -505,7 +509,7 @@ void calc_captures_w(void)
   }
 }
 
-void calc_captures_b(void)
+static void calc_captures_b(void)
 {
   int i;
   int n = numpcs;
@@ -576,7 +580,7 @@ int *iter_pcs;
 int *iter_pcs_opp;
 uint8_t tbl[256];
 
-void iter(struct thread_data *thread)
+static void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
@@ -648,7 +652,7 @@ void iter(struct thread_data *thread)
 
 static int iter_wtm;
 
-void run_iter(void)
+static void run_iter(void)
 {
   if (iter_wtm) {
     iter_table = table_w;
@@ -668,9 +672,9 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void find_draw_threats(struct thread_data *thread);
+static void find_draw_threats(struct thread_data *thread);
 
-void iterate()
+static void iterate()
 {
   int i;
   iter_wtm = 1;
@@ -830,7 +834,7 @@ void iterate()
   }
 }
 
-void set_draw_threats(void)
+static void set_draw_threats(void)
 {
   int i;
 
@@ -861,7 +865,7 @@ MARK(mark_threat_draws)
   MARK_END;
 }
 
-void find_draw_threats(struct thread_data *thread)
+static void find_draw_threats(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
   uint8_t *table = iter_table;
@@ -875,7 +879,7 @@ void find_draw_threats(struct thread_data *thread)
   }
 }
 
-void calc_last_pawn_capture_w(struct thread_data *thread)
+static void calc_last_pawn_capture_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -892,7 +896,7 @@ void calc_last_pawn_capture_w(struct thread_data *thread)
   }
 }
 
-void calc_last_pawn_capture_b(struct thread_data *thread)
+static void calc_last_pawn_capture_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -909,7 +913,8 @@ void calc_last_pawn_capture_b(struct thread_data *thread)
   }
 }
 
-int probe_pawn_capt(int k, int sq, uint64_t idx, int clr, int wtm, bitboard occ, int *p)
+static int probe_pawn_capt(int k, int sq, uint64_t idx, int clr, int wtm,
+    bitboard occ, int *p)
 {
   int i, m;
   int v;
@@ -959,7 +964,7 @@ int probe_pawn_capt(int k, int sq, uint64_t idx, int clr, int wtm, bitboard occ,
   return best;
 }
 
-void calc_pawn_captures_w(struct thread_data *thread)
+static void calc_pawn_captures_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
   int has_cursed = 0;
@@ -983,7 +988,7 @@ void calc_pawn_captures_w(struct thread_data *thread)
     cursed_pawn_capt_w = 1;
 }
 
-void calc_pawn_captures_b(struct thread_data *thread)
+static void calc_pawn_captures_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
   int has_cursed = 0;
@@ -1038,7 +1043,7 @@ static int has_moves(int *pcs, bitboard occ, int *p)
   return 0;
 }
 
-void calc_pawn_moves_w(struct thread_data *thread)
+static void calc_pawn_moves_w(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i, k;
@@ -1116,7 +1121,7 @@ lab:
     has_cursed_pawn_moves = 1;
 }
 
-void calc_pawn_moves_b(struct thread_data *thread)
+static void calc_pawn_moves_b(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i, k;
@@ -1202,7 +1207,7 @@ MARK(reset_capts)
   MARK_END;
 }
 
-void reset_captures_w(struct thread_data *thread)
+static void reset_captures_w(struct thread_data *thread)
 {
   uint64_t idx;
   int i = captured_piece;
@@ -1225,7 +1230,7 @@ void reset_captures_w(struct thread_data *thread)
   }
 }
 
-void reset_captures_b(struct thread_data *thread)
+static void reset_captures_b(struct thread_data *thread)
 {
   uint64_t idx;
   int i = captured_piece;
@@ -1248,7 +1253,7 @@ void reset_captures_b(struct thread_data *thread)
   }
 }
 
-void reset_pivot_captures(struct thread_data *thread)
+static void reset_pivot_captures(struct thread_data *thread)
 {
   uint64_t idx;
   int j, k;
@@ -1280,7 +1285,7 @@ void reset_pivot_captures(struct thread_data *thread)
   }
 }
 
-void reset_piece_captures(void)
+static void reset_piece_captures(void)
 {
   int i;
   int n = numpcs;
@@ -1306,7 +1311,7 @@ void reset_piece_captures(void)
   }
 }
 
-void reset_pawn_captures_w(struct thread_data *thread)
+static void reset_pawn_captures_w(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i, k;
@@ -1334,7 +1339,7 @@ void reset_pawn_captures_w(struct thread_data *thread)
   }
 }
 
-void reset_pawn_captures_b(struct thread_data *thread)
+static void reset_pawn_captures_b(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i, k;
@@ -1362,7 +1367,7 @@ void reset_pawn_captures_b(struct thread_data *thread)
   }
 }
 
-void reset_pawn_captures_unthreaded(void)
+static void reset_pawn_captures_unthreaded(void)
 {
   uint64_t idx, idx2;
   uint64_t size_p;
@@ -1394,7 +1399,7 @@ void reset_pawn_captures_unthreaded(void)
   printf("\n\n");
 }
 
-void reset_pawn_captures_threaded(void)
+static void reset_pawn_captures_threaded(void)
 {
   uint64_t idx, idx2;
   uint64_t size_p;

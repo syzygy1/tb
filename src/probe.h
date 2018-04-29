@@ -148,6 +148,8 @@ struct TBHashEntry {
   struct TBEntry *ptr;
 };
 
+int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
+
 uint64_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos,
     uint64_t *factor);
 void decode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos,

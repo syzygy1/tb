@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -29,9 +29,6 @@
 #define WIN_IN_ONE 2
 #define CAPT_CWIN (WIN_IN_ONE + DRAW_RULE)
 #define CAPT_CWIN_RED (WIN_IN_ONE + 1)
-
-int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(void);
 
 #define SET_CHANGED(x) \
 do { uint8_t dummy = CHANGED; \
@@ -74,7 +71,8 @@ uint8_t capt_val[6] = {
 
 // check whether all moves end up in wins for the opponent
 // if we are here, all captures are losing
-static int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
+static int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -136,7 +134,8 @@ lab:
 }
 #endif
 
-static int check_mate(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
+static int check_mate(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -486,7 +485,7 @@ int *iter_pcs;
 int *iter_pcs_opp;
 uint8_t tbl[256];
 
-void iter(struct thread_data *thread)
+static void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
@@ -537,7 +536,7 @@ void iter(struct thread_data *thread)
 static int iter_cnt;
 static int iter_wtm;
 
-void run_iter(void)
+static void run_iter(void)
 {
   if (iter_wtm) {
     iter_table = table_w;
@@ -558,7 +557,7 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void iterate()
+static void iterate()
 {
   int i;
   iter_cnt = 0;
@@ -692,7 +691,7 @@ MARK(reset_capt_closs)
   MARK_END;
 }
 
-void reset_captures_worker_w(struct thread_data *thread)
+static void reset_captures_worker_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   p[i] = 0;
@@ -732,7 +731,7 @@ void reset_captures_worker_w(struct thread_data *thread)
   }
 }
 
-void reset_captures_worker_b(struct thread_data *thread)
+static void reset_captures_worker_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   p[i] = 0;
@@ -772,7 +771,7 @@ void reset_captures_worker_b(struct thread_data *thread)
   }
 }
 
-void reset_captures_w(void)
+static void reset_captures_w(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -808,7 +807,7 @@ void reset_captures_w(void)
   }
 }
 
-void reset_captures_b(void)
+static void reset_captures_b(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -846,7 +845,8 @@ void reset_captures_b(void)
 
 // CAPT_CLOSS means there is a capture into a cursed win, preventing a loss
 // we need to determine if there are regular moves into a slower cursed loss
-int compute_capt_closs(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
+static int compute_capt_closs(int *pcs, uint64_t idx0, uint8_t *table,
+    bitboard occ, int *p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -869,7 +869,7 @@ int compute_capt_closs(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, in
   return best;
 }
 
-void fix_closs_worker_w(struct thread_data *thread)
+static void fix_closs_worker_w(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -881,7 +881,7 @@ void fix_closs_worker_w(struct thread_data *thread)
   }
 }
 
-void fix_closs_worker_b(struct thread_data *thread)
+static void fix_closs_worker_b(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -893,7 +893,7 @@ void fix_closs_worker_b(struct thread_data *thread)
   }
 }
 
-void fix_closs_w(void)
+static void fix_closs_w(void)
 {
   int i;
 
@@ -922,7 +922,7 @@ void fix_closs_w(void)
   }
 }
 
-void fix_closs_b(void)
+static void fix_closs_b(void)
 {
   int i;
 

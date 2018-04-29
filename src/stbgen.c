@@ -1,3 +1,9 @@
+/*
+  Copyright (c) 2011-2013, 2018 Ronald de Man
+
+  This file is distributed under the terms of the GNU GPL, version 2.
+*/
+
 #define REDUCE_PLY 110
 #define REDUCE_PLY_RED 105
 //#define REDUCE_PLY 30
@@ -42,9 +48,6 @@
 //#define THREAT_CLOSS 0xfd
 #define THREAT_DRAW 0xfc
 #define BASE_LOSS (0xfb + 2)
-
-int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(void);
 
 // for clang:
 //#define VOLATILE volatile
@@ -125,7 +128,7 @@ __asm__( \
 uint8_t win_loss[256];
 uint8_t loss_win[256];
 
-void calc_broken(struct thread_data *thread)
+static void calc_broken(struct thread_data *thread)
 {
   uint64_t idx, idx2;
   int i;
@@ -149,7 +152,8 @@ void calc_broken(struct thread_data *thread)
 }
 
 // check whether all moves end up in wins for the opponent
-int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
+static int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
   uint64_t idx, idx2;
@@ -211,7 +215,7 @@ MARK(mark_capt_value, uint8_t v)
 
 static int captured_piece;
 
-void probe_last_capture_w(struct thread_data *thread)
+static void probe_last_capture_w(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -223,7 +227,7 @@ void probe_last_capture_w(struct thread_data *thread)
   }
 }
 
-void probe_captures_w(struct thread_data *thread)
+static void probe_captures_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -260,7 +264,7 @@ void probe_captures_w(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void probe_last_pivot_capture_b(struct thread_data *thread)
+static void probe_last_pivot_capture_b(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT_NOPROBE;
 
@@ -272,7 +276,7 @@ void probe_last_pivot_capture_b(struct thread_data *thread)
   }
 }
 
-void probe_pivot_captures_b(struct thread_data *thread)
+static void probe_pivot_captures_b(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT;
   int has_cursed = 0;
@@ -310,7 +314,7 @@ void probe_pivot_captures_b(struct thread_data *thread)
   if (has_cursed) cursed_capt[0] |= has_cursed;
 }
 
-void probe_last_capture_b(struct thread_data *thread)
+static void probe_last_capture_b(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -322,7 +326,7 @@ void probe_last_capture_b(struct thread_data *thread)
   }
 }
 
-void probe_captures_b(struct thread_data *thread)
+static void probe_captures_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -359,7 +363,7 @@ void probe_captures_b(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void calc_captures_w(void)
+static void calc_captures_w(void)
 {
   int i, k;
   int n = numpcs;
@@ -382,7 +386,7 @@ void calc_captures_w(void)
   }
 }
 
-void calc_captures_b(void)
+static void calc_captures_b(void)
 {
   int i, k;
   int n = numpcs;
@@ -491,7 +495,7 @@ int *iter_pcs;
 int *iter_pcs_opp;
 uint8_t tbl[256];
 
-void iter(struct thread_data *thread)
+static void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
@@ -550,7 +554,7 @@ void iter(struct thread_data *thread)
 static int iter_cnt;
 static int iter_wtm;
 
-void run_iter(void)
+static void run_iter(void)
 {
   if (iter_wtm) {
     iter_table = table_w;
@@ -571,9 +575,9 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void find_draw_threats(struct thread_data *thread);
+static void find_draw_threats(struct thread_data *thread);
 
-void iterate()
+static void iterate()
 {
   int i;
   iter_cnt = 0;
@@ -745,7 +749,7 @@ MARK(mark_threat_draws)
   MARK_END;
 }
 
-void find_draw_threats(struct thread_data *thread)
+static void find_draw_threats(struct thread_data *thread)
 {
   BEGIN_ITER;
   uint8_t *table = iter_table;
@@ -758,4 +762,3 @@ void find_draw_threats(struct thread_data *thread)
     RETRO(mark_threat_draws);
   }
 }
-

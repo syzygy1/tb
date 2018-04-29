@@ -32,6 +32,8 @@ static int white_king, black_king;
 //#define MAX_NARROW 50
 #define MAX_NARROW 240
 
+static void reduce_tables(int local);
+
 static uint64_t *work_g, *work_piv;
 static uint64_t *work_p, *work_part;
 

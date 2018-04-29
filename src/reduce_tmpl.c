@@ -6,7 +6,7 @@
 
 #define NAME(f) EVALUATOR(f,T)
 
-void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
+static void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
 {
   int i;
   FILE *F;
@@ -39,7 +39,8 @@ void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
   fclose(F);
 }
 
-void NAME(verify_stats)(T *table, uint64_t *tot_stats, struct dtz_map *map)
+static void NAME(verify_stats)(T *table, uint64_t *tot_stats,
+    struct dtz_map *map)
 {
   uint64_t stats[MAX_STAT(*table)];
   uint64_t stats2[MAX_STAT(*table)];
@@ -106,7 +107,7 @@ void NAME(verify_stats)(T *table, uint64_t *tot_stats, struct dtz_map *map)
     exit(EXIT_FAILURE);
 }
 
-void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
+static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
 {
   int i, k;
   int num = map->max_num;
@@ -217,7 +218,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
   }
 }
 
-void NAME(load_table)(T *table, char color)
+static void NAME(load_table)(T *table, char color)
 {
   FILE *F;
   char name[64];

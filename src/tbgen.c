@@ -31,6 +31,8 @@ static int white_king, black_king;
 //#define MAX_NARROW 50
 #define MAX_NARROW 240
 
+static void reduce_tables(void);
+
 uint64_t total_stats_w[MAX_STATS];
 uint64_t total_stats_b[MAX_STATS];
 

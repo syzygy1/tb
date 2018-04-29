@@ -322,7 +322,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     }
 }
 
-void collect_stats(int phase)
+static void collect_stats(int phase)
 {
   int i;
 
@@ -344,7 +344,7 @@ void collect_stats(int phase)
     stats_val += REDUCE_PLY_RED;
 }
 
-void print_stats(FILE *F, uint64_t *stats, int wtm)
+static void print_stats(FILE *F, uint64_t *stats, int wtm)
 {
   int i;
   uint64_t sum;
@@ -431,7 +431,7 @@ void print_stats(FILE *F, uint64_t *stats, int wtm)
   fprintf(F, "\n");
 }
 
-void print_longest(FILE *F, int switched)
+static void print_longest(FILE *F, int switched)
 {
   if (!switched) {
     if (lw_ply >= 0) {

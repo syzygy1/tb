@@ -30,9 +30,6 @@
 #define CAPT_CWIN (WIN_IN_ONE + DRAW_RULE)
 #define CAPT_CWIN_RED (WIN_IN_ONE + 1)
 
-int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(void);
-
 #define SET_CHANGED(x) \
 do { uint8_t dummy = CHANGED; \
 __asm__( \
@@ -542,7 +539,7 @@ int *iter_pcs;
 int *iter_pcs_opp;
 uint8_t tbl[256];
 
-void iter(struct thread_data *thread)
+static void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
@@ -597,7 +594,7 @@ void iter(struct thread_data *thread)
 static int iter_cnt;
 static int iter_wtm;
 
-void run_iter(void)
+static void run_iter(void)
 {
   if (iter_wtm) {
     iter_table = table_w;
@@ -618,7 +615,7 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void iterate(void)
+static void iterate(void)
 {
   int i;
   iter_cnt = 0;
@@ -778,7 +775,7 @@ MARK(reset_capt_closs)
   MARK_END;
 }
 
-void reset_captures_worker_w(struct thread_data *thread)
+static void reset_captures_worker_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -794,7 +791,7 @@ void reset_captures_worker_w(struct thread_data *thread)
   }
 }
 
-void reset_captures_worker_b(struct thread_data *thread)
+static void reset_captures_worker_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -810,7 +807,7 @@ void reset_captures_worker_b(struct thread_data *thread)
   }
 }
 
-void reset_captures_w(void)
+static void reset_captures_w(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -846,7 +843,7 @@ void reset_captures_w(void)
   }
 }
 
-void reset_captures_b(void)
+static void reset_captures_b(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -884,7 +881,7 @@ void reset_captures_b(void)
 
 // CAPT_CLOSS means there is a capture into a cursed win, preventing a loss
 // we need to determine if there are regular moves into a slower cursed loss
-int compute_capt_closs(int *restrict pcs, uint64_t idx0,
+static int compute_capt_closs(int *restrict pcs, uint64_t idx0,
     uint8_t *restrict table, bitboard occ, int *restrict p)
 {
   int sq;
@@ -927,7 +924,7 @@ int compute_capt_closs(int *restrict pcs, uint64_t idx0,
   return best;
 }
 
-void fix_closs_worker_w(struct thread_data *thread)
+static void fix_closs_worker_w(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -939,7 +936,7 @@ void fix_closs_worker_w(struct thread_data *thread)
   }
 }
 
-void fix_closs_worker_b(struct thread_data *thread)
+static void fix_closs_worker_b(struct thread_data *thread)
 {
   BEGIN_ITER;
 
@@ -951,7 +948,7 @@ void fix_closs_worker_b(struct thread_data *thread)
   }
 }
 
-void fix_closs_w(void)
+static void fix_closs_w(void)
 {
   int i;
 
@@ -978,7 +975,7 @@ void fix_closs_w(void)
   run_threaded(fix_closs_worker_w, work_g, 1);
 }
 
-void fix_closs_b(void)
+static void fix_closs_b(void)
 {
   int i;
 

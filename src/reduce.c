@@ -9,7 +9,7 @@
 
 static int reduce_cnt;
 
-void save_table(uint8_t *table, char color)
+static void save_table(uint8_t *table, char color)
 {
   int i;
   FILE *F;
@@ -83,7 +83,7 @@ void save_table(uint8_t *table, char color)
   fclose(F);
 }
 
-void reduce_tables(void)
+static void reduce_tables(void)
 {
   int i;
   uint8_t v[256];
@@ -191,7 +191,7 @@ void reduce_tables(void)
     reduce_cnt += REDUCE_PLY_RED;
 }
 
-void store_table(uint8_t *table, char color)
+static void store_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
@@ -220,7 +220,7 @@ void store_table(uint8_t *table, char color)
   fclose(F);
 }
 
-void unlink_table(char color)
+static void unlink_table(char color)
 {
   char name[64];
 
@@ -228,7 +228,7 @@ void unlink_table(char color)
   unlink(name);
 }
 
-void unlink_saves(char color)
+static void unlink_saves(char color)
 {
   char name[64];
 
