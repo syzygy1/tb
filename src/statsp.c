@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2016, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -8,13 +8,13 @@ static char pc[] = { 0, 'P', 'N', 'B', 'R', 'Q', 'K', 0, 0, 'p', 'n', 'b', 'r', 
 
 static char fen_buf[128];
 
-void print_fen(long64 idx, int wtm)
+void print_fen(uint64_t idx, int wtm)
 {
-  long64 idx2 = idx ^ pw_mask;
+  uint64_t idx2 = idx ^ pw_mask;
   int i, j;
   int n = numpcs;
   int p[MAX_PIECES];
-  ubyte bd[64];
+  uint8_t bd[64];
   char *str = fen_buf;
 
   memset(bd, 0, 64);
@@ -30,10 +30,10 @@ void print_fen(long64 idx, int wtm)
         cnt++;
       else {
         if (cnt > 0) {
-	  *str++ = '0' + cnt;
+          *str++ = '0' + cnt;
           cnt = 0;
         }
-	*str++ = pc[pt[bd[j]-1]];
+        *str++ = pc[pt[bd[j]-1]];
       }
     if (cnt) *str++ = '0' + cnt;
     if (i) *str++ = '/';
@@ -50,16 +50,16 @@ void print_fen(long64 idx, int wtm)
 
 static LOCK_T stats_mutex;
 
-long64 found_idx;
-ubyte *find_val_table;
-ubyte find_val_v;
+uint64_t found_idx;
+uint8_t *find_val_table;
+uint8_t find_val_v;
 
 void find_loop(struct thread_data *thread)
 {
-  long64 idx = begin + thread->begin;
-  long64 end = begin + thread->end;
-  ubyte *table = find_val_table;
-  ubyte v = find_val_v;
+  uint64_t idx = begin + thread->begin;
+  uint64_t end = begin + thread->end;
+  uint8_t *table = find_val_table;
+  uint8_t v = find_val_v;
 
   if (idx > found_idx) return;
 
@@ -74,37 +74,55 @@ void find_loop(struct thread_data *thread)
   }
 }
 
-long64 find_val(ubyte *table, ubyte v, long64 *work)
+uint64_t find_val(uint8_t *table, uint8_t v, uint64_t *work)
 {
-  found_idx = 0xffffffffffffffffULL;
+  found_idx = UINT64_MAX;
   find_val_table = table;
   find_val_v = v;
 
   run_threaded(find_loop, work, 0);
 
-  if (found_idx == 0xffffffffffffffffULL)
+  if (found_idx == UINT64_MAX) {
     fprintf(stderr, "find_val: not found!\n");
+    exit(EXIT_FAILURE);
+  }
 
   return found_idx;
 }
 
-void count_stats(struct thread_data *thread)
+uint8_t *count_stats_table_u8;
+
+void count_stats_u8(struct thread_data *thread)
 {
-  long64 idx;
-  long64 end = begin + thread->end;
-  long64 *stats = thread->stats;
-  ubyte *table = count_stats_table;
+  uint64_t idx;
+  uint64_t end = begin + thread->end;
+  uint64_t *stats = thread->stats;
+  uint8_t *table = count_stats_table_u8;
 
   for (idx = begin + thread->begin; idx < end; idx++)
     stats[table[idx]]++;
 }
 
+uint16_t *count_stats_table_u16;
+
+void count_stats_u16(struct thread_data *thread)
+{
+  uint64_t idx;
+  uint64_t end = begin + thread->end;
+  uint64_t *stats = thread->stats;
+  uint16_t *table = count_stats_table_u16;
+
+  for (idx = begin + thread->begin; idx < end; idx++)
+    stats[table[idx]]++;
+}
+
+uint64_t *thread_stats = NULL;
 int lw_ply = -1;
 int lb_ply = -1;
 int lcw_ply = -1;
 int lcb_ply = -1;
 int lw_clr, lb_clr, lcw_clr, lcb_clr;
-long64 lw_idx, lb_idx, lcw_idx, lcb_idx;
+uint64_t lw_idx, lb_idx, lcw_idx, lcb_idx;
 int glw_ply = -1;
 int glb_ply = -1;
 int glcw_ply = -1;
@@ -114,7 +132,10 @@ char glb_fen[128];
 char glcw_fen[128];
 char glcb_fen[128];
 
-void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, int local, long64 *work)
+static int stats_val[];
+
+static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
+    int phase, int local, uint64_t *work)
 {
   int i, j;
   int n;
@@ -122,11 +143,11 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
 
   sval = (local == 0) ? 0 : stats_val[local - 1];
 
-  for (i = 0; i < 256 * numthreads; i++)
+  for (i = 0; i < MAX_VALS * numthreads; i++)
     thread_stats[i] = 0;
 
-  count_stats_table = table;
-  run_threaded(count_stats, work, 0);
+  count_stats_table_u8 = table;
+  run_threaded(count_stats_u8, work, 0);
 
   if (local == 0)
     n = REDUCE_PLY - 2;
@@ -136,7 +157,7 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
 
 #ifndef SUICIDE
   for (i = 0; i < numthreads; i++) {
-    long64 *stats = thread_data[i].stats;
+    uint64_t *stats = thread_data[i].stats;
     if (local == 0) {
       total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
       total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN];
@@ -144,33 +165,33 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       total_stats[STAT_PAWN_CWIN] += stats[PAWN_CWIN];
       total_stats[STAT_MATE] += stats[MATE];
       for (j = 0; j < DRAW_RULE; j++) {
-	total_stats[1 + j] += stats[WIN_IN_ONE + j];
-	total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+        total_stats[1 + j] += stats[WIN_IN_ONE + j];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
       }
       for (; j < n; j++) {
-	total_stats[1 + j] += stats[WIN_IN_ONE + j + 2];
-	total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+        total_stats[1 + j] += stats[WIN_IN_ONE + j + 2];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
       }
       total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
     } else {
       for (j = 0; j < n; j++) {
-	total_stats[1 + sval + j] += stats[CAPT_CWIN_RED + j + 2];
-	total_stats[STAT_MATE - sval - j - 2] += stats[LOSS_IN_ONE - j - 1];
+        total_stats[1 + sval + j] += stats[CAPT_CWIN_RED + j + 2];
+        total_stats[STAT_MATE - sval - j - 2] += stats[LOSS_IN_ONE - j - 1];
       }
     }
   }
 #else
   for (i = 0; i < numthreads; i++) {
-    long64 *stats = thread_data[i].stats;
+    uint64_t *stats = thread_data[i].stats;
     if (local == 0) {
       total_stats[0] += stats[STALE_WIN];
       total_stats[1] += stats[STALE_WIN + 1];
       for (j = 2; j <= DRAW_RULE + 1; j++)
-	total_stats[j] += stats[BASE_WIN + j];
+        total_stats[j] += stats[BASE_WIN + j];
       for (; j < n + 1; j++)
-	total_stats[j] += stats[BASE_WIN + j + 2];
+        total_stats[j] += stats[BASE_WIN + j + 2];
       for (j = 0; j < n + 2; j++)
-	total_stats[STAT_MATE - j] += stats[BASE_LOSS - j];
+        total_stats[STAT_MATE - j] += stats[BASE_LOSS - j];
       total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
       total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN];
       total_stats[STAT_CAPT_DRAW] += stats[CAPT_DRAW];
@@ -182,8 +203,8 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       total_stats[STAT_THREAT_CWIN1] += stats[THREAT_CWIN1];
     } else {
       for (j = 0; j < n; j++) {
-	total_stats[1 + sval + j] += stats[BASE_CWIN_RED + 1 + j];
-	total_stats[STAT_MATE - sval - j - 2] += stats[BASE_CLOSS_RED - 1 - j];
+        total_stats[1 + sval + j] += stats[BASE_CWIN_RED + 1 + j];
+        total_stats[STAT_MATE - sval - j - 2] += stats[BASE_CLOSS_RED - 1 - j];
       }
     }
   }
@@ -199,17 +220,17 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       j = (i < 2) ? STALE_WIN + i : BASE_WIN + i;
 #endif
       if (wtm) {
-	if (i > lw_ply) {
-	  lw_ply = i;
-	  lw_clr = 1;
-	  lw_idx = find_val(table, j, work);
-	}
+        if (i > lw_ply) {
+          lw_ply = i;
+          lw_clr = 1;
+          lw_idx = find_val(table, j, work);
+        }
       } else {
-	if (i > lb_ply) {
-	  lb_ply = i;
-	  lb_clr = 0;
-	  lb_idx = find_val(table, j, work);
-	}
+        if (i > lb_ply) {
+          lb_ply = i;
+          lb_clr = 0;
+          lb_idx = find_val(table, j, work);
+        }
       }
     }
     for (i = DRAW_RULE; i >= 0; i--)
@@ -221,17 +242,17 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
       j = BASE_LOSS - i;
 #endif
       if (wtm) {
-	if (i > lb_ply) {
-	  lb_ply = i;
-	  lb_clr = 1;
-	  lb_idx = find_val(table, j, work);
-	}
+        if (i > lb_ply) {
+          lb_ply = i;
+          lb_clr = 1;
+          lb_idx = find_val(table, j, work);
+        }
       } else {
-	if (i > lw_ply) {
-	  lw_ply = i;
-	  lw_clr = 0;
-	  lw_idx = find_val(table, j, work);
-	}
+        if (i > lw_ply) {
+          lw_ply = i;
+          lw_clr = 0;
+          lw_idx = find_val(table, j, work);
+        }
       }
     }
   }
@@ -252,15 +273,15 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
 #endif
     if (wtm) {
       if (i > lcw_ply) {
-	lcw_ply = i;
-	lcw_clr = 1;
-	lcw_idx = find_val(table, j, work);
+        lcw_ply = i;
+        lcw_clr = 1;
+        lcw_idx = find_val(table, j, work);
       }
     } else {
       if (i > lcb_ply) {
-	lcb_ply = i;
-	lcb_clr = 0;
-	lcb_idx = find_val(table, j, work);
+        lcb_ply = i;
+        lcb_clr = 0;
+        lcb_idx = find_val(table, j, work);
       }
     }
   }
@@ -278,15 +299,15 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
 #endif
     if (wtm) {
       if (i > lcb_ply) {
-	lcb_ply = i;
-	lcb_clr = 1;
-	lcb_idx = find_val(table, j, work);
+        lcb_ply = i;
+        lcb_clr = 1;
+        lcb_idx = find_val(table, j, work);
       }
     } else {
       if (i > lcw_ply) {
-	lcw_ply = i;
-	lcw_clr = 0;
-	lcw_idx = find_val(table, j, work);
+        lcw_ply = i;
+        lcw_clr = 0;
+        lcw_idx = find_val(table, j, work);
       }
     }
   }
@@ -308,7 +329,7 @@ void collect_stats_table(long64 *total_stats, ubyte *table, int wtm, int phase, 
 #endif
 }
 
-void collect_stats(long64 *work, int phase, int local)
+void collect_stats(uint64_t *work, int phase, int local)
 {
   int i;
 
@@ -320,19 +341,19 @@ void collect_stats(long64 *work, int phase, int local)
   }
 
   if (thread_stats == NULL) {
-    thread_stats = (long64 *)alloc_aligned(8 * 256 * numthreads, 64);
+    thread_stats = (uint64_t *)alloc_aligned(8 * MAX_VALS * numthreads, 64);
     for (i = 0; i < numthreads; i++)
-      thread_data[i].stats = thread_stats + i * 256;
+      thread_data[i].stats = thread_stats + i * MAX_VALS;
   }
 
   collect_stats_table(total_stats_w, table_w, 1, phase, local, work);
   collect_stats_table(total_stats_b, table_b, 0, phase, local, work);
 }
 
-void print_stats(FILE *F, long64 *stats, int wtm)
+void print_stats(FILE *F, uint64_t *stats, int wtm)
 {
   int i;
-  long64 sum;
+  uint64_t sum;
 
   fprintf(F, "%s to move:\n\n", wtm ? "White" : "Black");
 

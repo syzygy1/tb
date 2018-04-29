@@ -13,6 +13,7 @@ $max = 4;
 GetOptions('threads=i' => \$threads,
 	   'generate' => \$generate,
 	   'verify' => \$verify,
+           'huffman' => \$huffman,
 	   'min=i' => \$min,
 	   'max=i' => \$max,
 	   'disk' => \$disk);
@@ -39,6 +40,13 @@ sub Process {
       system "rtbver -t $threads --log $tb";
     } else {
       system "rtbverp -t $threads --log $tb";
+    }
+  }
+  if ($huffman && -e $tb.".rtbw") {
+    if ($tb !~ /.*P.*/) {
+      system "rtbver -h $tb";
+    } else {
+      system "rtbverp -h $tb";
     }
   }
 }

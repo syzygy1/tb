@@ -7,9 +7,9 @@
 
 // implementations of _pext_u64 and _pdep_u64 for testing
 #if 0
-static long64 _pext_u64(long64 val, long64 mask)
+static uint64_t _pext_u64(uint64_t val, uint64_t mask)
 {
-  long64 res = 0;
+  uint64_t res = 0;
   int i = 0;
 
   while (mask) {
@@ -22,9 +22,9 @@ static long64 _pext_u64(long64 val, long64 mask)
   return res;
 }
 
-static long64 _pdep_u64(long64 val, long64 mask)
+static uint64_t _pdep_u64(uint64_t val, uint64_t mask)
 {
-  long64 res = 0;
+  uint64_t res = 0;
   int i = 0;
 
   while (mask) {
@@ -38,12 +38,12 @@ static long64 _pdep_u64(long64 val, long64 mask)
 #endif
 
 struct BMI2Info {
-  ushort *data;
+  uint16_t *data;
   bitboard mask1;
   bitboard mask2;
 };
 
-extern ushort attack_table[107648];
+extern uint16_t attack_table[107648];
 extern struct BMI2Info bishop_bmi2[64];
 extern struct BMI2Info rook_bmi2[64];
 

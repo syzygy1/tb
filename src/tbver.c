@@ -1,74 +1,63 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
+#include <getopt.h>
+#include <inttypes.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <getopt.h>
-#include <stdarg.h>
-#include <inttypes.h>
+
+#include "board.h"
+#include "decompress.h"
 #include "defs.h"
 #include "threads.h"
-#include "board.h"
 #include "util.h"
+
+#ifndef SUICIDE
+static int white_king, black_king;
+#endif
 
 #include "probe.c"
 #include "board.c"
 
-#define MAXPIECES 8
-
-struct tb_handle;
-
-void decomp_init_piece(int *pcs);
-struct tb_handle *open_tb(char *tablename, int wdl);
-void decomp_init_table(struct tb_handle *H);
-ubyte *decompress_table(struct tb_handle *H, int bside, int f);
-void close_tb(struct tb_handle *H);
-void set_perm(struct tb_handle *H, int bside, int f, int *perm, int *pt);
-struct TBEntry *get_entry(struct tb_handle *H);
-int get_ply_accurate_win(struct tb_handle *H, int f);
-int get_ply_accurate_loss(struct tb_handle *H, int f);
-int get_dtz_side(struct tb_handle *H, int f);
-ubyte (*get_dtz_map(struct tb_handle *H, int f))[256];
+#define MAX_PIECES 8
 
 void error(char *str, ...);
 
 extern int use_envdirs;
 
 extern int total_work;
-extern struct thread_data thread_data[];
+extern struct thread_data *thread_data;
 extern int numthreads;
 extern struct timeval start_time, cur_time;
 
-static long64 *work_g;
+static uint64_t *work_g;
 #ifndef SMALL
-static long64 *work_piv;
+static uint64_t *work_piv;
 #else
-static long64 *work_piv0, *work_piv1;
+static uint64_t *work_piv0, *work_piv1;
 #endif
 
-ubyte *table_w, *table_b;
+uint8_t *table_w, *table_b;
 int numpcs;
 int numpawns = 0;
 int ply_accurate_win, ply_accurate_loss;
 //int dtz_side;
-ubyte *load_table;
+uint8_t *load_table;
 int load_bside;
 struct TBEntry_piece *load_entry;
-ubyte *load_opp_table;
+uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
-ubyte (*load_map)[256];
-ubyte *tb_table;
-int tb_perm[MAXPIECES];
+uint8_t (*load_map)[256];
+uint8_t *tb_table;
+int tb_perm[MAX_PIECES];
 
-static long64 size;
+static uint64_t size;
 
-#ifndef SUICIDE
-static int white_king, black_king;
-#endif
 static int white_pcs[MAX_PIECES], black_pcs[MAX_PIECES];
 static int pt[MAX_PIECES];
 #ifndef SUICIDE
@@ -118,13 +107,39 @@ void error(char *str, ...)
   num_errors++;
   if (num_errors == 10) {
     if (log) fclose(L);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
+}
+
+static void check_huffman_tb(int wdl)
+{
+  struct tb_handle *F = open_tb(tablename, wdl);
+  decomp_init_table(F);
+  struct TBEntry_piece *entry = &(F->entry_piece);
+  printf("%s%s:", tablename, wdl ? WDLSUFFIX : DTZSUFFIX);
+  int m0 = entry->precomp[0]->max_len;
+  printf(" %d", m0);
+  int m1 = 0;
+  if (F->split) {
+    m1 = entry->precomp[1]->max_len;
+    printf(" %d", m1);
+  }
+  if (m0 >= 32 || m1 >= 32)
+    printf(" ----- WARNING!!!!!");
+  printf("\n");
+  close_tb(F);
+}
+
+static void check_huffman()
+{
+  check_huffman_tb(1);
+  check_huffman_tb(0);
 }
 
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
   { "log", 0, NULL, 'l' },
+  { "huffman", 0, NULL, 'h' },
 //  { "wdl", 0, NULL, 'w' },
   { 0, 0, NULL, 0 }
 };
@@ -136,6 +151,7 @@ int main(int argc, char **argv)
   int val, longindex;
   int pcs[16];
   int wdl_only = 0;
+  int check_huff = 0;
 #ifdef SUICIDE
   int switched = 0;
 #endif
@@ -144,7 +160,7 @@ int main(int argc, char **argv)
 
   do {
 //    val = getopt_long(argc, argv, "t:lwc", options, &longindex);
-    val = getopt_long(argc, argv, "t:ld", options, &longindex);
+    val = getopt_long(argc, argv, "t:ldh", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -158,16 +174,17 @@ int main(int argc, char **argv)
     case 'd':
       use_envdirs = 1;
       break;
+    case 'h':
+      check_huff = 1;
+      break;
     }
   } while (val != EOF);
 
   if (optind >= argc) {
     fprintf(stderr, "No tablebase specified.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   tablename = argv[optind];
-
-  init_tablebases();
 
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
@@ -202,18 +219,27 @@ int main(int argc, char **argv)
       pt[j++] = KING | color;
       break;
     case 'v':
-      if (color) exit(1);
+      if (color) exit(EXIT_FAILURE);
       color = 0x08;
       break;
     default:
-      exit(1);
+      exit(EXIT_FAILURE);
     }
-  if (!color) exit(1);
+  if (!color) exit(EXIT_FAILURE);
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
     fprintf(stderr, "Can't handle pawns.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
+
+  decomp_init_piece(pcs);
+
+  if (check_huff) {
+    check_huffman();
+    return 0;
+  }
+
+  init_tablebases();
 
   if (numthreads < 1) numthreads = 1;
 
@@ -270,9 +296,9 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     for (j = i + 1; j < numpcs; j++)
       if (piece_order[pt[i]] > piece_order[pt[j]]) {
-	int tmp = pt[i];
-	pt[i] = pt[j];
-	pt[j] = tmp;
+        int tmp = pt[i];
+        pt[i] = pt[j];
+        pt[j] = tmp;
       }
 
   for (i = 0, j = 0; i < numpcs; i++)
@@ -340,8 +366,6 @@ int main(int argc, char **argv)
   iter_pcs_opp = black_pcs;
   run_threaded(calc_threats, work_g, 1);
 #endif
-
-  decomp_init_piece(pcs);
 
   // open wdl table
   struct tb_handle *H = open_tb(tablename, 1);
@@ -449,4 +473,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-

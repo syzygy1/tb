@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -36,18 +36,15 @@
 #define WIN_RED 2
 #define CAPT_CWIN_RED (WIN_RED + 1)
 
-int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
-void reduce_tables(int local);
-
 #define SET_CHANGED(x) \
-{ ubyte dummy = CHANGED; \
+{ uint8_t dummy = CHANGED; \
 __asm__( \
 "movb %2, %%al\n\t" \
 "lock cmpxchgb %1, %0" \
 : "+m" (x), "+r" (dummy) : "i" (UNKNOWN) : "eax"); }
 
 #define SET_CAPT_VALUE(x,v) \
-{ ubyte dummy = v; __asm__( \
+{ uint8_t dummy = v; __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
 "cmpb %1, %%al\n\t" \
@@ -58,7 +55,7 @@ __asm__( \
 : "+m" (x), "+r" (dummy) : : "eax"); }
 
 #define SET_WIN_VALUE(x,v) \
-{ ubyte dummy = v; \
+{ uint8_t dummy = v; \
 __asm__( \
 "movb %0, %%al\n" \
 "0:\n\t" \
@@ -69,13 +66,13 @@ __asm__( \
 "1:" \
 : "+m" (x), "+r" (dummy) : : "eax"); }
 
-ubyte win_loss[256];
-ubyte loss_win[256];
+uint8_t win_loss[256];
+uint8_t loss_win[256];
 char tbl_to_wdl[256];
-ubyte wdl_to_tbl[8] = {
+uint8_t wdl_to_tbl[8] = {
   0xff, 0xff, CHANGED, CAPT_CLOSS, CAPT_DRAW, CAPT_CWIN, CAPT_WIN, 0xff
 };
-ubyte wdl_to_tbl_pawn[8] = {
+uint8_t wdl_to_tbl_pawn[8] = {
   0xff, 0xff, CHANGED, CAPT_CLOSS, PAWN_DRAW, PAWN_CWIN, PAWN_WIN, 0xff
 };
 
@@ -108,11 +105,11 @@ static void set_tbl_to_wdl(int saves)
 
 // check whether all moves end up in wins for the opponent
 // we already know there are no legal captures
-int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
-		bitboard occ, int *restrict p)
+static int check_loss(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
   int best = LOSS_IN_ONE;
 
@@ -133,7 +130,7 @@ int check_loss(int *restrict pcs, long64 idx0, ubyte *restrict table,
   return best;
 }
 
-int is_attacked(int sq, int *restrict pcs, bitboard occ, int *restrict p)
+static int is_attacked(int sq, int *pcs, bitboard occ, int *p)
 {
   int k;
 
@@ -145,12 +142,12 @@ int is_attacked(int sq, int *restrict pcs, bitboard occ, int *restrict p)
   return 0;
 }
 
-// pawn moves and captures should be taken care of already
-int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
-		bitboard occ, int *restrict p)
+// pawn moves and captures have been taken care of already
+static int check_mate(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
 
   do {
@@ -169,89 +166,89 @@ int check_mate(int *restrict pcs, long64 idx0, ubyte *restrict table,
 }
 
 #if 1
-void calc_broken(struct thread_data *thread)
+static void calc_broken(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
 
   for (idx = thread->begin; idx < end; idx += 64) {
     FILL_OCC64_cheap {
       for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	if (occ & bb)
-	  table_w[idx + i] = table_b[idx + i] = BROKEN;
-	else
-	  table_w[idx + i] = table_b[idx + i] = UNKNOWN;
+        if (occ & bb)
+          table_w[idx + i] = table_b[idx + i] = BROKEN;
+        else
+          table_w[idx + i] = table_b[idx + i] = UNKNOWN;
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = BROKEN;
+        table_w[idx + i] = table_b[idx + i] = BROKEN;
     }
   }
 }
 #else
-void calc_broken(struct thread_data *thread)
+static void calc_broken(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb;
-  long64 end = thread->end;
+  uint64_t end = thread->end;
   int p[MAX_PIECES];
 
   for (idx = thread->begin; idx < end; idx += 64) {
     FILL_OCC64 {
       if (n == numpawns) { // FIXME: only possible in suicide?
-	for (i = 0; i < 8; i++)
-	  table_w[idx + i] = table_b[idx + i] = BROKEN;
-	for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = table_b[idx + i] = BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = UNKNOWN;
-	    p[n -1] = i; 
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = ILLEGAL;
-	  }
-	for (; i < 64; i++)
-	  table_w[idx + i] = table_b[idx + i] = BROKEN;
+        for (i = 0; i < 8; i++)
+          table_w[idx + i] = table_b[idx + i] = BROKEN;
+        for (bb = 1ULL << 8; i < 56; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = table_b[idx + i] = BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = UNKNOWN;
+            p[n -1] = i; 
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = ILLEGAL;
+          }
+        for (; i < 64; i++)
+          table_w[idx + i] = table_b[idx + i] = BROKEN;
       } else {
-	for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
-	  if (occ & bb) {
-	    table_w[idx + i] = table_b[idx + i] = BROKEN;
-	  } else {
-	    table_w[idx + i] = table_b[idx + i] = UNKNOWN;
-	    p[n - 1] = i;
-	    if (is_attacked(p[black_king], white_all, occ | bb, p))
-	      table_w[idx + i] = ILLEGAL;
-	    if (is_attacked(p[white_king], black_all, occ | bb, p))
-	      table_b[idx + i] = ILLEGAL;
-	  }
+        for (i = 0, bb = 1ULL; i < 64; i++, bb <<= 1)
+          if (occ & bb) {
+            table_w[idx + i] = table_b[idx + i] = BROKEN;
+          } else {
+            table_w[idx + i] = table_b[idx + i] = UNKNOWN;
+            p[n - 1] = i;
+            if (is_attacked(p[black_king], white_all, occ | bb, p))
+              table_w[idx + i] = ILLEGAL;
+            if (is_attacked(p[white_king], black_all, occ | bb, p))
+              table_b[idx + i] = ILLEGAL;
+          }
       }
     } else {
       // two or more on one square or a pawn on rank 1 or 8
       for (i = 0; i < 64; i++)
-	table_w[idx + i] = table_b[idx + i] = BROKEN;
+        table_w[idx + i] = table_b[idx + i] = BROKEN;
     }
   }
 }
 #endif
 
-void calc_mates(struct thread_data *thread)
+static void calc_mates(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
   bitboard occ, bb = thread->occ;
   int *p = thread->p;
-  long64 end = begin + thread->end;
+  uint64_t end = begin + thread->end;
 
   for (idx = begin + thread->begin; idx < end; idx++) {
     if (table_w[idx] == BROKEN) continue;
@@ -261,10 +258,10 @@ void calc_mates(struct thread_data *thread)
     FILL_OCC_PIECES;
     if (chk_w) {
       if (table_w[idx] == UNKNOWN && check_mate(white_pcs, idx, table_b, occ, p))
-	table_w[idx] = MATE;
+        table_w[idx] = MATE;
     } else {
       if (table_b[idx] == UNKNOWN && check_mate(black_pcs, idx, table_w, occ, p))
-	table_b[idx] = MATE;
+        table_b[idx] = MATE;
     }
   }
 }
@@ -331,7 +328,7 @@ MARK(mark_win_in_1)
 
 static int captured_piece;
 
-void calc_illegal_w(struct thread_data *thread)
+static void calc_illegal_w(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -343,7 +340,7 @@ void calc_illegal_w(struct thread_data *thread)
   }
 }
 
-void calc_illegal_b(struct thread_data *thread)
+static void calc_illegal_b(struct thread_data *thread)
 {
   BEGIN_CAPTS_NOPROBE;
 
@@ -355,7 +352,7 @@ void calc_illegal_b(struct thread_data *thread)
   }
 }
 
-void probe_captures_w(struct thread_data *thread)
+static void probe_captures_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -369,25 +366,25 @@ void probe_captures_w(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_WHITE_PIECES(mark_capt_wins);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_WHITE_PIECES(mark_capt_cursed_wins);
-	break;
+        has_cursed |= 1;
+        LOOP_WHITE_PIECES(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_WHITE_PIECES(mark_capt_draws);
-	break;
+        LOOP_WHITE_PIECES(mark_capt_draws);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_WHITE_PIECES(mark_capt_cursed_losses);
-	break;
+        has_cursed |= 2;
+        LOOP_WHITE_PIECES(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_WHITE_PIECES(mark_changed);
-	break;
+        LOOP_WHITE_PIECES(mark_changed);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -395,7 +392,7 @@ void probe_captures_w(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void probe_captures_b(struct thread_data *thread)
+static void probe_captures_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
   int has_cursed = 0;
@@ -409,25 +406,25 @@ void probe_captures_b(struct thread_data *thread)
       MAKE_IDX2;
       switch (v) {
       case -2:
-	LOOP_BLACK_PIECES(mark_capt_wins);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_BLACK_PIECES(mark_capt_cursed_wins);
-	break;
+        has_cursed |= 1;
+        LOOP_BLACK_PIECES(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_BLACK_PIECES(mark_capt_draws);
-	break;
+        LOOP_BLACK_PIECES(mark_capt_draws);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_BLACK_PIECES(mark_capt_cursed_losses);
-	break;
+        has_cursed |= 2;
+        LOOP_BLACK_PIECES(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_BLACK_PIECES(mark_changed);
-	break;
+        LOOP_BLACK_PIECES(mark_changed);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -435,7 +432,7 @@ void probe_captures_b(struct thread_data *thread)
   if (has_cursed) cursed_capt[i] |= has_cursed;
 }
 
-void probe_pivot_captures(struct thread_data *thread)
+static void probe_pivot_captures(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT;
   int has_cursed = 0;
@@ -448,25 +445,25 @@ void probe_pivot_captures(struct thread_data *thread)
       MAKE_IDX2_PIVOT;
       switch (v) {
       case -2:
-	LOOP_PIECES_PIVOT(mark_capt_wins);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_wins);
+        break;
       case -1:
-	has_cursed |= 1;
-	LOOP_PIECES_PIVOT(mark_capt_cursed_wins);
-	break;
+        has_cursed |= 1;
+        LOOP_PIECES_PIVOT(mark_capt_cursed_wins);
+        break;
       case 0:
-	LOOP_PIECES_PIVOT(mark_capt_draws);
-	break;
+        LOOP_PIECES_PIVOT(mark_capt_draws);
+        break;
       case 1:
-	has_cursed |= 2;
-	LOOP_PIECES_PIVOT(mark_capt_cursed_losses);
-	break;
+        has_cursed |= 2;
+        LOOP_PIECES_PIVOT(mark_capt_cursed_losses);
+        break;
       case 2:
-	LOOP_PIECES_PIVOT(mark_changed);
-	break;
+        LOOP_PIECES_PIVOT(mark_changed);
+        break;
       default:
-	assume(0);
-	break;
+        assume(0);
+        break;
       }
     }
   }
@@ -476,7 +473,7 @@ void probe_pivot_captures(struct thread_data *thread)
 
 static int capturing_pawn;
 
-void calc_pawn_illegal_w(struct thread_data *thread)
+static void calc_pawn_illegal_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
   int k = capturing_pawn;
@@ -490,7 +487,7 @@ void calc_pawn_illegal_w(struct thread_data *thread)
   }
 }
 
-void calc_pawn_illegal_b(struct thread_data *thread)
+static void calc_pawn_illegal_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
   int k = capturing_pawn;
@@ -504,7 +501,7 @@ void calc_pawn_illegal_b(struct thread_data *thread)
   }
 }
 
-void calc_captures_w(void)
+static void calc_captures_w(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -522,7 +519,7 @@ void calc_captures_w(void)
     if (!(pt[i] & 0x08) || i == black_king) continue;
     for (k = 0, j = 0; black_all[k] >= 0; k++)
       if (black_all[k] != i)
-	pcs2[j++] = black_all[k];
+        pcs2[j++] = black_all[k];
     pcs2[j] = -1;
     if (i) {
       captured_piece = i;
@@ -532,7 +529,7 @@ void calc_captures_w(void)
   }
 }
 
-void calc_captures_b(void)
+static void calc_captures_b(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -560,17 +557,17 @@ void calc_captures_b(void)
   }
 }
 
-ubyte *iter_table, *iter_table_opp;
+uint8_t *iter_table, *iter_table_opp;
 int *iter_pcs;
 int *iter_pcs_opp;
-ubyte tbl[256];
+uint8_t tbl[256];
 
-void iter(struct thread_data *thread)
+static void iter(struct thread_data *thread)
 {
   BEGIN_ITER;
   int not_fin = 0;
-  ubyte *restrict table = iter_table;
-  ubyte *restrict table_opp = iter_table_opp;
+  uint8_t *restrict table = iter_table;
+  uint8_t *restrict table_opp = iter_table_opp;
   int *restrict pcs = iter_pcs;
   int *restrict pcs_opp = iter_pcs_opp;
 
@@ -584,10 +581,10 @@ void iter(struct thread_data *thread)
     case 1: /* CHANGE */
       v = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-	table[idx] = v;
-	RETRO(mark_wins, loss_win[v]);
+        table[idx] = v;
+        RETRO(mark_wins, loss_win[v]);
       } else {
-	table[idx] = UNKNOWN;
+        table[idx] = UNKNOWN;
       }
       break;
     case 2: /* normal WIN, including CAPT_WIN, WIN_IN_ONE */
@@ -599,12 +596,12 @@ void iter(struct thread_data *thread)
     case 4: /* CAPT_CLOSS */
       v  = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-	if (v > LOSS_IN_ONE - DRAW_RULE)
-	  v = LOSS_IN_ONE - DRAW_RULE;
-	table[idx] = v;
-	RETRO(mark_wins, loss_win[v]);
+        if (v > LOSS_IN_ONE - DRAW_RULE)
+          v = LOSS_IN_ONE - DRAW_RULE;
+        table[idx] = v;
+        RETRO(mark_wins, loss_win[v]);
       } else {
-	table[idx] = UNKNOWN;
+        table[idx] = UNKNOWN;
       }
       break;
     default:
@@ -619,7 +616,7 @@ void iter(struct thread_data *thread)
 
 static int iter_wtm;
 
-void run_iter(void)
+static void run_iter(void)
 {
   if (iter_wtm) {
     iter_table = table_w;
@@ -639,7 +636,7 @@ void run_iter(void)
   iter_wtm ^= 1;
 }
 
-void iterate()
+static void iterate()
 {
   int i;
   iter_wtm = 0;
@@ -737,14 +734,14 @@ void iterate()
 
     while (!finished) {
       if (num_saves == 0)
-	set_tbl_to_wdl(1);
+        set_tbl_to_wdl(1);
       reduce_tables(local_num_saves);
       local_num_saves++;
 
       for (i = 0; i < 256; i++)
-	win_loss[i] = loss_win[i] = 0;
+        win_loss[i] = loss_win[i] = 0;
       for (i = 0; i <= CAPT_CWIN_RED + 1; i++)
-	win_loss[i] = 0xff;
+        win_loss[i] = 0xff;
 
       ply = 0;
       tbl[CAPT_CWIN_RED + ply + 3] = 2;
@@ -752,13 +749,13 @@ void iterate()
       loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
 
       while (ply < REDUCE_PLY_RED && !finished) {
-	finished = 1;
-	ply++;
-	tbl[CAPT_CWIN_RED + ply + 1] = 0;
-	tbl[CAPT_CWIN_RED + ply + 3] = 2;
-	win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
-	loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
-	run_iter();
+        finished = 1;
+        ply++;
+        tbl[CAPT_CWIN_RED + ply + 1] = 0;
+        tbl[CAPT_CWIN_RED + ply + 3] = 2;
+        win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
+        loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
+        run_iter();
       }
 
       tbl[CAPT_CWIN_RED + ply + 2] = 0;
@@ -773,8 +770,8 @@ void iterate()
 }
 
 // returns -4, -2, -1, 0, 1, 2
-int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
-		    bitboard occ, int *restrict p)
+static int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr,
+    int wtm, bitboard occ, int *restrict p)
 {
   int i, m;
   int v;
@@ -792,13 +789,13 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && ((pt[i] & 0x08) != clr))
-	  pcs[m++] = i;
+        if (i != t && ((pt[i] & 0x08) != clr))
+          pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pt2[t] = 0;
       pos[k] = sq2;
@@ -813,22 +810,22 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && (pt[i] & 0x08) != clr)
-	  pcs[m++] = i;
+        if (i != t && (pt[i] & 0x08) != clr)
+          pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pt2[t] = 0;
       pos[k] = sq2;
       if (best < -2) best = -2;
       for (m = QUEEN; m >= KNIGHT; m--) {
-	pt2[k] = m | (pt[k] & 0x08);
-	v = -probe_tb(pt2, pos, wtm, occ, -2, -best);
-	if (v > 1) return v;
-	if (v > best) best = v;
+        pt2[k] = m | (pt[k] & 0x08);
+        v = -probe_tb(pt2, pos, wtm, occ, -2, -best);
+        if (v > 1) return v;
+        if (v > best) best = v;
       }
     }
   }
@@ -836,15 +833,15 @@ int probe_pawn_capt(int k, int sq, long64 idx, int king, int clr, int wtm,
   return best;
 }
 
-static ubyte wdl_to_cursed[8] = {
+static uint8_t wdl_to_cursed[8] = {
   0, 0, 0, 1, 0, 2, 0, 0
 };
 
 // TODO: consider updating 'alpha'
-void calc_pawn_captures_w(struct thread_data *thread)
+static void calc_pawn_captures_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte has_cursed = 0;
+  uint8_t has_cursed = 0;
 
   LOOP_ITER_ALL {
     if (table_w[idx] == BROKEN || table_w[idx] <= CAPT_WIN) continue;
@@ -864,10 +861,10 @@ void calc_pawn_captures_w(struct thread_data *thread)
   if (has_cursed) cursed_pawn_capt_w |= has_cursed;
 }
 
-void calc_pawn_captures_b(struct thread_data *thread)
+static void calc_pawn_captures_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte has_cursed = 0;
+  uint8_t has_cursed = 0;
 
   LOOP_ITER_ALL {
     if (table_b[idx] == BROKEN || table_b[idx] <= CAPT_WIN) continue;
@@ -889,7 +886,7 @@ void calc_pawn_captures_b(struct thread_data *thread)
 
 // now returns -2, -1, 0, 1, 2
 static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
-		    bitboard occ, int *restrict p)
+    bitboard occ, int *restrict p)
 {
   int i, m, v;
   int pcs[MAX_PIECES];
@@ -914,11 +911,11 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
   return v;
 }
 
-static int has_moves(int *restrict pcs, long64 idx0, ubyte *table,
-		      bitboard occ, int *restrict p)
+static int has_moves(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
+    int *p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
 
   do {
@@ -936,9 +933,9 @@ static int has_moves(int *restrict pcs, long64 idx0, ubyte *table,
   return 0;
 }
 
-void calc_pawn_moves_w(struct thread_data *thread)
+static void calc_pawn_moves_w(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, k;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
@@ -946,7 +943,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *restrict p = thread->p;
-  long64 end = begin + thread->end;
+  uint64_t end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
   int has_cursed = 0;
@@ -960,50 +957,50 @@ void calc_pawn_moves_w(struct thread_data *thread)
       sq = p[i];
       if (bit[sq + 8] & occ) continue;
       if (sq >= 0x30) {
-	bitboard bb = occ ^ bit[sq] ^ bit[sq + 8];
-	if (is_attacked(p[white_king], black_all, bb, p))
-	  continue;
-	for (k = 0; k < n; k++) {
-	  pos[k] = p[k];
-	  pt2[k] = pt[k];
-	}
-	pos[i] = sq + 8;
-	if (best < -2) best = -2;
-	for (k = WQUEEN; k >= WKNIGHT; k--) {
-	  pt2[i] = k;
-	  int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
-	  if (v > best) {
-	    best = v;
-	    if (best == 2) goto lab;
-	  }
-	}
+        bitboard bb = occ ^ bit[sq] ^ bit[sq + 8];
+        if (is_attacked(p[white_king], black_all, bb, p))
+          continue;
+        for (k = 0; k < n; k++) {
+          pos[k] = p[k];
+          pt2[k] = pt[k];
+        }
+        pos[i] = sq + 8;
+        if (best < -2) best = -2;
+        for (k = WQUEEN; k >= WKNIGHT; k--) {
+          pt2[i] = k;
+          int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
+          if (v > best) {
+            best = v;
+            if (best == 2) goto lab;
+          }
+        }
       } else {
-	long64 idx0 = idx & ~mask[i];
-	if (i) idx2 = idx0 | ((long64)((p[i] + 0x08) ^ 0x38) << shift[i]);
-	else idx2 = idx0 | piv_idx[p[i] + 0x08];
-	if (tbl_to_wdl[table_b[idx2]] > best) best = tbl_to_wdl[table_b[idx2]];
-	if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
-	  if (i) idx2 = idx0 | ((long64)((p[i] + 0x10) ^ 0x38) << shift[i]);
-	  else idx2 = idx0 | piv_idx[p[i] + 0x10];
-	  if (table_b[idx2] == ILLEGAL) continue;
-	  int v0, v1 = 3;
-	  bitboard bits = sides_mask[p[i] + 0x10] & bb;
-	  while (bits) {
-	    int sq2 = FirstOne(bits);
-	    for (k = 0; p[k] != sq2; k++);
-	    if (pt[k] == BPAWN) {
-	      v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
-	      if (v0 < v1) v1 = v0;
-	    }
-	    ClearFirst(bits);
-	  }
-	  int v = tbl_to_wdl[table_b[idx2]];
-	  if (v1 < 3) {
-	    if (v1 < v || (table_b[idx2] == UNKNOWN && !has_moves(black_pcs, idx2, table_w, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
-	      v = v1;
-	  }
-	  if (v > best) best = v;
-	}
+        uint64_t idx0 = idx & ~mask[i];
+        if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x08) ^ 0x38) << shift[i]);
+        else idx2 = idx0 | piv_idx[p[i] + 0x08];
+        if (tbl_to_wdl[table_b[idx2]] > best) best = tbl_to_wdl[table_b[idx2]];
+        if (sq < 0x10 && !(bit[sq + 0x10] & occ)) {
+          if (i) idx2 = idx0 | ((uint64_t)((p[i] + 0x10) ^ 0x38) << shift[i]);
+          else idx2 = idx0 | piv_idx[p[i] + 0x10];
+          if (table_b[idx2] == ILLEGAL) continue;
+          int v0, v1 = 3;
+          bitboard bits = sides_mask[p[i] + 0x10] & bb;
+          while (bits) {
+            int sq2 = FirstOne(bits);
+            for (k = 0; p[k] != sq2; k++);
+            if (pt[k] == BPAWN) {
+              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
+              if (v0 < v1) v1 = v0;
+            }
+            ClearFirst(bits);
+          }
+          int v = tbl_to_wdl[table_b[idx2]];
+          if (v1 < 3) {
+            if (v1 < v || (table_b[idx2] == UNKNOWN && !has_moves(black_pcs, idx2, table_w, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
+              v = v1;
+          }
+          if (v > best) best = v;
+        }
       }
     }
 lab:
@@ -1017,9 +1014,9 @@ lab:
     has_cursed_pawn_moves = 1;
 }
 
-void calc_pawn_moves_b(struct thread_data *thread)
+static void calc_pawn_moves_b(struct thread_data *thread)
 {
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   int i, k;
   int n = numpcs;
   assume(n >= 3 && n <= TBPIECES);
@@ -1027,7 +1024,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
   int sq;
   bitboard occ, bb = thread->occ;
   int *restrict p = thread->p;
-  long64 end = begin + thread->end;
+  uint64_t end = begin + thread->end;
   int pos[MAX_PIECES];
   int pt2[MAX_PIECES];
   int has_cursed = 0;
@@ -1041,50 +1038,50 @@ void calc_pawn_moves_b(struct thread_data *thread)
       sq = p[i];
       if (bit[sq - 8] & occ) continue;
       if (sq < 0x10) {
-	bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
-	if (is_attacked(p[black_king], white_all, bb, p))
-	  continue;
-	for (k = 0; k < n; k++) {
-	  pos[k] = p[k];
-	  pt2[k] = pt[k];
-	}
-	pos[i] = sq - 8;
-	if (best < -2) best = -2;
-	for (k = BQUEEN; k >= BKNIGHT; k--) {
-	  pt2[i] = k;
-	  int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
-	  if (v > best) {
-	    best = v;
-	    if (best == 2) goto lab;
-	  }
-	}
+        bitboard bb = occ ^ bit[sq] ^ bit[sq - 8];
+        if (is_attacked(p[black_king], white_all, bb, p))
+          continue;
+        for (k = 0; k < n; k++) {
+          pos[k] = p[k];
+          pt2[k] = pt[k];
+        }
+        pos[i] = sq - 8;
+        if (best < -2) best = -2;
+        for (k = BQUEEN; k >= BKNIGHT; k--) {
+          pt2[i] = k;
+          int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
+          if (v > best) {
+            best = v;
+            if (best == 2) goto lab;
+          }
+        }
       } else {
-	long64 idx0 = idx & ~mask[i];
-	if (i) idx2 = idx0 | ((long64)(p[i] - 0x08) << shift[i]);
-	else idx2 = idx0 | piv_idx[p[i] - 0x08];
-	if (tbl_to_wdl[table_w[idx2]] > best) best = tbl_to_wdl[table_w[idx2]];
-	if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
-	  if (i) idx2 = idx0 | ((long64)(p[i] - 0x10) << shift[i]);
-	  else idx2 = idx0 | piv_idx[p[i] - 0x10];
-	  if (table_w[idx2] == ILLEGAL) continue;
-	  int v0, v1 = 3;
-	  bitboard bits = sides_mask[p[i] - 0x10] & bb;
-	  while (bits) {
-	    int sq2 = FirstOne(bits);
-	    for (k = 0; p[k] != sq2; k++);
-	    if (pt[k] == WPAWN) {
-	      v0 = eval_ep(i, k, sq2, p[i] - 0x08, white_king, 0, 0, occ, p);
-	      if (v0 < v1) v1 = v0;
-	    }
-	    ClearFirst(bits);
-	  }
-	  int v = tbl_to_wdl[table_w[idx2]];
-	  if (v1 < 3) {
-	    if (v1 < v || (table_w[idx2] == UNKNOWN && !has_moves(white_pcs, idx2, table_b, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))
-	      v = v1;
-	  }
-	  if (v > best) best = v;
-	}
+        uint64_t idx0 = idx & ~mask[i];
+        if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x08) << shift[i]);
+        else idx2 = idx0 | piv_idx[p[i] - 0x08];
+        if (tbl_to_wdl[table_w[idx2]] > best) best = tbl_to_wdl[table_w[idx2]];
+        if (sq >= 0x30 && !(bit[sq - 0x10] & occ)) {
+          if (i) idx2 = idx0 | ((uint64_t)(p[i] - 0x10) << shift[i]);
+          else idx2 = idx0 | piv_idx[p[i] - 0x10];
+          if (table_w[idx2] == ILLEGAL) continue;
+          int v0, v1 = 3;
+          bitboard bits = sides_mask[p[i] - 0x10] & bb;
+          while (bits) {
+            int sq2 = FirstOne(bits);
+            for (k = 0; p[k] != sq2; k++);
+            if (pt[k] == WPAWN) {
+              v0 = eval_ep(i, k, sq2, p[i] - 0x08, white_king, 0, 0, occ, p);
+              if (v0 < v1) v1 = v0;
+            }
+            ClearFirst(bits);
+          }
+          int v = tbl_to_wdl[table_w[idx2]];
+          if (v1 < 3) {
+            if (v1 < v || (table_w[idx2] == UNKNOWN && !has_moves(white_pcs, idx2, table_b, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))
+              v = v1;
+          }
+          if (v > best) best = v;
+        }
       }
     }
 lab:
@@ -1098,18 +1095,18 @@ lab:
     has_cursed_pawn_moves = 1;
 }
 
-static ubyte reset_v[256];
+static uint8_t reset_v[256];
 
 MARK(reset_capt_closs)
 {
-  ubyte *restrict v = reset_v;
+  uint8_t *restrict v = reset_v;
 
   MARK_BEGIN;
   if (v[table[idx2]]) table[idx2] = CAPT_CLOSS;
   MARK_END;
 }
 
-void reset_captures_w(struct thread_data *thread)
+static void reset_captures_w(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -1118,14 +1115,14 @@ void reset_captures_w(struct thread_data *thread)
       if (is_attacked(p[white_king], pcs2, occ, p)) continue;
       int v = probe_tb(pt2, p, 0, occ, 0, 2);
       if (v == 1) {
-	MAKE_IDX2;
-	LOOP_WHITE_PIECES(reset_capt_closs);
+        MAKE_IDX2;
+        LOOP_WHITE_PIECES(reset_capt_closs);
       }
     }
   }
 }
 
-void reset_captures_b(struct thread_data *thread)
+static void reset_captures_b(struct thread_data *thread)
 {
   BEGIN_CAPTS;
 
@@ -1134,14 +1131,14 @@ void reset_captures_b(struct thread_data *thread)
       if (is_attacked(p[black_king], pcs2, occ, p)) continue;
       int v = probe_tb(pt2, p, 1, occ, 0, 2);
       if (v == 1) {
-	MAKE_IDX2;
-	LOOP_BLACK_PIECES(reset_capt_closs);
+        MAKE_IDX2;
+        LOOP_BLACK_PIECES(reset_capt_closs);
       }
     }
   }
 }
 
-void reset_pivot_captures(struct thread_data *thread)
+static void reset_pivot_captures(struct thread_data *thread)
 {
   BEGIN_CAPTS_PIVOT;
 
@@ -1151,18 +1148,18 @@ void reset_pivot_captures(struct thread_data *thread)
       if (is_attacked(p[king], pcs2, occ, p)) continue;
       int v = probe_tb(pt2, p, wtm, occ, 0, 2);
       if (v == 1) {
-	MAKE_IDX2_PIVOT;
-	LOOP_PIECES_PIVOT(reset_capt_closs);
+        MAKE_IDX2_PIVOT;
+        LOOP_PIECES_PIVOT(reset_capt_closs);
       }
     }
   }
 }
 
-void reset_piece_captures(void)
+static void reset_piece_captures(void)
 {
   int i, j, k;
   int n = numpcs;
-  ubyte *restrict v = reset_v;
+  uint8_t *restrict v = reset_v;
 
   for (i = 0;i < 256; i++)
     v[i] = 0;
@@ -1185,7 +1182,7 @@ void reset_piece_captures(void)
     }
     for (k = 0, j = 0; black_all[k] >= 0; k++)
       if (black_all[k] != i)
-	pcs2[j++] = black_all[k];
+        pcs2[j++] = black_all[k];
     pcs2[j] = -1;
     if (i) {
       captured_piece = i;
@@ -1203,7 +1200,7 @@ void reset_piece_captures(void)
     }
     for (k = 0, j = 0; white_all[k] >= 0; k++)
       if (white_all[k] != i)
-	pcs2[j++] = white_all[k];
+        pcs2[j++] = white_all[k];
     pcs2[j] = -1;
     if (i) {
       captured_piece = i;
@@ -1214,8 +1211,8 @@ void reset_piece_captures(void)
 }
 
 // return 1 if a non-losing capture exists, otherwise 0
-int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
-		    int clr, int wtm, bitboard occ, int *restrict p)
+static int test_pawn_capt(int k, int sq, uint64_t idx, uint8_t *restrict table,
+    int king, int clr, int wtm, bitboard occ, int *restrict p)
 {
   int i, m;
   int pt2[MAX_PIECES];
@@ -1231,18 +1228,18 @@ int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pos[k] = sq2;
       pt2[t] = 0;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && ((pt[i] & 0x08) != clr))
-	  pcs[m++] = i;
+        if (i != t && ((pt[i] & 0x08) != clr))
+          pcs[m++] = i;
       pcs[m] = -1;
       if (!is_attacked(p[king], pcs, occ, p)
-		      && probe_tb(pt2, pos, wtm, occ, 1, 2) <= 1)
-	return 1;
+                      && probe_tb(pt2, pos, wtm, occ, 1, 2) <= 1)
+        return 1;
     }
   } else { // pawn promotion
     for (bits = sides_mask[sq] & occ; bits; ClearFirst(bits)) {
@@ -1251,20 +1248,20 @@ int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
       for (t = 0; p[t] != sq2; t++);
       if ((pt[t] & 0x08) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-	if (i != t && (pt[i] & 0x08) != clr)
-	  pcs[m++] = i;
+        if (i != t && (pt[i] & 0x08) != clr)
+          pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
-	pos[i] = p[i];
-	pt2[i] = pt[i];
+        pos[i] = p[i];
+        pt2[i] = pt[i];
       }
       pt2[t] = 0;
       pos[k] = sq2;
       for (m = QUEEN; m >= KNIGHT; m--) {
-	pt2[k] = m | (pt[k] & 0x08);
-	if (probe_tb(pt2, pos, wtm, occ, 1, 2) <= 1)
-	  return 1;
+        pt2[k] = m | (pt[k] & 0x08);
+        if (probe_tb(pt2, pos, wtm, occ, 1, 2) <= 1)
+          return 1;
       }
     }
   }
@@ -1272,10 +1269,10 @@ int test_pawn_capt(int k, int sq, long64 idx, ubyte *restrict table, int king,
   return 0;
 }
 
-void reset_pawn_captures_w(struct thread_data *thread)
+static void reset_pawn_captures_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *v = reset_v;
+  uint8_t *v = reset_v;
 
   LOOP_ITER_ALL {
     if (!v[table_w[idx]]) continue;
@@ -1283,17 +1280,17 @@ void reset_pawn_captures_w(struct thread_data *thread)
     for (i = 0; i < numpawns; i++) {
       if (!pw[i]) continue; // loop through white pawns
       if (test_pawn_capt(i, p[i] + 0x08, idx & ~mask[i], table_b, white_king, 0, 0, occ & ~bit[p[i]], p)) {
-	table_w[idx] = CAPT_CLOSS;
-	break;
+        table_w[idx] = CAPT_CLOSS;
+        break;
       }
     }
   }
 }
 
-void reset_pawn_captures_b(struct thread_data *thread)
+static void reset_pawn_captures_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
-  ubyte *v = reset_v;
+  uint8_t *v = reset_v;
 
   LOOP_ITER_ALL {
     if (!v[table_b[idx]]) continue;
@@ -1301,18 +1298,18 @@ void reset_pawn_captures_b(struct thread_data *thread)
     for (i = 0; i < numpawns; i++) {
       if (pw[i]) continue; // loop through black pawns
       if (test_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], table_w, black_king, 8, 1, occ & ~bit[p[i]], p)) {
-	table_b[idx] = CAPT_CLOSS;
-	break;
+        table_b[idx] = CAPT_CLOSS;
+        break;
       }
     }
   }
 }
 
-int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
-			bitboard occ, int *restrict p)
+static int compute_capt_closs(int *restrict pcs, uint64_t idx0,
+    uint8_t *restrict table, bitboard occ, int *restrict p)
 {
   int sq;
-  long64 idx, idx2;
+  uint64_t idx, idx2;
   bitboard bb;
   int best = 0;
 
@@ -1332,7 +1329,7 @@ int compute_capt_closs(int *restrict pcs, long64 idx0, ubyte *restrict table,
   return best;
 }
 
-void fix_closs_w(struct thread_data *thread)
+static void fix_closs_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -1344,7 +1341,7 @@ void fix_closs_w(struct thread_data *thread)
   }
 }
 
-void fix_closs_b(struct thread_data *thread)
+static void fix_closs_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -1356,7 +1353,7 @@ void fix_closs_b(struct thread_data *thread)
   }
 }
 
-void fix_closs(void)
+static void fix_closs(void)
 {
   int i;
 
@@ -1389,4 +1386,3 @@ void fix_closs(void)
     run_threaded(fix_closs_b, work_g, 1);
   }
 }
-

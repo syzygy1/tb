@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -11,42 +11,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include "decompress.h"
 #include "defs.h"
 #include "probe.h"
 #include "threads.h"
 #include "util.h"
-
-// FIXME: move to probe.h
-long64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor);
-void decode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, long64 *factor, int *order, long64 idx);
-long64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, long64 *factor);
-void decode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, long64 *factor, int *order, long64 idx, int file);
-
-void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces, int order);
-void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces, int order, int order2);
-long64 calc_factors_piece(long64 *factor, int num, int order, ubyte *norm, ubyte enc_type);
-long64 calc_factors_pawn(long64 *factor, int num, int order, int order2, ubyte *norm, int file);
-
-struct tb_handle {
-  FILE *F;
-  ubyte *data;
-  long64 data_size;
-  int wdl;
-  int num_files;
-  int split;
-  int has_pawns;
-  struct {
-    long64 idx[2];
-    long64 size[2];
-  } file[4];
-  union {
-    struct TBEntry entry;
-    struct TBEntry_piece entry_piece;
-    struct TBEntry_pawn entry_pawn;
-  };
-  ubyte dtz_flags[4];
-  ubyte (*map[4])[256];
-};
 
 extern int total_work;
 extern int numthreads;
@@ -86,19 +56,6 @@ void decomp_init_pawn(int *pcs, int *pt)
   }
 }
 
-struct PairsData {
-  char *indextable;
-  ushort *sizetable;
-  ubyte *data;
-  ushort *offset;
-  ubyte *symlen;
-  ubyte *sympat;
-  int blocksize;
-  int idxbits;
-  int min_len;
-  long64 base[];
-};
-
 static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {
   int s1, s2;
@@ -116,11 +73,11 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
   tmp[s] = 1;
 }
 
-struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64 *size, ubyte *flags)
+struct PairsData *decomp_setup_pairs(struct tb_handle *H, uint64_t tb_size, uint64_t *size, uint8_t *flags)
 {
   struct PairsData *d;
   int i;
-  ubyte data[256];
+  uint8_t data[256];
   FILE *F = H->F;
 
   fread(data, 1, 2, F);
@@ -128,6 +85,7 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64
   if (*flags & 0x80) {
     d = malloc(sizeof(struct PairsData));
     d->idxbits = 0;
+    d->max_len = 0;
     if (H->wdl)
       d->min_len = data[1];
     else
@@ -138,21 +96,22 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64
   fread(data + 2, 1, 10, F);
   int blocksize = data[1];
   int idxbits = data[2];
-  uint32 real_num_blocks = data[4] | (data[5] << 8)
-			  | (data[6] << 16) | (data[7] << 24);
-  uint32 num_blocks = real_num_blocks + *(ubyte *)(&data[3]);
+  uint32_t real_num_blocks = data[4] | (data[5] << 8)
+                          | (data[6] << 16) | (data[7] << 24);
+  uint32_t num_blocks = real_num_blocks + *(uint8_t *)(&data[3]);
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
   fread(data + 12, 1, 2 * h, F);
   int num_syms = data[10 + 2 * h] | (data[11 + 2 * h] << 8);
-  d = malloc(sizeof(struct PairsData) + h * sizeof(long64) + num_syms);
+  d = malloc(sizeof(struct PairsData) + h * sizeof(uint64_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->offset = malloc(2 * h);
   memcpy(d->offset, &data[10], 2 * h);
-  d->symlen = ((unsigned char *)d) + sizeof(struct PairsData) + h * sizeof(long64);
+  d->symlen = ((unsigned char *)d) + sizeof(struct PairsData) + h * sizeof(uint64_t);
   d->sympat = malloc(3 * num_syms + (num_syms & 1));
+  d->max_len = max_len; // to allow checking max_len with rtbver/rtbverp
   d->min_len = min_len;
   fread(d->sympat, 1, 3 * num_syms + (num_syms & 1), F);
 
@@ -178,13 +137,13 @@ struct PairsData *decomp_setup_pairs(struct tb_handle *H, long64 tb_size, long64
   return d;
 }
 
-static void decomp_setup_pieces_piece(struct tb_handle *H, long64 *tb_size)
+static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
 {
   int i;
   int order;
   struct TBEntry_piece *entry = &(H->entry_piece);
   FILE *F = H->F;
-  ubyte data[TBPIECES + 1];
+  uint8_t data[TBPIECES + 1];
 
   fread(data, 1, numpcs + 1, F);
   entry->num = numpcs;
@@ -214,13 +173,13 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, long64 *tb_size)
   }
 }
 
-void decomp_setup_pieces_pawn(struct tb_handle *H, long64 *tb_size, int f)
+void decomp_setup_pieces_pawn(struct tb_handle *H, uint64_t *tb_size, int f)
 {
   int i, j;
   int order, order2;
   struct TBEntry_pawn *entry = &(H->entry_pawn);
   FILE *F = H->F;
-  ubyte data[TBPIECES + 2];
+  uint8_t data[TBPIECES + 2];
 
   entry->num = numpcs;
   entry->pawns[0] = pawns0;
@@ -260,19 +219,19 @@ void decomp_setup_pieces_pawn(struct tb_handle *H, long64 *tb_size, int f)
 
 void decomp_init_table(struct tb_handle *H)
 {
-  uint32 magic;
-  ubyte byte;
+  uint32_t magic;
+  uint8_t byte;
   int f;
-  long64 size[8 * 3];
+  uint64_t size[8 * 3];
   FILE *F = H->F;
   int split, files;
-  ubyte dummy;
+  uint8_t dummy;
 
   magic = 0;
   fread(&magic, 1, 4, F);
   if (magic != (H->wdl ? WDL_MAGIC : DTZ_MAGIC)) {
     fprintf(stderr, "Corrupted table.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   fread(&byte, 1, 1, F);
@@ -299,13 +258,23 @@ void decomp_init_table(struct tb_handle *H)
 
     if (!H->wdl) {
       if (H->dtz_flags[0] & 2) {
-	int i;
-	ubyte num;
-	H->map[0] = malloc(4 * 256);
-	for (i = 0; i < 4; i++) {
-	  fread(&num, 1, 1, F);
-	  fread(H->map[0][i], 1, num, F);
-	}
+        if (!(H->dtz_flags[0] & 16)) {
+          int i;
+          uint8_t num;
+          H->map[0] = malloc(4 * 256);
+          for (i = 0; i < 4; i++) {
+            fread(&num, 1, 1, F);
+            fread(H->map[0][i], 1, num, F);
+          }
+        } else {
+          int i;
+          uint16_t num;
+          H->map16[0] = malloc(4 * MAX_VALS * 2);
+          for (i = 0; i < 4; i++) {
+            fread(&num, 2, 1, F);
+            fread(H->map16[0][i], 2, num, F);
+          }
+        }
       }
       if (ftell(F) & 0x01) fgetc(F);
     }
@@ -327,7 +296,7 @@ void decomp_init_table(struct tb_handle *H)
     if (!split)
       entry->precomp[1] = entry->precomp[0];
 
-    long64 idx = ftell(F);
+    uint64_t idx = ftell(F);
     idx = (idx + 0x3f) & ~0x3f;
     H->file[0].idx[0] = idx;
     idx += size[2];
@@ -341,20 +310,20 @@ void decomp_init_table(struct tb_handle *H)
     for (f = 0; f < files; f++) {
       entry->file[f].precomp[0] = decomp_setup_pairs(H, H->file[f].size[0], &size[6 * f], &(H->dtz_flags[f]));
       if (split)
-	entry->file[f].precomp[1] = decomp_setup_pairs(H, H->file[f].size[1], &size[6 * f + 3], &dummy);
+        entry->file[f].precomp[1] = decomp_setup_pairs(H, H->file[f].size[1], &size[6 * f + 3], &dummy);
     }
 
     if (!H->wdl) {
       int i;
       for (f = 0; f < files; f++) {
-	if (H->dtz_flags[f] & 2) {
-	  H->map[f] = malloc(4 * 256);
-	  ubyte num;
-	  for (i = 0; i < 4; i++) {
-	    fread(&num, 1, 1, F);
-	    fread(H->map[f][i], 1, num, F);
-	  }
-	}
+        if (H->dtz_flags[f] & 2) {
+          H->map[f] = malloc(4 * 256);
+          uint8_t num;
+          for (i = 0; i < 4; i++) {
+            fread(&num, 1, 1, F);
+            fread(H->map[f][i], 1, num, F);
+          }
+        }
       }
       if (ftell(F) & 0x01) fgetc(F);
     }
@@ -363,8 +332,8 @@ void decomp_init_table(struct tb_handle *H)
       entry->file[f].precomp[0]->indextable = malloc(size[6 * f]);
       fread(entry->file[f].precomp[0]->indextable, 1, size[6 * f], F);
       if (split) {
-	entry->file[f].precomp[1]->indextable = malloc(size[6 * f + 3]);
-	fread(entry->file[f].precomp[1]->indextable, 1, size[6 * f + 3], F);
+        entry->file[f].precomp[1]->indextable = malloc(size[6 * f + 3]);
+        fread(entry->file[f].precomp[1]->indextable, 1, size[6 * f + 3], F);
       }
     }
 
@@ -372,30 +341,30 @@ void decomp_init_table(struct tb_handle *H)
       entry->file[f].precomp[0]->sizetable = malloc(size[6 * f + 1]);
       fread(entry->file[f].precomp[0]->sizetable, 1, size[6 * f + 1], F);
       if (split) {
-	entry->file[f].precomp[1]->sizetable = malloc(size[6 * f + 4]);
-	fread(entry->file[f].precomp[1]->sizetable, 1, size[6 * f + 4], F);
+        entry->file[f].precomp[1]->sizetable = malloc(size[6 * f + 4]);
+        fread(entry->file[f].precomp[1]->sizetable, 1, size[6 * f + 4], F);
       }
     }
 
     if (!split)
       for (f = 0; f < files; f++)
-	entry->file[f].precomp[1] = entry->file[f].precomp[0];
+        entry->file[f].precomp[1] = entry->file[f].precomp[0];
 
-    long64 idx = ftell(F);
+    uint64_t idx = ftell(F);
     for (f = 0; f < files; f++) {
       idx = (idx + 0x3f) & ~0x3f;
       H->file[f].idx[0] = idx;
       idx += size[6 * f + 2];
       if (split) {
-	idx = (idx + 0x3f) & ~0x3f;
-	H->file[f].idx[1] = idx;
-	idx += size[6 * f + 5];
+        idx = (idx + 0x3f) & ~0x3f;
+        H->file[f].idx[1] = idx;
+        idx += size[6 * f + 5];
       }
     }
   }
 }
 
-long64 expand_symbol(ubyte *dst, int sym, long64 idx, long64 end, ubyte *sympat, ubyte *symlen)
+uint64_t expand_symbol(uint8_t *dst, int sym, uint64_t idx, uint64_t end, uint8_t *sympat, uint8_t *symlen)
 {
   if (idx == end) return idx;
   int w = *(int *)(sympat + 3 * sym);
@@ -408,19 +377,19 @@ long64 expand_symbol(ubyte *dst, int sym, long64 idx, long64 end, ubyte *sympat,
   return idx;
 }
 
-static ubyte *table;
-static long64 table_size = 0;
+static uint8_t *table;
+static uint64_t table_size = 0;
 
 static struct PairsData *decomp_d;
-static ubyte *decomp_data;
-static long64 *work_decomp = NULL;
+static uint8_t *decomp_data;
+static uint64_t *work_decomp = NULL;
 
 static void decompress_worker(struct thread_data *thread)
 {
-  long64 idx = thread->begin;
-  long64 end = thread->end;
+  uint64_t idx = thread->begin;
+  uint64_t end = thread->end;
   struct PairsData *d = decomp_d;
-  ubyte *dst = table;
+  uint8_t *dst = table;
 
   if (!d->idxbits) {
     int s = d->min_len;
@@ -431,16 +400,16 @@ static void decompress_worker(struct thread_data *thread)
 
   int l;
   int m = d->min_len;
-  ushort *offset = d->offset;
-  long64 *base = d->base - m;
-  ubyte *symlen = d->symlen;
-  ubyte *sympat = d->sympat;
+  uint16_t *offset = d->offset;
+  uint64_t *base = d->base - m;
+  uint8_t *symlen = d->symlen;
+  uint8_t *sympat = d->sympat;
   int sym, bitcnt;
 
-  uint32 mainidx = idx >> d->idxbits;
+  uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) -1)) - (1 << (d->idxbits - 1));
-  uint32 block = *(uint32 *)(d->indextable + 6 * mainidx);
-  litidx += *(ushort *)(d->indextable + 6 * mainidx + 4);
+  uint32_t block = *(uint32_t *)(d->indextable + 6 * mainidx);
+  litidx += *(uint16_t *)(d->indextable + 6 * mainidx + 4);
   if (litidx < 0) {
     do {
       litidx += d->sizetable[--block] + 1;
@@ -451,7 +420,7 @@ static void decompress_worker(struct thread_data *thread)
       litidx -= d->sizetable[block++] + 1;
   }
 
-  long64 idx2 = (1ULL << (d->idxbits - 1)) + (((long64)mainidx) << d->idxbits);
+  uint64_t idx2 = (1ULL << (d->idxbits - 1)) + (((uint64_t)mainidx) << d->idxbits);
   if (litidx > 0) {
     idx += d->sizetable[block++] + 1 - litidx;
     while (idx >= idx2) {
@@ -460,25 +429,26 @@ static void decompress_worker(struct thread_data *thread)
     }
   }
 
-  ubyte *data = decomp_data + (((long64)block) << d->blocksize);
+  uint8_t *data = decomp_data + (((uint64_t)block) << d->blocksize);
   while (idx < end) {
     int size = d->sizetable[block] + 1;
     while (idx + size > idx2) {
-      if (*((uint32 *)(d->indextable + 6 * mainidx)) != block
-	      || *((ushort *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx) {
-	fprintf(stderr, "ERROR in main index!!\n");
-	exit(1);
+      if (*(uint32_t *)(d->indextable + 6 * mainidx) != block
+          || *((uint16_t *)(d->indextable + 6 * mainidx + 4)) != idx2 - idx)
+      {
+        fprintf(stderr, "ERROR in main index!!\n");
+        exit(EXIT_FAILURE);
       }
       idx2 += 1ULL << d->idxbits;
       mainidx++;
     }
     block++;
 
-    long64 blockend = idx + size;
+    uint64_t blockend = idx + size;
     if (blockend > table_size) blockend = table_size;
 
-    uint32 *ptr = (uint32 *)data;
-    long64 code = __builtin_bswap64(*(long64 *)ptr);
+    uint32_t *ptr = (uint32_t *)data;
+    uint64_t code = __builtin_bswap64(*(uint64_t *)ptr);
     ptr += 2;
     bitcnt = 0;
     while (idx < blockend) {
@@ -489,19 +459,19 @@ static void decompress_worker(struct thread_data *thread)
       code <<= l;
       bitcnt += l;
       if (bitcnt >= 32) {
-	bitcnt -= 32;
-	code |= ((long64)(__builtin_bswap32(*ptr++))) << bitcnt;
+        bitcnt -= 32;
+        code |= ((uint64_t)(__builtin_bswap32(*ptr++))) << bitcnt;
       }
     }
     data += 1 << d->blocksize;
   }
 }
 
-ubyte *decompress_table(struct tb_handle *H, int bside, int f)
+uint8_t *decompress_table(struct tb_handle *H, int bside, int f)
 {
   if (!H->split && bside) return table;
 
-  long64 tb_size = H->file[f].size[bside];
+  uint64_t tb_size = H->file[f].size[bside];
   if (tb_size != table_size) {
     if (table) free(table);
     table = malloc(tb_size);
@@ -512,7 +482,7 @@ ubyte *decompress_table(struct tb_handle *H, int bside, int f)
   }
 
   decomp_d = !H->has_pawns ? H->entry_piece.precomp[bside]
-			    : H->entry_pawn.file[f].precomp[bside];
+                            : H->entry_pawn.file[f].precomp[bside];
   decomp_data = H->data + H->file[f].idx[bside];
 
   run_threaded(decompress_worker, work_decomp, 1);
@@ -535,9 +505,9 @@ struct tb_handle *open_tb(char *tablename, int wdl)
   strcat(name, wdl ? WDLSUFFIX : DTZSUFFIX);
   if (!(H->F = fopen(name, "rb"))) {
     fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
-  H->data = (ubyte *)map_file(name, 1, &(H->data_size));
+  H->data = (uint8_t *)map_file(name, 1, &(H->data_size));
   H->wdl = wdl;
 
   return H;
@@ -568,9 +538,9 @@ void close_tb(struct tb_handle *H)
       free(entry->file[f].precomp[0]->sizetable);
       free(entry->file[f].precomp[0]);
       if (H->split) {
-	free(entry->file[f].precomp[1]->indextable);
-	free(entry->file[f].precomp[1]->sizetable);
-	free(entry->file[f].precomp[1]);
+        free(entry->file[f].precomp[1]->indextable);
+        free(entry->file[f].precomp[1]->sizetable);
+        free(entry->file[f].precomp[1]);
       }
     }
   }
@@ -579,8 +549,8 @@ void close_tb(struct tb_handle *H)
 void set_perm(struct tb_handle *H, int bside, int f, int *perm, int *pt)
 {
   int i, j;
-  ubyte *pieces = !H->has_pawns ? H->entry_piece.pieces[bside]
-				: H->entry_pawn.file[f].pieces[bside];
+  uint8_t *pieces = !H->has_pawns ? H->entry_piece.pieces[bside]
+                                : H->entry_pawn.file[f].pieces[bside];
   int n = !H->has_pawns ? H->entry_piece.num : H->entry_pawn.num;
   int k = 0;
 
@@ -614,11 +584,10 @@ int get_dtz_side(struct tb_handle *H, int f)
   return H->dtz_flags[f] & 0x01;
 }
 
-ubyte (*get_dtz_map(struct tb_handle *H, int f))[256]
+uint8_t (*get_dtz_map(struct tb_handle *H, int f))[256]
 {
   if (H->dtz_flags[f] & 0x02)
     return H->map[f];
   else
     return NULL;
 }
-

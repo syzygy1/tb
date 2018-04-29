@@ -4,51 +4,56 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/time.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/time.h>
+
+#include "compress.h"
 #include "defs.h"
+#include "permute.h"
 #include "threads.h"
+#include "util.h"
 
 #include "board.h"
+
+#ifndef SUICIDE
+static int white_king, black_king;
+#endif
+
 #include "probe.c"
 #include "board.c"
 
 #define MAX_PIECES 8
 
+//#define MAX_NARROW 50
 #define MAX_NARROW 240
 
-void transform_table(struct thread_data *thread);
+static void reduce_tables(void);
 
-extern int total_work;
-extern struct thread_data *thread_data;
-static long64 *work_g;
-#ifndef SMALL
-static long64 *work_piv;
+uint64_t total_stats_w[MAX_STATS];
+uint64_t total_stats_b[MAX_STATS];
+
+static void transform_table_u8(struct thread_data *thread);
+static void transform_table_u16(struct thread_data *thread);
+
+static uint64_t *work_g;
+#if !defined(SMALL) && !defined(SMALL2)
+static uint64_t *work_piv;
 #else
-static long64 *work_piv0, *work_piv1;
+static uint64_t *work_piv0, *work_piv1;
 #endif
 
-struct tb_handle;
-ubyte *restrict table_w, *restrict table_b;
+uint8_t *restrict table_w, *restrict table_b;
 int numpcs;
 int numpawns = 0;
 int symmetric, split;
 static int captured_piece;
 
-static long64 size;
+static uint64_t size;
 
-extern int numthreads;
-extern int thread_affinity;
-
-extern struct timeval start_time, cur_time;
-
-#ifndef SUICIDE
-static int white_king, black_king;
-#endif
 static int white_pcs[MAX_PIECES], black_pcs[MAX_PIECES];
 static int pt[MAX_PIECES];
 #ifndef SUICIDE
@@ -70,20 +75,18 @@ static int to_fix_w, to_fix_b;
 int threat_dc, wdl_threat_win, wdl_threat_cwin, wdl_threat_draw;
 #endif
 
-static long64 total_stats_w[MAX_STATS];
-static long64 total_stats_b[MAX_STATS];
+u8 *transform_v_u8;
+u8 *transform_tbl_u8;
 
-ubyte *transform_v;
-ubyte *transform_tbl;
+u16 *transform_v_u16;
+u16 *transform_tbl_u16;
 
-// FIXME: should put COPYSIZE in some header
-#define COPYSIZE 10*1024*1024
-ubyte *copybuf = NULL;
-
-#ifndef SMALL
-#include "generic.c"
-#else
+#if defined(SMALL)
 #include "generics.c"
+#elif defined(SMALL2)
+#include "generics2.c"
+#else
+#include "generic.c"
 #endif
 
 #if defined(REGULAR)
@@ -98,44 +101,20 @@ ubyte *copybuf = NULL;
 
 #define HUGEPAGESIZE 2*1024*1024
 
-struct tb_handle;
-
-struct dtz_map {
-  ushort map[4][MAX_VALS];
-  ushort inv_map[4][MAX_VALS];
-  ushort num[4];
-  ushort max_num;
-  ubyte side;
-  ubyte ply_accurate_win;
-  ubyte ply_accurate_loss;
-  ubyte high_freq_max;
-};
-
-ubyte *init_permute_piece(int *pcs, int *pt, ubyte *tb_table);
-void permute_piece_wdl(ubyte *tb_table, int *pcs, int *pt, ubyte *table, ubyte *best, ubyte *v);
-long64 estimate_piece_dtz(int *pcs, int *pt, ubyte *table, ubyte *best, int *bestp, ubyte *v);
-void permute_piece_dtz(ubyte *tb_table, int *pcs, ubyte *table, int bestp, ubyte *v);
-struct tb_handle *create_tb(char *tablename, int wdl, int blocksize);
-void compress_tb(struct tb_handle *F, ubyte *data, ubyte *perm, int minfreq);
-void merge_tb(struct tb_handle *F);
-void compress_alloc(void);
-void compress_init_wdl(int *vals, int flags);
-void compress_init_dtz(struct dtz_map *map);
-
 static int minfreq = 8;
 static int only_generate = 0;
 static int generate_dtz = 1;
 static int generate_wdl = 1;
 
-static char *tablename;
+char *tablename;
 
 #include "stats.c"
 
 void transform(struct thread_data *thread)
 {
-  long64 idx;
-  long64 end = thread->end;
-  ubyte *v = transform_v;
+  uint64_t idx;
+  uint64_t end = thread->end;
+  uint8_t *v = transform_v_u8;
 
   for (idx = thread->begin; idx < end; idx++) {
     table_w[idx] = v[table_w[idx]];
@@ -143,12 +122,23 @@ void transform(struct thread_data *thread)
   }
 }
 
-void transform_table(struct thread_data *thread)
+void transform_table_u8(struct thread_data *thread)
 {
-  long64 idx;
-  long64 end = thread->end;
-  ubyte *v = transform_v;
-  ubyte *table = transform_tbl;
+  uint64_t idx;
+  uint64_t end = thread->end;
+  uint8_t *v = transform_v_u8;
+  uint8_t *table = transform_tbl_u8;
+
+  for (idx = thread->begin; idx < end; idx++)
+    table[idx] = v[table[idx]];
+}
+
+void transform_table_u16(struct thread_data *thread)
+{
+  uint64_t idx;
+  uint64_t end = thread->end;
+  uint16_t *v = transform_v_u16;
+  uint16_t *table = transform_tbl_u16;
 
   for (idx = thread->begin; idx < end; idx++)
     table[idx] = v[table[idx]];
@@ -158,46 +148,46 @@ void transform_table(struct thread_data *thread)
 
 #ifndef SUICIDE
 static LOCK_T tc_mutex;
-static ubyte *tc_table;
-static ubyte *tc_v;
+static uint8_t *tc_table;
+static uint8_t *tc_v;
 static int tc_capt_closs, tc_closs;
 
 static void tc_loop(struct thread_data *thread)
 {
   int i;
-  long64 idx = thread->begin;
-  long64 end = thread->end;
-  ubyte *restrict table = tc_table;
-  ubyte *restrict v = tc_v;
+  uint64_t idx = thread->begin;
+  uint64_t end = thread->end;
+  uint8_t *restrict table = tc_table;
+  uint8_t *restrict v = tc_v;
 
   for (; idx < end; idx++)
     if (v[table[idx]]) {
       LOCK(tc_mutex);
       switch (v[table[idx]]) {
       case 1:
-	tc_capt_closs = 1;
-	v[CAPT_CLOSS] = 0;
-	break;
+        tc_capt_closs = 1;
+        v[CAPT_CLOSS] = 0;
+        break;
       case 2:
-	tc_closs = 1;
-	if (num_saves == 0)
-	  for (i = DRAW_RULE; i < REDUCE_PLY; i++)
-	    v[LOSS_IN_ONE - i] = 0;
-	else
-	  for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
-	    v[i] = 0;
-	break;
+        tc_closs = 1;
+        if (num_saves == 0)
+          for (i = DRAW_RULE; i < REDUCE_PLY; i++)
+            v[LOSS_IN_ONE - i] = 0;
+        else
+          for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
+            v[i] = 0;
+        break;
       }
       if (tc_capt_closs && tc_closs)
-	idx = end;
+        idx = end;
       UNLOCK(tc_mutex);
     }
 }
 
-void test_closs(long64 *stats, ubyte *table, int to_fix)
+void test_closs(uint64_t *stats, uint8_t *table, int to_fix)
 {
   int i;
-  ubyte v[256];
+  uint8_t v[256];
 
   tc_capt_closs = tc_closs = 0;
   if (to_fix) {
@@ -208,10 +198,10 @@ void test_closs(long64 *stats, ubyte *table, int to_fix)
     v[CAPT_CLOSS] = 1;
     if (num_saves == 0)
       for (i = DRAW_RULE; i < REDUCE_PLY; i++)
-	v[LOSS_IN_ONE - i] = 2;
+        v[LOSS_IN_ONE - i] = 2;
     else
       for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
-	v[i] = 2;
+        v[i] = 2;
     run_threaded(tc_loop, work_g, 0);
   } else {
     for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
@@ -222,7 +212,7 @@ void test_closs(long64 *stats, ubyte *table, int to_fix)
 }
 #endif
 
-void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
+void prepare_wdl_map(uint64_t *stats, uint8_t *v, int pa_w, int pa_l)
 {
   int i, j;
   int vals[5];
@@ -353,7 +343,7 @@ void prepare_wdl_map(long64 *stats, ubyte *v, int pa_w, int pa_l)
 
 struct dtz_map map_w, map_b;
 
-int sort_list(long64 *freq, ushort *map, ushort *inv_map)
+int sort_list(uint64_t *freq, uint16_t *map, uint16_t *inv_map)
 {
   int i, j;
   int num;
@@ -369,9 +359,9 @@ int sort_list(long64 *freq, ushort *map, ushort *inv_map)
   for (i = 0; i < num; i++)
     for (j = i + 1; j < num; j++)
       if (freq[map[i]] < freq[map[j]]) {
-	ushort tmp = map[i];
-	map[i] = map[j];
-	map[j] = tmp;
+        uint16_t tmp = map[i];
+        map[i] = map[j];
+        map[j] = tmp;
       }
   for (i = 0; i < num; i++)
     inv_map[map[i]] = i;
@@ -379,12 +369,13 @@ int sort_list(long64 *freq, ushort *map, ushort *inv_map)
   return num;
 }
 
-void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int pa_l)
+void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w,
+    int pa_l)
 {
   int i, j;
-  long64 freq[4][MAX_VALS];
-  ushort (*map)[MAX_VALS] = dtzmap->map;
-  ushort (*inv_map)[MAX_VALS] = dtzmap->inv_map;
+  uint64_t freq[4][MAX_VALS];
+  uint16_t (*map)[MAX_VALS] = dtzmap->map;
+  uint16_t (*inv_map)[MAX_VALS] = dtzmap->inv_map;
 
   dtzmap->side = side;
   dtzmap->ply_accurate_win = pa_w;
@@ -444,7 +435,7 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
       num = dtzmap->num[i];
   dtzmap->max_num = num;
 
-  static long64 tot_pos[] = {
+  static uint64_t tot_pos[] = {
     518,
     31332,
     1911252,
@@ -452,22 +443,32 @@ void sort_values(long64 *stats, struct dtz_map *dtzmap, int side, int pa_w, int 
     6765832080,
     392418260640
   };
-  long64 tot = tot_pos[numpcs - 2] / 3500ULL;
+  uint64_t tot = tot_pos[numpcs - 2] / 3500ULL;
 
   for (i = 0; i < num; i++) {
-    long64 f = 0;
+    uint64_t f = 0;
     for (j = 0; j < 4; j++)
       if (i < dtzmap->num[j])
-	f += freq[j][map[j][i]];
+        f += freq[j][map[j][i]];
     if (f < tot) break;
   }
   dtzmap->high_freq_max = i;
+
+  dtzmap->wide = 0;
+  if (num >= 256)
+    dtzmap->wide = 1;
+  else {
+    for (j = 0; j < 4; j++)
+      for (i = 0; i < dtzmap->num[j]; i++)
+        if (dtzmap->map[j][i] >= 256)
+          dtzmap->wide = 1;
+  }
 }
 
-void prepare_dtz_map(ubyte *v, struct dtz_map *map)
+void prepare_dtz_map_u8(u8 *v, struct dtz_map *map)
 {
   int i;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
   int num = map->max_num;
 
   if (num_saves == 0) {
@@ -482,16 +483,16 @@ void prepare_dtz_map(ubyte *v, struct dtz_map *map)
     v[MATE] = inv_map[1][0];
     if (map->ply_accurate_win)
       for (i = 0; i < DRAW_RULE; i++)
-	v[WIN_IN_ONE + i] = inv_map[0][i];
+        v[WIN_IN_ONE + i] = inv_map[0][i];
     else
       for (i = 0; i < DRAW_RULE; i++)
-	v[WIN_IN_ONE + i] = inv_map[0][i / 2];
+        v[WIN_IN_ONE + i] = inv_map[0][i / 2];
     if (map->ply_accurate_loss)
       for (i = 0; i < DRAW_RULE; i++)
-	v[LOSS_IN_ONE - i] = inv_map[1][i];
+        v[LOSS_IN_ONE - i] = inv_map[1][i];
     else
       for (i = 0; i < DRAW_RULE; i++)
-	v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
+        v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
     for (; i <= REDUCE_PLY; i++) {
       v[WIN_IN_ONE + i + 1] = inv_map[2][(i - DRAW_RULE) / 2];
       v[LOSS_IN_ONE - i] = inv_map[3][(i - DRAW_RULE) / 2];
@@ -505,16 +506,16 @@ void prepare_dtz_map(ubyte *v, struct dtz_map *map)
     v[THREAT_DRAW] = num;
     if (map->ply_accurate_win)
       for (i = 3; i <= DRAW_RULE; i++)
-	v[BASE_WIN + i] = inv_map[0][i - 1];
+        v[BASE_WIN + i] = inv_map[0][i - 1];
     else
       for (i = 3; i <= DRAW_RULE; i++)
-	v[BASE_WIN + i] = inv_map[0][(i - 1) / 2];
+        v[BASE_WIN + i] = inv_map[0][(i - 1) / 2];
     if (map->ply_accurate_loss)
       for (i = 2; i <= DRAW_RULE; i++)
-	v[BASE_LOSS - i] = inv_map[1][i - 1];
+        v[BASE_LOSS - i] = inv_map[1][i - 1];
     else
       for (i = 2; i <= DRAW_RULE; i++)
-	v[BASE_LOSS - i] = inv_map[1][(i - 1) / 2];
+        v[BASE_LOSS - i] = inv_map[1][(i - 1) / 2];
     v[BASE_WIN + DRAW_RULE + 1] = inv_map[2][0];
     for (i = DRAW_RULE + 2; i <= REDUCE_PLY; i++)
       v[BASE_WIN + i + 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
@@ -526,7 +527,72 @@ void prepare_dtz_map(ubyte *v, struct dtz_map *map)
       v[i] = i;
   }
 
-  compress_init_dtz(map);
+  compress_init_dtz_u8(map);
+}
+
+void prepare_dtz_map_u16(u16 *v, struct dtz_map *map)
+{
+  int i;
+  uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
+  int num = map->max_num;
+
+  if (num_saves == 0) {
+    for (i = 0; i < MAX_VALS; i++)
+      v[i] = 0;
+
+#ifndef SUICIDE
+    v[ILLEGAL] = num;
+    v[UNKNOWN] = v[BROKEN] = num;
+    v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
+
+    v[MATE] = inv_map[1][0];
+    if (map->ply_accurate_win)
+      for (i = 0; i < DRAW_RULE; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i];
+    else
+      for (i = 0; i < DRAW_RULE; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i / 2];
+    if (map->ply_accurate_loss)
+      for (i = 0; i < DRAW_RULE; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i];
+    else
+      for (i = 0; i < DRAW_RULE; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
+    for (; i <= REDUCE_PLY; i++) {
+      v[WIN_IN_ONE + i + 1] = inv_map[2][(i - DRAW_RULE) / 2];
+      v[LOSS_IN_ONE - i] = inv_map[3][(i - DRAW_RULE) / 2];
+    }
+#else
+    v[BROKEN] = v[UNKNOWN] = num;
+    v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
+    v[CAPT_CLOSS] = v[CAPT_LOSS] = num;
+    v[THREAT_WIN] = num;
+    v[THREAT_CWIN1] = v[THREAT_CWIN2] = num;
+    v[THREAT_DRAW] = num;
+    if (map->ply_accurate_win)
+      for (i = 3; i <= DRAW_RULE; i++)
+        v[BASE_WIN + i] = inv_map[0][i - 1];
+    else
+      for (i = 3; i <= DRAW_RULE; i++)
+        v[BASE_WIN + i] = inv_map[0][(i - 1) / 2];
+    if (map->ply_accurate_loss)
+      for (i = 2; i <= DRAW_RULE; i++)
+        v[BASE_LOSS - i] = inv_map[1][i - 1];
+    else
+      for (i = 2; i <= DRAW_RULE; i++)
+        v[BASE_LOSS - i] = inv_map[1][(i - 1) / 2];
+    v[BASE_WIN + DRAW_RULE + 1] = inv_map[2][0];
+    for (i = DRAW_RULE + 2; i <= REDUCE_PLY; i++)
+      v[BASE_WIN + i + 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
+    for (i = DRAW_RULE + 1; i <= REDUCE_PLY; i++)
+      v[BASE_LOSS - i] = inv_map[3][(i - DRAW_RULE - 1) / 2];
+#endif
+  } else {
+    for (i = 0; i < MAX_VALS; i++)
+      v[i] = i;
+  }
+
+  compress_init_dtz_u16(map);
 }
 
 extern char *optarg;
@@ -660,17 +726,25 @@ int main(int argc, char **argv)
   else
     total_work = 100 + 10 * numthreads;
 
+#ifndef SMALL2
   for (i = 0; i < numpcs; i++) {
     shift[i] = (numpcs - i - 1) * 6;
     mask[i] = 0x3fULL << shift[i];
   }
-
-#ifndef SMALL
-  size = 10ULL << (6 * (numpcs-1));
 #else
-  size = 462ULL << (6 * (numpcs-2));
 
+  for (i = 0; i < numpcs; i++) {
+  }
+#endif
+
+#if defined(SMALL)
+  size = 462ULL << (6 * (numpcs-2));
   mask[0] = 0x1ffULL << shift[1];
+#elif defined(SMALL2)
+  size = 462ULL << (6 * (numpcs-2) - 1);
+  mask[0] = 0x1ffULL << shift[1];
+#else
+  size = 10ULL << (6 * (numpcs-1));
 #endif
 
   work_g = create_work(total_work, size, 0x3f);
@@ -718,9 +792,9 @@ int main(int argc, char **argv)
   for (i = 0; i < numpcs; i++)
     for (j = i + 1; j < numpcs; j++)
       if (piece_order[pt[i]] > piece_order[pt[j]]) {
-	int tmp = pt[i];
-	pt[i] = pt[j];
-	pt[j] = tmp;
+        int tmp = pt[i];
+        pt[i] = pt[j];
+        pt[j] = tmp;
       }
 
   for (i = 0, j = 0; i < numpcs; i++)
@@ -759,7 +833,7 @@ int main(int argc, char **argv)
     cursed_capt[i] = 0;
   has_cursed_capts = 0;
 
-  long64 alloc_size = 0ULL;
+  uint64_t alloc_size = 0ULL;
   if (numpcs == 3)
     alloc_size = 31332 + 1;
   else if (numpcs == 4)
@@ -769,8 +843,6 @@ int main(int argc, char **argv)
 
   table_w = alloc_huge(2 * alloc_size);
   table_b = table_w + alloc_size;
-
-  compress_alloc();
 
   init_threads(0);
   init_tables();
@@ -827,11 +899,11 @@ int main(int argc, char **argv)
     if (F) {
       fprintf(F, "########## %s ##########\n\n", tablename);
       if (!switched) {
-	print_stats(F, total_stats_w, 1);
-	print_stats(F, total_stats_b, 0);
+        print_stats(F, total_stats_w, 1);
+        print_stats(F, total_stats_b, 0);
       } else {
-	print_stats(F, total_stats_b, 1);
-	print_stats(F, total_stats_w, 0);
+        print_stats(F, total_stats_b, 1);
+        print_stats(F, total_stats_w, 0);
       }
       print_longest(F, switched);
       fclose(F);
@@ -849,27 +921,36 @@ int main(int argc, char **argv)
   if (total_stats_b[DRAW_RULE] || total_stats_w[STAT_MATE - DRAW_RULE])
     ply_accurate_b = 1;
 
-  ubyte *tb_table;
-  ubyte best_w[MAX_PIECES];
-  ubyte best_b[MAX_PIECES];
+  uint8_t best_w[MAX_PIECES];
+  uint8_t best_b[MAX_PIECES];
   int bestp_w, bestp_b;
 
-#ifndef SUICIDE
-  reset_captures();
-#endif
+  sort_values(total_stats_w, &map_w, 0, ply_accurate_w, ply_accurate_b);
+  if (!symmetric)
+    sort_values(total_stats_b, &map_b, 1, ply_accurate_b, ply_accurate_w);
 
-  ubyte v[256];
-  tb_table = NULL;
+  int wide =  (map_w.max_num >= MAX_NARROW || map_b.max_num >= MAX_NARROW)
+            && generate_dtz;
+  compress_alloc_wdl();
+
+  uint64_t tb_size = init_permute_piece(pcs, pt);
+  uint8_t *tb_table = NULL;
   if (save_to_disk || symmetric || !generate_wdl)
     tb_table = table_b;
-  tb_table = init_permute_piece(pcs, pt, tb_table);
-  if (save_to_disk && !symmetric && generate_wdl) {
+  else
+    tb_table = malloc(tb_size + 1);
+
+  if ((save_to_disk && !symmetric && generate_wdl) || wide) {
     store_table(table_w, 'w');
-    store_table(table_b, 'b');
+    if (!symmetric)
+      store_table(table_b, 'b');
   }
 
   if (generate_wdl) {
+
+    uint8_t v[256];
 #ifndef SUICIDE
+    reset_captures_w();
     test_closs(total_stats_w, table_w, to_fix_w);
 #endif
     prepare_wdl_map(total_stats_w, v, ply_accurate_w, ply_accurate_b);
@@ -877,83 +958,162 @@ int main(int argc, char **argv)
     printf("find optimal permutation for wtm/wdl\n");
     permute_piece_wdl(tb_table, pcs, pt, table_w, best_w, v);
     printf("compressing data for wtm/wdl\n");
-    compress_tb(G, tb_table, best_w, minfreq);
+    compress_tb_u8(G, tb_table, tb_size, best_w, minfreq);
 
     if (!symmetric) {
       if (save_to_disk) {
-        load_table(table_b, 'b');
+        load_table_u8(table_b, 'b');
         tb_table = table_w;
       }
 #ifndef SUICIDE
+      reset_captures_b();
       test_closs(total_stats_b, table_b, to_fix_b);
 #endif
       prepare_wdl_map(total_stats_b, v, ply_accurate_b, ply_accurate_w);
       printf("find optimal permutation for btm/wdl\n");
       permute_piece_wdl(tb_table, pcs, pt, table_b, best_b, v);
       printf("compressing data for btm/wdl\n");
-      compress_tb(G, tb_table, best_b, minfreq);
+      compress_tb_u8(G, tb_table, tb_size, best_b, minfreq);
     }
 
     merge_tb(G);
 
-  }
-
-  if (generate_dtz && (map_w.max_num >= MAX_NARROW || map_b.max_num >= MAX_NARROW)) {
-    fprintf(stderr, "Max DTZ too high.\n");
-    generate_dtz = 0;
   }
 
   if (generate_dtz) {
-    if (tb_table == table_w)
-      load_table(table_w, 'w');
-
-#if defined(REGULAR) || defined(ATOMIC)
-    fix_closs();
-#endif
-
-    sort_values(total_stats_w, &map_w, 0, ply_accurate_w, ply_accurate_b);
-    if (!symmetric)
-      sort_values(total_stats_b, &map_b, 1, ply_accurate_b, ply_accurate_w);
-
-    if (num_saves > 0) {
-      reconstruct_table(table_w, 'w', &map_w);
-      if (!symmetric)
-          reconstruct_table(table_b, 'b', &map_b);
-    }
 
     struct tb_handle *G = create_tb(tablename, 0, 10);
+    uint64_t estimate_w, estimate_b;
 
-    long64 estimate_w, estimate_b;
+    if (!wide) {
 
-    prepare_dtz_map(v, &map_w);
-    printf("find optimal permutation for wtm/dtz\n");
-    estimate_w = estimate_piece_dtz(pcs, pt, table_w, best_w, &bestp_w, v);
+      compress_alloc_dtz_u8();
 
-    if (!symmetric) {
-      prepare_dtz_map(v, &map_b);
-      printf("find optimal permutation for btm/dtz\n");
-      estimate_b = estimate_piece_dtz(pcs, pt, table_b, best_b, &bestp_b, v);
-    } else
-      estimate_b = UINT64_MAX;
+      if (!symmetric)
+        unlink_table('b');
 
-    if (estimate_w <= estimate_b) {
-      tb_table = table_b;
-      prepare_dtz_map(v, &map_w);
-      printf("permute table for wtm/dtz\n");
-      permute_piece_dtz(tb_table, pcs, table_w, bestp_w, v);
-      printf("compressing data for wtm/dtz\n");
-      compress_tb(G, tb_table, best_w, minfreq);
+      if (tb_table == table_w) {
+        load_table_u8(table_w, 'w');
+        unlink_table('w');
+      }
+#if defined(REGULAR) || defined(ATOMIC)
+      else
+        fix_closs_w();
+
+      fix_closs_b();
+#endif
+
+      if (num_saves > 0) {
+        reconstruct_table_u8(table_w, 'w', &map_w);
+        unlink_saves('w');
+        if (!symmetric) {
+          reconstruct_table_u8(table_b, 'b', &map_b);
+          unlink_saves('b');
+        }
+      }
+
+      uint8_t v[256];
+
+      prepare_dtz_map_u8(v, &map_w);
+      printf("find optimal permutation for wtm/dtz\n");
+      estimate_w = estimate_piece_dtz_u8(pcs, pt, table_w, best_w, &bestp_w, v);
+
+      if (!symmetric) {
+        prepare_dtz_map_u8(v, &map_b);
+        printf("find optimal permutation for btm/dtz\n");
+        estimate_b = estimate_piece_dtz_u8(pcs, pt, table_b, best_b, &bestp_b, v);
+      } else
+        estimate_b = UINT64_MAX;
+
+      if (estimate_w <= estimate_b) {
+        tb_table = table_b;
+        prepare_dtz_map_u8(v, &map_w);
+        printf("permute table for wtm/dtz\n");
+        permute_piece_dtz_u8(tb_table, pcs, table_w, bestp_w, v);
+        printf("compressing data for wtm/dtz\n");
+        compress_tb_u8(G, tb_table, tb_size, best_w, minfreq);
+      } else {
+        tb_table = table_w;
+        prepare_dtz_map_u8(v, &map_b);
+        printf("permute table for btm/dtz\n");
+        permute_piece_dtz_u8(tb_table, pcs, table_b, bestp_b, v);
+        printf("compressing data for btm/dtz\n");
+        compress_tb_u8(G, tb_table, tb_size, best_b, minfreq);
+      }
+
     } else {
-      tb_table = table_w;
-      prepare_dtz_map(v, &map_b);
-      printf("permute table for btm/dtz\n");
-      permute_piece_dtz(tb_table, pcs, table_b, bestp_b, v);
-      printf("compressing data for btm/dtz\n");
-      compress_tb(G, tb_table, best_b, minfreq);
+
+      compress_alloc_dtz_u16();
+
+      uint16_t v[MAX_VALS];
+      uint16_t *table_u16 = (uint16_t *)table_w;
+      uint16_t *tb_table_u16 = NULL;
+      uint64_t tb_step = 0;
+
+      if (tb_table != table_w && tb_table != table_b) {
+        if (save_to_disk)
+          free(tb_table);
+        else {
+          tb_table_u16 = (uint16_t *)tb_table;
+          tb_step = (tb_size + 1) / 2;
+        }
+      }
+      if (!tb_table_u16) {
+        tb_step = save_to_disk ? MAX_STEP : (tb_size + 1) / 2;
+        tb_table_u16 = malloc(2 * tb_step);
+      }
+
+      if (!symmetric) {
+        load_table_u16(table_u16, 'b');
+        if (num_saves > 0)
+          reconstruct_table_u16(table_u16, 'b', &map_b);
+
+        prepare_dtz_map_u16(v, &map_b);
+        printf("find optimal permutation for btm/dtz\n");
+        estimate_b = estimate_piece_dtz_u16(pcs, pt, table_u16, best_b, &bestp_b, v);
+      } else
+        estimate_b = UINT64_MAX;
+
+      load_table_u16(table_u16, 'w');
+      unlink_table('w');
+      if (num_saves > 0) {
+        reconstruct_table_u16(table_u16, 'w', &map_w);
+        unlink_saves('w');
+      }
+
+      prepare_dtz_map_u16(v, &map_w);
+      printf("find optimal permutation for wtm/dtz\n");
+      estimate_w = estimate_piece_dtz_u16(pcs, pt, table_u16, best_w, &bestp_w, v);
+
+      if (estimate_w <= estimate_b) {
+        prepare_dtz_map_u16(v, &map_w);
+        printf("permute table for wtm/dtz\n");
+        permute_piece_dtz_u16_full(tb_table_u16, pcs, table_u16, bestp_w, v, tb_step);
+        printf("compressing data for wtm/dtz\n");
+        compress_tb_u16(G, table_u16, tb_size, best_w, minfreq);
+      } else {
+        load_table_u16(table_u16, 'b');
+        if (num_saves > 0)
+          reconstruct_table_u16(table_u16, 'b', &map_b);
+
+        prepare_dtz_map_u16(v, &map_b);
+        printf("permute table for btm/dtz\n");
+        permute_piece_dtz_u16_full(tb_table_u16, pcs, table_u16, bestp_b, v, tb_step);
+        printf("compressing data for btm/dtz\n");
+        compress_tb_u16(G, table_u16, tb_size, best_b, minfreq);
+      }
+
+      if (!symmetric) {
+        unlink_table('b');
+        if (num_saves > 0)
+          unlink_saves('b');
+      }
+
     }
 
     merge_tb(G);
-  }
+
+ }
 
   return 0;
 }

@@ -4,32 +4,32 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-static long64 mask[MAX_PIECES];
+static uint64_t mask[MAX_PIECES];
 int shift[MAX_PIECES];
 
 int piv_sq[24];
-long64 piv_idx[64];
-ubyte piv_valid[64];
-long64 sq_mask[64];
+uint64_t piv_idx[64];
+uint8_t piv_valid[64];
+uint64_t sq_mask[64];
 
 #ifdef SMALL
-long64 diagonal;
-short KK_map[64][64];
+uint64_t diagonal;
+int16_t KK_map[64][64];
 char mirror[64][64];
 #endif
 
-static long64 pw_mask, pw_pawnmask;
-static long64 pw_capt_mask[8];
-static long64 idx_mask1[8], idx_mask2[8];
+static uint64_t pw_mask, pw_pawnmask;
+static uint64_t pw_capt_mask[8];
+static uint64_t idx_mask1[8], idx_mask2[8];
 
 void init_tables(void)
 {
   set_up_tables();
 }
 
-static long64 __inline__ MakeMove(long64 idx, int k, int sq)
+static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
 {
-  return idx | ((long64)sq << shift[k]);
+  return idx | ((uint64_t)sq << shift[k]);
 }
 
 #define PAWN_MASK 0xff000000000000ffULL
@@ -37,10 +37,10 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 // use bit_set
 #if 1
 
-#define bit_set(x,y) { long64 dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
+#define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
 
 #define bit_set_test(x,y,v) \
-  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((long64)(y)) :);
+  __asm__("bts %2, %0\n\tadcl $0, %1\n" : "+r" (x), "+r" (v) : "r" ((uint64_t)(y)) :);
 
 #ifdef USE_POPCNT
 #define FILL_OCC64_cheap \
@@ -64,7 +64,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
 
 #define FILL_OCC_CAPTS \
-  long64 idx2 = idx ^ pw_capt_mask[i]; \
+  uint64_t idx2 = idx ^ pw_capt_mask[i]; \
   occ = bb = 0; \
   for (k = n - 1; k >= numpawns; k--) \
     if (k != i) { \
@@ -81,7 +81,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
 
 #define FILL_OCC_CAPTS_PIVOT \
-  long64 idx2 = idx ^ pw_mask; \
+  uint64_t idx2 = idx ^ pw_mask; \
   occ = bb = 0; \
   assume(numpawns >= 0); \
   for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
@@ -113,7 +113,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 
 #define FILL_OCC_CAPTS \
   int c = 0; \
-  long64 idx2 = idx ^ pw_capt_mask[i]; \
+  uint64_t idx2 = idx ^ pw_capt_mask[i]; \
   occ = bb = 0; \
   for (k = n - 1; k >= numpawns; k--) \
     if (k != i) { \
@@ -130,7 +130,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 
 #define FILL_OCC_CAPTS_PIVOT \
   int c = 0; \
-  long64 idx2 = idx ^ pw_mask; \
+  uint64_t idx2 = idx ^ pw_mask; \
   occ = bb = 0; \
   for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
     bit_set_test(occ, p[k] = idx2 & 0x3f, c); \
@@ -195,7 +195,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
 
 #define FILL_OCC_CAPTS \
-  long64 idx2 = idx ^ pw_capt_mask[i]; \
+  uint64_t idx2 = idx ^ pw_capt_mask[i]; \
   occ = bb = 0; \
   for (k = n - 1; k >= numpawns; k--) \
     if (k != i) { \
@@ -212,7 +212,7 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
   if (PopCount(occ) == n - 1 && !(bb & PAWN_MASK))
 
 #define FILL_OCC_CAPTS_PIVOT \
-  long64 idx2 = idx ^ pw_mask; \
+  uint64_t idx2 = idx ^ pw_mask; \
   occ = bb = 0; \
   for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
     occ |= bit[p[k] = idx2 & 0x3f]; \
@@ -247,11 +247,11 @@ static long64 __inline__ MakeMove(long64 idx, int k, int sq)
 #endif
 
 #define MARK(func, ...) \
-static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
+static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int *restrict p, ##__VA_ARGS__)
 
 #define MARK_BEGIN \
   int sq; \
-  long64 idx2; \
+  uint64_t idx2; \
   bitboard bb = PieceMoves1(p[k], pt[k], occ); \
   while (bb) { \
     sq = FirstOne(bb); \
@@ -262,7 +262,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   }
 
 #define BEGIN_CAPTS \
-  long64 idx; \
+  uint64_t idx; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
@@ -270,25 +270,25 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   bitboard occ, bb; \
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
-  long64 end = thread->end >> 6; \
+  uint64_t end = thread->end >> 6; \
   for (k = 0; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[i] = 0
 
 #define BEGIN_CAPTS_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   int i = captured_piece; \
   int j, k; \
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
-  long64 end = thread->end >> 6
+  uint64_t end = thread->end >> 6
 
 #ifndef SUICIDE
 #ifndef ATOMIC
 #define BEGIN_CAPTS_PIVOT \
-  long64 idx; \
+  uint64_t idx; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
@@ -297,9 +297,9 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   assume(n >= 3 && n <= TBPIECES); \
   assume(numpawns > 0); \
   int king, wtm; \
-  ubyte *restrict table; \
+  uint8_t *restrict table; \
   int *restrict pcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   for (k = 1; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[0] = 0; \
@@ -316,7 +316,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   }
 #else /* ATOMIC */
 #define BEGIN_CAPTS_PIVOT \
-  long64 idx; \
+  uint64_t idx; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
@@ -324,9 +324,9 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
   int king, opp_king, wtm; \
-  ubyte *restrict table; \
+  uint8_t *restrict table; \
   int *restrict pcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   if (pt[0] == WPAWN) { \
     king = black_king; \
     opp_king = white_king; \
@@ -343,16 +343,16 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
 #endif
 
 #define BEGIN_CAPTS_PIVOT_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   int j, k; \
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
   assume(n >= 3 && n <= TBPIECES); \
   int king; \
-  ubyte *restrict table; \
+  uint8_t *restrict table; \
   int *restrict pcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   if (pt[0] == WPAWN) { \
     king = black_king; \
     table = table_b; \
@@ -364,7 +364,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   }
 #else
 #define BEGIN_CAPTS_PIVOT \
-  long64 idx; \
+  uint64_t idx; \
   int j, k; \
   int p[MAX_PIECES]; \
   int pt2[MAX_PIECES]; \
@@ -372,9 +372,9 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
   int wtm; \
-  ubyte *restrict table; \
+  uint8_t *restrict table; \
   int *restrict pcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   for (k = 1; k < n; k++) \
     pt2[k] = pt[k]; \
   pt2[0] = 0; \
@@ -389,15 +389,15 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   }
 
 #define BEGIN_CAPTS_PIVOT_NOPROBE \
-  long64 idx; \
+  uint64_t idx; \
   int j, k; \
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
-  ubyte *restrict table; \
+  uint8_t *restrict table; \
   int *restrict pcs; \
-  long64 end = thread->end; \
+  uint64_t end = thread->end; \
   if (pt[0] == WPAWN) { \
     table = table_b; \
     pcs = black_pcs; \
@@ -443,7 +443,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { for (j = 0; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
-    long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -454,7 +454,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     for (j = 1; white_pcs[j] >= 0; j++) { \
       k = white_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | ((long64)p[k] << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
       func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
     } \
   } while (0)
@@ -465,7 +465,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
     if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
-    long64 idx3 = idx2 | ((long64)(p[k] ^ pw[i]) << shift[i]); \
+    uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #else
@@ -476,7 +476,7 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
     for (j = 1; black_pcs[j] >= 0; j++) { \
       k = black_pcs[j]; \
       if (bit[p[k]] & bits) continue; \
-      long64 idx3 = idx2 | ((long64)(p[k] ^ pw[i]) << shift[i]); \
+      uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]); \
       func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 #endif
@@ -485,30 +485,30 @@ static void func(int k, ubyte *restrict table, long64 idx, bitboard occ, int *re
   do { for (j = 0; pcs[j] >= 0; j++) { \
     k = pcs[j]; \
     if (!piv_valid[p[k]]) continue; \
-    long64 idx3 = idx2 | piv_idx[p[k]]; \
+    uint64_t idx3 = idx2 | piv_idx[p[k]]; \
     func(k, table, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
 
 #define BEGIN_ITER \
-  long64 idx, idx2; \
+  uint64_t idx, idx2; \
   int i; \
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
   bitboard occ, bb = thread->occ; \
   int *p = thread->p; \
-  long64 end = begin + thread->end
+  uint64_t end = begin + thread->end
 
 #define LOOP_ITER \
   for (idx = begin + thread->begin; idx < end; idx++)
 
 #define BEGIN_ITER_ALL \
-  long64 idx, idx2; \
+  uint64_t idx, idx2; \
   int i; \
   int n = numpcs; \
   assume(n >= 2 && n <= TBPIECES); \
   bitboard occ; \
   int p[MAX_PIECES]; \
-  long64 end = thread->end
+  uint64_t end = thread->end
 
 #define LOOP_ITER_ALL \
   for (idx = thread->begin; idx < end; idx++)

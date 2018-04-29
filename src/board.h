@@ -8,6 +8,7 @@
 #define BOARD_BB_H
 
 #include "defs.h"
+#include "types.h"
 
 extern bitboard bit[64];
 

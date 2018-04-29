@@ -1,38 +1,32 @@
 /*
-  Copyright (c) 2011-2016 Ronald de Man
+  Copyright (c) 2011-2016, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
 #include "lz4.h"
+#include "util.h"
 
-static char *lz4_buf = NULL;
-
-#define MAX_SAVES 16
+#define MAX_SAVES 32
 
 void reduce_tables(int local);
 void count_stats(struct thread_data *thread);
-void collect_stats(long64 *work, int phase, int local);
+void collect_stats(uint64_t *work, int phase, int local);
 
 static FILE *tmp_table[MAX_SAVES][2];
 static int reduce_cnt[MAX_SAVES];
 static int stats_val[MAX_SAVES];
 static int reduce_val[MAX_SAVES];
 
-void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
+void save_table(uint8_t *table, char color, int local, uint64_t begin,
+    uint64_t size)
 {
   int i;
   FILE *F;
   char name[64];
-  ubyte v[256];
+  uint8_t v[256];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   if (local == num_saves) {
     sprintf(name, "%s.%c.%d", tablename, color, num_saves);
@@ -88,8 +82,8 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
   }
 #endif
 
-  ubyte *ptr = table + begin;
-  long64 total = size;
+  uint8_t *ptr = table + begin;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
@@ -97,220 +91,19 @@ void save_table(ubyte *table, char color, int local, long64 begin, long64 size)
     for (i = 0; i < chunk; i++)
       copybuf[i] = v[ptr[i]];
     ptr += chunk;
-    uint32 lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
-    ((uint32 *)lz4_buf)[0] = lz4_size;
-    ((uint32 *)lz4_buf)[1] = chunk;
+    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
+    ((uint32_t *)lz4_buf)[0] = lz4_size;
+    ((uint32_t *)lz4_buf)[1] = chunk;
     fwrite(lz4_buf, 1, lz4_size + 8, F);
-  }
-}
-
-void reconstruct_table_pass(ubyte *table, char color, int k, ubyte *v)
-{
-  int i;
-  FILE *F;
-  char name[64];
-
-  sprintf(name, "%s.%c.%d", tablename, color, k);
-
-  if (!(F = fopen(name, "rb"))) {
-    fprintf(stderr, "Could not open %s for writing.\n", name);
-    exit(1);
-  }
-
-  ubyte *ptr = table;
-  long64 total = size;
-  while (total > 0) {
-    int chunk;
-    uint32 lz4_size;
-    fread(&lz4_size, 1, 4, F);
-    fread(&chunk, 1, 4, F);
-    fread(lz4_buf, 1, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (i = 0; i < chunk; i++)
-      ptr[i] |= v[copybuf[i]];
-    ptr += chunk;
-    total -= chunk;
-  }
-
-  fclose(F);
-  unlink(name);
-}
-
-void verify_stats(ubyte *table, long64 *tot_stats, struct dtz_map *map)
-{
-  long64 stats[256];
-  long64 stats2[256];
-  int i, j;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
-
-  for (i = 0; i < 256; i++)
-    stats[i] = stats2[i] = 0;
-
-  for (i = 0; i < 256 * numthreads; i++)
-    thread_stats[i] = 0;
-  count_stats_table = table;
-  run_threaded(count_stats, work_g, 0);
-  for (i = 0; i < numthreads; i++)
-    for (j = 0; j < 256; j++)
-      stats[j] += thread_data[i].stats[j];
-
-  stats2[inv_map[0][0]] = tot_stats[0];
-  stats2[inv_map[1][0]] += tot_stats[STAT_MATE];
-  if (map->ply_accurate_win)
-    for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i]] += tot_stats[i + 1];
-  else
-    for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[0][i / 2]] += tot_stats[i + 1];
-  if (map->ply_accurate_loss)
-    for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i]] += tot_stats[STAT_MATE - 1 - i];
-  else
-    for (i = 0; i < DRAW_RULE; i++)
-      stats2[inv_map[1][i / 2]] += tot_stats[STAT_MATE - 1 - i];
-  for (i = DRAW_RULE + 1; i < MAX_PLY; i++) {
-    stats2[inv_map[2][(i - DRAW_RULE - 1) / 2]] += tot_stats[i];
-    stats2[inv_map[3][(i - DRAW_RULE - 1) / 2]] += tot_stats[STAT_MATE - i];
-  }
-
-  int verify_ok = 1;
-  for (i = 0; i < 256; i++)
-    if (stats[i] != stats2[i] && i != map->max_num) {
-      fprintf(stderr, "stats[%d] = %"PRIu64"; stats2[%d] = %"PRIu64"\n",
-		    i, stats[i], i, stats2[i]);
-      int j;
-      for (j = 0; j < 4; j++)
-	fprintf(stderr, "map[%d][%d]=%d\n", j, i, map->map[j][i]);
-      verify_ok = 0;
-    }
-
-  if (!verify_ok)
-    exit(1);
-}
-
-void reconstruct_table(ubyte *table, char color, struct dtz_map *map)
-{
-  int i, k;
-  int num = map->max_num;
-  ushort (*inv_map)[MAX_VALS] = map->inv_map;
-  ubyte v[256];
-
-  for (i = 0; i < 256; i++)
-    v[i] = 0;
-
-#ifndef SUICIDE
-  v[ILLEGAL] = num;
-  v[BROKEN] = num;
-  v[UNKNOWN] = num;
-  v[PAWN_DRAW] = num;
-  v[CAPT_DRAW] = num;
-  v[CAPT_CWIN_RED] = num;
-  v[CAPT_WIN] = num;
-  for (i = 0; i <= REDUCE_PLY_RED; i++) {
-    v[CAPT_CWIN_RED + i + 2] = inv_map[2][(reduce_cnt[num_saves - 1] + i) / 2];
-    v[LOSS_IN_ONE - i - 1] = inv_map[3][(reduce_cnt[num_saves - 1] + i + 1) / 2];
-  }
-  v[CAPT_CWIN_RED + i + 2] = inv_map[2][(reduce_cnt[num_saves - 1] + i) / 2];
-#else
-  v[BROKEN] = num;
-  v[UNKNOWN] = v[PAWN_DRAW] = num;
-  v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
-  v[CAPT_CLOSS] = v[CAPT_LOSS] = num;
-  v[THREAT_WIN_RED] = v[THREAT_CWIN_RED] = v[THREAT_DRAW] = num;
-// FIXME: add THREAT_CLOSS
-  for (i = 0; i <= REDUCE_PLY_RED; i++) {
-    v[BASE_CWIN_RED + i + 1] = inv_map[2][(reduce_cnt[num_saves - 1] + i) / 2];
-    v[BASE_CLOSS_RED - i - 1] = inv_map[3][(reduce_cnt[num_saves - 1] + i + 1) / 2];
-  }
-  v[BASE_CWIN_RED + i + 1] = inv_map[2][(reduce_cnt[num_saves -1] + i) / 2];
-#endif
-
-  begin = 0;
-  transform_v = v;
-  transform_tbl = table;
-  run_threaded(transform_table, work_g, 0);
-
-  v[0] = 0;
-  int red_cnt = 0;
-#ifndef SUICIDE
-  for (k = 0; k < num_saves; k++) {
-    if (k == 0) {
-      v[255] = inv_map[1][0];
-      v[1] = num;
-      if (map->ply_accurate_win)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 2] = inv_map[0][i];
-      else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[i + 2] = inv_map[0][i / 2];
-      if (map->ply_accurate_loss)
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i];
-      else
-	for (i = 0; i < DRAW_RULE; i++)
-	  v[254 - i] = inv_map[1][i / 2];
-      for (; i <= REDUCE_PLY; i += 2) {
-	v[2 + DRAW_RULE + (i - DRAW_RULE) / 2] = inv_map[2][(i - DRAW_RULE) / 2];
-	v[254 - DRAW_RULE - (i - DRAW_RULE) / 2] = inv_map[3][(i - DRAW_RULE) / 2];
-      }
-      red_cnt = REDUCE_PLY - DRAW_RULE - 2;
-    } else {
-      for (i = 0; i <= REDUCE_PLY_RED + 1; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
-      }
-      red_cnt += REDUCE_PLY_RED;
-    }
-    reconstruct_table_pass(table, color, k, v);
-  }
-#else
-  for (k = 0; k < num_saves; k++) {
-    if (k == 0) {
-      v[1] = inv_map[0][0];
-      if (map->ply_accurate_win)
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[1 + i] = inv_map[0][i - 1];
-      else
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[1 + i] = inv_map[0][(i - 1) / 2];
-      v[255] = inv_map[1][0];
-      if (map->ply_accurate_loss)
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[255 - i] = inv_map[1][i - 1];
-      else
-	for (i = 1; i <= DRAW_RULE; i++)
-	  v[255 - i] = inv_map[1][(i - 1) / 2];
-      for (i = DRAW_RULE + 1; i < REDUCE_PLY; i += 2) {
-	v[2 + DRAW_RULE + (i - DRAW_RULE - 1) / 2] = inv_map[2][(i - DRAW_RULE - 1) / 2];
-	v[254 - DRAW_RULE - (i - DRAW_RULE - 1) / 2] = inv_map[3][(i - DRAW_RULE - 1) / 2];
-      }
-      red_cnt = REDUCE_PLY - 1 - DRAW_RULE;
-    } else {
-      for (i = 0; i < REDUCE_PLY_RED; i += 2) {
-	v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
-	v[255 - ((red_cnt & 1) + i + 1) / 2] = inv_map[3][(red_cnt + i + 1) / 2];
-      }
-      red_cnt += REDUCE_PLY_RED;
-    }
-    reconstruct_table_pass(table, color, k, v);
-  }
-#endif
-
-  if (color == 'w') {
-    printf("Verifying reconstructed table_w based on collected statistics.\n");
-    verify_stats(table_w, total_stats_w, map);
-  } else {
-    printf("Verifying reconstructed table_b based on collected statistics.\n");
-    verify_stats(table_b, total_stats_b, map);
   }
 }
 
 void reduce_tables(int local)
 {
   int i;
-  ubyte v[256];
-  long64 *work;
-  long64 save_begin = begin;
+  uint8_t v[256];
+  uint64_t *work;
+  uint64_t save_begin = begin;
 
   if (!copybuf)
     copybuf = malloc(COPYSIZE);
@@ -423,7 +216,7 @@ void reduce_tables(int local)
   }
 #endif
 
-  transform_v = v;
+  transform_v_u8 = v;
   run_threaded(transform, work, 0);
 
   if (local == num_saves) {
@@ -436,18 +229,12 @@ void reduce_tables(int local)
   }
 }
 
-void store_table(ubyte *table, char color)
+void store_table(uint8_t *table, char color)
 {
   FILE *F;
   char name[64];
 
-  if (!lz4_buf) {
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
-    if (!lz4_buf) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(1);
-    }
-  }
+  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c", tablename, color);
 
@@ -456,47 +243,48 @@ void store_table(ubyte *table, char color)
     exit(1);
   }
 
-  ubyte *ptr = table;
-  long64 total = size;
+  uint8_t *ptr = table;
+  uint64_t total = size;
   while (total > 0) {
     int chunk = COPYSIZE;
     if (total < chunk) chunk = total;
     total -= chunk;
-    uint32 lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
+    uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
     ptr += chunk;
-    *(uint32 *)lz4_buf = lz4_size;
+    *(uint32_t *)lz4_buf = lz4_size;
     fwrite(lz4_buf, 1, lz4_size + 4, F);
   }
 
   fclose(F);
 }
 
-void load_table(ubyte *table, char color)
+void unlink_table(char color)
 {
-  FILE *F;
   char name[64];
 
   sprintf(name, "%s.%c", tablename, color);
-
-  if (!(F = fopen(name, "rb"))) {
-    fprintf(stderr, "Could not open %s for writing.\n", name);
-    exit(1);
-  }
-
-  ubyte *ptr = table;
-  long64 total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    uint32 lz4size;
-    fread(&lz4size, 1, 4, F);
-    fread(lz4_buf, 1, lz4size, F);
-    LZ4_uncompress(lz4_buf, (char *)ptr, chunk);
-    ptr += chunk;
-  }
-
-  fclose(F);
   unlink(name);
 }
 
+void unlink_saves(char color)
+{
+  char name[64];
+
+  for (int k = 0; k < num_saves; k++) {
+    sprintf(name, "%s.%c.%d", tablename, color, k);
+    unlink(name);
+  }
+}
+
+#define MAX_STAT(x) _Generic((x), \
+  u8: 256, \
+  u16: MAX_VALS \
+)
+
+#define T u8
+#include "reducep_tmpl.c"
+#undef T
+
+#define T u16
+#include "reducep_tmpl.c"
+#undef T
