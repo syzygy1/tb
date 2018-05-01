@@ -11,13 +11,12 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+#include "board.h"
 #include "compress.h"
 #include "defs.h"
 #include "permute.h"
 #include "threads.h"
 #include "util.h"
-
-#include "board.h"
 
 #ifndef SUICIDE
 static int white_king, black_king;
@@ -39,11 +38,11 @@ uint64_t total_stats_b[MAX_STATS];
 static void transform_table_u8(struct thread_data *thread);
 static void transform_table_u16(struct thread_data *thread);
 
-static uint64_t *work_g;
+static struct Work *work_g;
 #if !defined(SMALL) && !defined(SMALL2)
-static uint64_t *work_piv;
+static struct Work *work_piv;
 #else
-static uint64_t *work_piv0, *work_piv1;
+static struct Work *work_piv0, *work_piv1;
 #endif
 
 uint8_t *restrict table_w, *restrict table_b;
@@ -73,6 +72,26 @@ static int to_fix_w, to_fix_b;
 
 #ifdef SUICIDE
 int threat_dc, wdl_threat_win, wdl_threat_cwin, wdl_threat_draw;
+#endif
+
+#ifdef SMALL
+// Partition 462 KK slices according to the position of the leading king.
+// 2 nodes: B1+C1+D1+C2, D2+D3+A1+B2+C3+D4
+// 4 nodes: B1+C1, D1+C2, D2+D3, A1+B2+C3+D4
+// 8 nodes: B1, C1, D1, C2, D2, D3, A1+B2, C3+D4
+static uint64_t partition[4][8] = {
+  { 462 },
+  { 229, 233 },
+  { 116, 113, 110, 123 },
+  { 58, 58, 58, 55, 55, 55, 63, 60 }
+};
+
+static uint64_t partition_piv1[4][8] = {
+  { 10 },
+  { 4, 6 },
+  { 2, 2, 2, 4 },
+  { 1, 1, 1, 1, 1, 1, 2, 2 }
+};
 #endif
 
 u8 *transform_v_u8;
@@ -599,6 +618,7 @@ extern char *optarg;
 
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
+  { "numa", 0, NULL, 'n' },
   { "wdl", 0, NULL, 'w' },
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
@@ -616,16 +636,20 @@ int main(int argc, char **argv)
   int save_stats = 0;
   int save_to_disk = 0;
   int switched = 0;
+  int try_numa = 0;
 
   numthreads = 1;
   do {
-    val = getopt_long(argc, argv, "at:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "at:ngwzsd", options, &longindex);
     switch (val) {
     case 'a':
       thread_affinity = 1;
       break;
     case 't':
       numthreads = atoi(optarg);
+      break;
+    case 'n':
+      try_numa = 1;
       break;
     case 'g':
       only_generate = 1;
@@ -714,28 +738,13 @@ int main(int argc, char **argv)
 
   if (pcs[WPAWN] || pcs[BPAWN]) {
     fprintf(stderr, "Can't handle pawns.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
-  if (numthreads < 1) numthreads = 1;
-
-  printf("number of threads = %d\n", numthreads);
-
-  if (numthreads == 1)
-    total_work = 1;
-  else
-    total_work = 100 + 10 * numthreads;
-
-#ifndef SMALL2
   for (i = 0; i < numpcs; i++) {
     shift[i] = (numpcs - i - 1) * 6;
     mask[i] = 0x3fULL << shift[i];
   }
-#else
-
-  for (i = 0; i < numpcs; i++) {
-  }
-#endif
 
 #if defined(SMALL)
   size = 462ULL << (6 * (numpcs-2));
@@ -747,12 +756,41 @@ int main(int argc, char **argv)
   size = 10ULL << (6 * (numpcs-1));
 #endif
 
-  work_g = create_work(total_work, size, 0x3f);
+  if (numthreads < 1) numthreads = 1;
+  printf("Number of threads = %d\n", numthreads);
+
+  if (try_numa) {
+#ifdef NUMA
+    numa_init();
+    printf("Number of NUMA nodes = %d\n", num_nodes[numa]);
+    if (numthreads < num_nodes[numa]) {
+      printf("Too few threads. NUMA disabled.\n");
+      numa = 0;
+    }
+#else
+    printf("Compiled without NUMA support.\n");
+#endif
+  }
+
+  if (numthreads == 1)
+    total_work = 1;
+  else
+    total_work = 100 + 10 * numthreads;
+
+  if (!numa)
+    work_g = create_work(total_work, size, 0x3f);
+  else
+    work_g = create_work_numa(total_work, partition[numa], 1ULL << shift[1],
+        0x3f);
 #ifndef SMALL
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
 #else
   work_piv0 = create_work(total_work, 1ULL << shift[0], 0);
-  work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+  if (!numa)
+    work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+  else
+    work_piv1 = create_work_numa(total_work, partition_piv1[numa],
+        1ULL << shift[1], 0);
 #endif
 
   static int piece_order[16] = {
@@ -843,6 +881,18 @@ int main(int argc, char **argv)
 
   table_w = alloc_huge(2 * alloc_size);
   table_b = table_w + alloc_size;
+
+#ifdef NUMA
+  if (numa) {
+    // Bind table memory regions to nodes.
+    uint64_t start = 0;
+    for (i = 0; i < num_nodes[numa]; i++) {
+      numa_tonode_memory(table_w + start, partition[numa][i] << shift[1], i);
+      numa_tonode_memory(table_b + start, partition[numa][i] << shift[1], i);
+      start += partition[numa][i] << shift[1];
+    }
+  }
+#endif
 
   init_threads(0);
   init_tables();

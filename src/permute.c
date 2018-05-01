@@ -21,8 +21,8 @@
 #include "threads.h"
 #include "util.h"
 
-uint64_t *restrict work_convert = NULL;
-uint64_t *restrict work_est = NULL;
+static struct Work *work_convert = NULL;
+static struct Work *work_est = NULL;
 
 extern char *tablename;
 

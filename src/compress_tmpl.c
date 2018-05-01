@@ -37,8 +37,10 @@ void NAME(compress_alloc_dtz)(void)
 }
 
 // used only for dtz
-static void NAME(adjust_work_dontcares)(uint64_t *work1, uint64_t *work2)
+static void NAME(adjust_work_dontcares)(struct Work *w1, struct Work *w2)
 {
+  uint64_t *restrict work1 = w1->work[0];
+  uint64_t *restrict work2 = w2->work[0];
   uint64_t idx;
   uint64_t end = work1[total_work];
   T *data = compress_state.data;
@@ -148,8 +150,9 @@ static void NAME(count_pairs_dtz)(struct thread_data *thread)
   }
 }
 
-static void NAME(adjust_work_replace)(uint64_t *work)
+static void NAME(adjust_work_replace)(struct Work *w)
 {
+  uint64_t *work = w->work[0];
   uint64_t idx, idx2;
   uint64_t end = compress_state.size;
   T *data = compress_state.data;
@@ -249,9 +252,10 @@ static void NAME(remove_dtz_worker)(struct thread_data *thread)
   }
 }
 
-static void NAME(adjust_work_dontcares_dtz)(uint64_t *restrict work1,
-    uint64_t *restrict work2)
+static void NAME(adjust_work_dontcares_dtz)(struct Work *w1, struct Work *w2)
 {
+  uint64_t *restrict work1 = w1->work[0];
+  uint64_t *restrict work2 = w2->work[0];
   uint64_t idx;
   uint64_t end = work1[total_work];
   T *data = compress_state.data;

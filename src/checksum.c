@@ -29,7 +29,7 @@ static uint8_t *data;
 static uint64_t size;
 static int checksum_found;
 static int checksum_match;
-static uint64_t *work = NULL;
+static struct Work *work = NULL;
 
 static void checksum_worker(struct thread_data *thread)
 {

@@ -85,7 +85,7 @@ static uint32_t (*countfirst)[MAX_NEW][MAXSYMB];
 static uint32_t (*countsecond)[MAX_NEW][MAXSYMB];
 
 extern int total_work;
-static uint64_t *restrict work = NULL, *restrict work_adj = NULL;
+static struct Work *work = NULL, *work_adj = NULL;
 
 static struct {
   void *data;
@@ -226,9 +226,10 @@ static void remove_wdl_worker(struct thread_data *thread)
   }
 }
 
-void adjust_work_dontcares_wdl(uint64_t *restrict work1,
-    uint64_t *restrict work2)
+void adjust_work_dontcares_wdl(struct Work *w1, struct Work *w2)
 {
+  uint64_t *restrict work1 = w1->work[0];
+  uint64_t *restrict work2 = w2->work[0];
   uint64_t idx;
   uint64_t end = work1[total_work];
   uint8_t *restrict data = compress_state.data;
