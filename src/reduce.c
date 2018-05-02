@@ -183,7 +183,7 @@ static void reduce_tables(void)
 #endif
 
   transform_v_u8 = v;
-  run_threaded(transform, work_g, 1);
+  run_threaded(transform, work_g, HIGH, 1);
 
   if (num_saves == 0)
     reduce_cnt = REDUCE_PLY - DRAW_RULE - 2;

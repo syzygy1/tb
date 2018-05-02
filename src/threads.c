@@ -5,6 +5,7 @@
 */
 
 #include <stdalign.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef __WIN32__
@@ -91,46 +92,49 @@ typedef void (*WorkerFunc)(struct thread_data *);
 
 static WorkerFunc worker_func;
 static int numa_threading;
+static int low_threading;
+static uint64_t *work_queue;
 
-struct Queue {
-  alignas(64) uint64_t *work;
-  int counter;
-  int total;
+struct Counter {
+  alignas(64) atomic_int counter;
+  int stop;
 };
 
-static struct Queue queues[8];
+static struct Counter counters[8];
 
-int total_work;
-int numthreads;
+int numthreads, numthreads_low;
 int thread_affinity;
 
 struct timeval start_time, cur_time;
 
-void fill_work(int n, uint64_t size, uint64_t mask, struct Work *work)
+void fill_work(uint64_t size, uint64_t mask, struct Work *work)
 {
   int i;
-  uint64_t *w = work->work[0];
+  uint64_t *w = work->work;
+  int n = work->total;
 
   w[0] = 0;
   w[n] = size;
 
   for (i = 1; i < n; i++)
-    w[i] = (((uint64_t)i * size) / (uint64_t)n) & ~mask;
+    w[i] = (i * size / n) & ~mask;
 }
 
-void fill_work_offset(int n, uint64_t size, uint64_t mask, struct Work *w,
+void fill_work_offset(uint64_t size, uint64_t mask, struct Work *w,
     uint64_t offset)
 {
-  fill_work(n, size, mask, w);
-  for (int i = 0; i <= n; i++)
-    w->work[0][i] += offset;
+  fill_work(size, mask, w);
+  for (int i = 0; i <= w->total; i++)
+    w->work[i] += offset;
 }
 
 struct Work *alloc_work(int n)
 {
   struct Work *w = malloc(sizeof(*w));
   w->numa = 0;
-  w->work[0] = malloc((n + 1) * sizeof(uint64_t));
+  w->total = w->allocated = n;
+  w->work = malloc((n + 1) * sizeof(uint64_t));
+
   return w;
 }
 
@@ -139,7 +143,7 @@ struct Work *create_work(int n, uint64_t size, uint64_t mask)
   struct Work *w;
 
   w = alloc_work(n);
-  fill_work(n, size, mask, w);
+  fill_work(size, mask, w);
 
   return w;
 }
@@ -149,17 +153,52 @@ struct Work *create_work_numa(int n, uint64_t *partition, uint64_t step,
 {
   struct Work *w = malloc(sizeof(*w));
   w->numa = 1;
+  w->total = w->allocated = n * num_nodes[numa];
+  w->work = malloc((n * num_nodes[numa] + 1) * sizeof(uint64_t));
   uint64_t start = 0;
   for (int i = 0; i < num_nodes[numa]; i++) {
-    w->work[i] = malloc((n + 1) * sizeof(uint64_t));
-    w->work[i][0] = start;
-    w->work[i][n] = start + partition[i] * step;
-    for (int j = 1; j < n; j++)
-      w->work[i][j] = start + ((j * partition[i] * step / n) & ~mask);
+    for (int k = 0; k < n; k++)
+      w->work[i * n + k] = start + ((k * partition[i] * step / n) & ~mask);
     start += partition[i] * step;
   }
+  w->work[num_nodes[numa] * n] = start;
 
   return w;
+}
+
+struct Work *create_work_numa2(int n, uint64_t *stop)
+{
+  struct Work *w = malloc(sizeof(*w));
+  w->numa = 1;
+  w->total = w->allocated = n * num_nodes[numa];
+  w->work = malloc((n * num_nodes[numa] + 1) * sizeof(uint64_t));
+  for (int i = 0; i < num_nodes[numa]; i++) {
+    for (int k = 0; k < n; k++)
+      w->work[i * n + k] = stop[i] + k * (stop[i + 1] - stop[i]) / n;
+  }
+  w->work[num_nodes[numa] * n] = stop[num_nodes[numa]];
+
+  return w;
+}
+
+void copy_work(struct Work **dst, struct Work *src)
+{
+  if (*dst == NULL) {
+    *dst = malloc(sizeof(**dst));
+    (*dst)->work = NULL;
+  }
+  if ((*dst)->work == NULL || (*dst)->allocated < src->total)
+    (*dst)->work = realloc((*dst)->work, (src->total + 1) * sizeof(uint64_t));
+  (*dst)->numa = src->numa;
+  (*dst)->total = src->total;
+  for (int i = 0; i <= src->total; i++)
+    (*dst)->work[i] = src->work[i];
+}
+
+void free_work(struct Work *work)
+{
+  free(work->work);
+  free(work);
 }
 
 THREAD_FUNC worker(void *arg);
@@ -170,9 +209,13 @@ void init_threads(int pawns)
 
   thread_data = alloc_aligned(numthreads * sizeof(*thread_data), 64);
 
+  int per_node = numthreads / num_nodes[numa];
+  int per_node_low = numthreads_low / num_nodes[numa];
+
   for (i = 0; i < numthreads; i++) {
     thread_data[i].thread = i;
-    thread_data[i].node = i * num_nodes[numa] / numthreads;
+    thread_data[i].node = i / per_node;
+    thread_data[i].low = (i % per_node) < per_node_low;
   }
 
   if (pawns) {
@@ -269,16 +312,22 @@ THREAD_FUNC worker(void *arg)
     }
 #endif
 
-    struct Queue *queue = &queues[numa_threading ? thread->node : 0];
-    int total = queue->total;
-    WorkerFunc func = worker_func;
+    if (!low_threading || thread->low) {
 
-    while (1) {
-      w = __sync_fetch_and_add(&queue->counter, 1);
-      if (w >= total) break;
-      thread->begin = queue->work[w];
-      thread->end = queue->work[w + 1];
-      func(thread);
+      int node = numa_threading ? thread->node : 0;
+      struct Counter *counter = &counters[node];
+      int stop = counter->stop;
+      WorkerFunc func = worker_func;
+      uint64_t *queue = work_queue;
+
+      while (1) {
+        w = atomic_fetch_add_explicit(&counter->counter, 1, memory_order_relaxed);
+        if (w >= stop) break;
+        thread->begin = queue[w];
+        thread->end = queue[w + 1];
+        func(thread);
+      }
+
     }
 
 #ifndef __WIN32__
@@ -294,24 +343,27 @@ THREAD_FUNC worker(void *arg)
   return 0;
 }
 
-void run_threaded(WorkerFunc func, struct Work *work, int report_time)
+void run_threaded(WorkerFunc func, struct Work *work, int threading,
+    int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;
 
+  low_threading = (threading == LOW);
   worker_func = func;
+  work_queue = work->work;
   if (!work->numa) {
     numa_threading = 0;
-    queues[0].work = work->work[0];
-    queues[0].counter = 0;
-    queues[0].total = total_work;
+    counters[0].counter = 0;
+    counters[0].stop = work->total;
   } else {
     numa_threading = 1;
+    int total = work->total / num_nodes[numa];
     for (int i = 0; i < num_nodes[numa]; i++) {
-      queues[i].work = work->work[i];
-      queues[i].counter = 0;
-      queues[i].total = total_work;
+      counters[i].counter = i * total;
+      counters[i].stop = (i + 1) * total;
     }
+    counters[num_nodes[numa] - 1].stop = work->total;
   }
 
   worker((void *)&(thread_data[numthreads - 1]));
@@ -334,8 +386,8 @@ void run_single(WorkerFunc func, struct Work *work, int report_time)
   struct timeval stop_time;
   struct thread_data *thread = &(thread_data[0]);
 
-  thread->begin = work->work[0][0];
-  thread->end = work->work[0][total_work];
+  thread->begin = work->work[0];
+  thread->end = work->work[work->total];
   func(thread);
 
   gettimeofday(&stop_time, NULL);

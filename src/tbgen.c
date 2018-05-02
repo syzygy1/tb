@@ -38,12 +38,15 @@ uint64_t total_stats_b[MAX_STATS];
 static void transform_table_u8(struct thread_data *thread);
 static void transform_table_u16(struct thread_data *thread);
 
+int total_work, total_work_numa;
+
 static struct Work *work_g;
 #if !defined(SMALL) && !defined(SMALL2)
 static struct Work *work_piv;
 #else
 static struct Work *work_piv0, *work_piv1;
 #endif
+struct Work *work_convert = NULL, *work_est = NULL, *work_sample = NULL;
 
 uint8_t *restrict table_w, *restrict table_b;
 int numpcs;
@@ -221,7 +224,7 @@ void test_closs(uint64_t *stats, uint8_t *table, int to_fix)
     else
       for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
         v[i] = 2;
-    run_threaded(tc_loop, work_g, 0);
+    run_threaded(tc_loop, work_g, HIGH, 0);
   } else {
     for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
       if (stats[STAT_MATE - i]) break;
@@ -639,14 +642,18 @@ int main(int argc, char **argv)
   int try_numa = 0;
 
   numthreads = 1;
+  numthreads_low = 0;
   do {
-    val = getopt_long(argc, argv, "at:ngwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "at:l:ngwzsd", options, &longindex);
     switch (val) {
     case 'a':
       thread_affinity = 1;
       break;
     case 't':
       numthreads = atoi(optarg);
+      break;
+    case 'l':
+      numthreads_low = atoi(optarg);
       break;
     case 'n':
       try_numa = 1;
@@ -756,9 +763,6 @@ int main(int argc, char **argv)
   size = 10ULL << (6 * (numpcs-1));
 #endif
 
-  if (numthreads < 1) numthreads = 1;
-  printf("Number of threads = %d\n", numthreads);
-
   if (try_numa) {
 #ifdef NUMA
     numa_init();
@@ -767,21 +771,33 @@ int main(int argc, char **argv)
       printf("Too few threads. NUMA disabled.\n");
       numa = 0;
     }
+    if (numthreads_low < num_nodes[numa])
+      numthreads_low = num_nodes[numa];
 #else
     printf("Compiled without NUMA support.\n");
 #endif
   }
 
-  if (numthreads == 1)
+  if (numthreads < 1) numthreads = 1;
+  if (numthreads_low < 1 || numthreads_low > numthreads)
+    numthreads_low = numthreads;
+  numthreads = (numthreads + num_nodes[numa] - 1) & ~(num_nodes[numa] - 1);
+  numthreads_low = (numthreads_low + num_nodes[numa] - 1) & ~(num_nodes[numa] - 1);
+  printf("Number of threads = %d (%d)\n", numthreads, numthreads_low);
+
+  if (numthreads == 1) {
     total_work = 1;
-  else
+    total_work_numa = 1;
+  } else {
     total_work = 100 + 10 * numthreads;
+    total_work_numa = 100 + 10 * numthreads / num_nodes[numa];
+  }
 
   if (!numa)
     work_g = create_work(total_work, size, 0x3f);
   else
-    work_g = create_work_numa(total_work, partition[numa], 1ULL << shift[1],
-        0x3f);
+    work_g = create_work_numa(total_work_numa, partition[numa],
+        1ULL << shift[1], 0x3f);
 #ifndef SMALL
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
 #else
@@ -789,7 +805,7 @@ int main(int argc, char **argv)
   if (!numa)
     work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
   else
-    work_piv1 = create_work_numa(total_work, partition_piv1[numa],
+    work_piv1 = create_work_numa(total_work_numa, partition_piv1[numa],
         1ULL << shift[1], 0);
 #endif
 
@@ -906,7 +922,7 @@ int main(int argc, char **argv)
   cur_time = start_time;
 
   printf("Initialising broken positions.\n");
-  run_threaded(calc_broken, work_g, 1);
+  run_threaded(calc_broken, work_g, HIGH, 1);
   printf("Calculating white captures.\n");
   calc_captures_w();
   printf("Calculating black captures.\n");
@@ -918,7 +934,7 @@ int main(int argc, char **argv)
     }
 #ifndef SUICIDE
   printf("Calculating mate positions.\n");
-  run_threaded(calc_mates, work_g, 1);
+  run_threaded(calc_mates, work_g, HIGH, 1);
 #endif
 
   iterate();
@@ -987,8 +1003,30 @@ int main(int argc, char **argv)
   uint8_t *tb_table = NULL;
   if (save_to_disk || symmetric || !generate_wdl)
     tb_table = table_b;
-  else
-    tb_table = malloc(tb_size + 1);
+  else {
+    // tb_table = alloc_huge(tb_size + 1);
+    uint64_t rounded = (tb_size + 0x200000) & ~0x1fffff;
+    tb_table = alloc_huge(rounded);
+#ifdef NUMA
+    if (numa) {
+      rounded /= 0x200000;
+      uint64_t stop[9];
+      for (i = 0; i <= num_nodes[numa]; i++) {
+        stop[i] = i * rounded / num_nodes[numa] * 0x200000ULL;
+      }
+      for (i = 0; i < num_nodes[numa]; i++)
+        numa_tonode_memory(tb_table + stop[i], stop[i + 1] - stop[i], i);
+      for (i = 0; i <= num_nodes[numa]; i++)
+        if (stop[i] > tb_size)
+          stop[i] = tb_size;
+      work_convert = create_work_numa2(total_work_numa, stop);
+    }
+#endif
+  }
+  if (!work_convert)
+    work_convert = create_work(total_work, tb_size, 0);
+  work_est = alloc_work(total_work);
+  work_sample = alloc_work(total_work);
 
   if ((save_to_disk && !symmetric && generate_wdl) || wide) {
     store_table(table_w, 'w');
@@ -1092,6 +1130,9 @@ int main(int argc, char **argv)
       }
 
     } else {
+
+      free_work(work_convert);
+      work_convert = create_work(total_work, tb_size, 0);
 
       compress_alloc_dtz_u16();
 

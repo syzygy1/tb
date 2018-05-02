@@ -67,8 +67,8 @@ static void calc_checksum(char *name)
 
   int chunks = (size + CHUNK - 1) / CHUNK;
   results = (uint64_t *)malloc(32 * chunks);
-  fill_work(total_work, chunks, 0, work);
-  run_threaded(checksum_worker, work, 0);
+  fill_work(chunks, 0, work);
+  run_threaded(checksum_worker, work, HIGH, 0);
   CityHashCrc128((char *)results, 32 * chunks, checksum2);
   unmap_file(data, orig_size);
   free(results);

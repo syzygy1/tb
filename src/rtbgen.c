@@ -469,7 +469,7 @@ static void calc_captures_w(void)
   int i, j, k;
   int n = numpcs;
 
-  run_threaded(calc_illegal_w, work_piv1, 1);
+  run_threaded(calc_illegal_w, work_piv1, HIGH, 1);
 
   for (i = 2; i < n; i++) { // loop over non-king black pieces
     if (!(pt[i] & 0x08)) continue;
@@ -478,7 +478,7 @@ static void calc_captures_w(void)
         pcs2[j++] = black_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(probe_captures_w, work_g, 1);
+    run_threaded(probe_captures_w, work_g, HIGH, 1);
   }
 }
 
@@ -487,7 +487,7 @@ static void calc_captures_b(void)
   int i, j, k;
   int n = numpcs;
 
-  run_threaded(calc_illegal_b, work_piv0, 1);
+  run_threaded(calc_illegal_b, work_piv0, HIGH, 1);
 
   for (i = 2; i < n; i++) { // loop over non-king white pieces
     if (pt[i] & 0x08) continue;
@@ -496,7 +496,7 @@ static void calc_captures_b(void)
         pcs2[j++] = white_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(probe_captures_b, work_g, 1);
+    run_threaded(probe_captures_b, work_g, HIGH, 1);
   }
 }
 
@@ -609,7 +609,7 @@ static void run_iter(void)
     iter_pcs = black_pcs;
     iter_pcs_opp = white_pcs;
   }
-  run_threaded(iter, work_g, 0);
+  run_threaded(iter, work_g, HIGH, 0);
   if (!iter_wtm)
     printf("done.\n");
   iter_wtm ^= 1;
@@ -839,7 +839,7 @@ static void reset_captures_w(void)
         pcs2[j++] = black_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(reset_captures_worker_w, work_g, 1);
+    run_threaded(reset_captures_worker_w, work_g, HIGH, 1);
   }
 }
 
@@ -875,7 +875,7 @@ static void reset_captures_b(void)
         pcs2[j++] = white_pcs[k];
     pcs2[j] = -1;
     captured_piece = i;
-    run_threaded(reset_captures_worker_b, work_g, 1);
+    run_threaded(reset_captures_worker_b, work_g, HIGH, 1);
   }
 }
 
@@ -972,7 +972,7 @@ static void fix_closs_w(void)
   }
 
   printf("fixing cursed white losses.\n");
-  run_threaded(fix_closs_worker_w, work_g, 1);
+  run_threaded(fix_closs_worker_w, work_g, LOW, 1);
 }
 
 static void fix_closs_b(void)
@@ -999,5 +999,5 @@ static void fix_closs_b(void)
   }
 
   printf("fixing cursed black losses.\n");
-  run_threaded(fix_closs_worker_b, work_g, 1);
+  run_threaded(fix_closs_worker_b, work_g, LOW, 1);
 }

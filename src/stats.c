@@ -78,7 +78,7 @@ static uint64_t find_val(uint8_t *table, uint8_t v)
   find_val_table = table;
   find_val_v = v;
 
-  run_threaded(find_loop, work_g, 0);
+  run_threaded(find_loop, work_g, HIGH, 0);
 
   if (found_idx == UINT64_MAX) {
     fprintf(stderr, "find_val: not found!\n");
@@ -156,7 +156,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     thread_stats[i] = 0;
 
   count_stats_table_u8 = table;
-  run_threaded(count_stats_u8, work_g, 0);
+  run_threaded(count_stats_u8, work_g, HIGH, 0);
 
   if (num_saves == 0)
     n = REDUCE_PLY - 2;

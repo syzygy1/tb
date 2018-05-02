@@ -27,13 +27,11 @@ static struct dtz_map *dtz_map;
 extern int split;
 extern int numpcs;
 extern int numpawns;
+extern struct Work *work_convert, *work_sample;
 
 int blockbits = 8;
 
-uint8_t pieces[TBPIECES];
-
-int freq[MAXSYMB];
-int low, high;
+static int high;
 
 char name[64];
 
@@ -84,7 +82,6 @@ static uint8_t newtest[MAXSYMB][MAXSYMB];
 static uint32_t (*countfirst)[MAX_NEW][MAXSYMB];
 static uint32_t (*countsecond)[MAX_NEW][MAXSYMB];
 
-extern int total_work;
 static struct Work *work = NULL, *work_adj = NULL;
 
 static struct {
@@ -228,25 +225,26 @@ static void remove_wdl_worker(struct thread_data *thread)
 
 void adjust_work_dontcares_wdl(struct Work *w1, struct Work *w2)
 {
-  uint64_t *restrict work1 = w1->work[0];
-  uint64_t *restrict work2 = w2->work[0];
+  uint64_t *restrict work1 = w1->work;
+  uint64_t *restrict work2 = w2->work;
   uint64_t idx;
-  uint64_t end = work1[total_work];
+  int total = w1->total;
+  uint64_t end = work1[total];
   uint8_t *restrict data = compress_state.data;
   int i;
 
   work2[0] = work1[0];
-  for (i = 1; i < total_work; i++) {
+  for (i = 1; i < total; i++) {
     idx = work1[i];
     if (idx < work2[i - 1]) {
       work2[i] = work2[i - 1];
       continue;
     }
-    while (idx < end && (data[idx -1] >= 5 || data[idx] >= 5))
+    while (idx < end && (data[idx - 1] >= 5 || data[idx] >= 5))
       idx++;
     work2[i] = idx;
   }
-  work2[total_work] = work1[total_work];
+  work2[total] = work1[total];
 }
 
 static int d[5] = { 5, 5, 6, 7, 8 };
@@ -257,14 +255,32 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
   int i, j, k, l;
   int s1, s2;
 
+  if (maxsymbols == 0) { // compress whole table
+    copy_work(&work, work_convert);
+    copy_work(&work_adj, work_convert);
+    high = work_convert->numa ? HIGH : LOW;
+  } else { // compress small sample
+    copy_work(&work, work_sample);
+    copy_work(&work_adj, work_sample);
+    high = LOW; // force low number of threads
+  }
+
+  // sanity check
+  if (size != work->work[work->total]) {
+    fprintf(stderr, "sanity check failed\n");
+    exit(1);
+  }
+
+/*
   if (!work) {
     work = alloc_work(total_work);
     work_adj = alloc_work(total_work);
   }
+*/
 
   compress_state.data = data;
   compress_state.size = size;
-  fill_work(total_work, size, 0, work);
+//  fill_work(total_work, size, 0, work);
 
   for (i = 0; i < 9; i++) {
     symtable[i].pattern[0] = i;
@@ -274,7 +290,7 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
   }
 
   adjust_work_dontcares_wdl(work, work_adj);
-  run_threaded(remove_wdl_worker, work_adj, 0);
+  run_threaded(remove_wdl_worker, work_adj, high, 0);
 
   num_syms = 9;
 
@@ -304,7 +320,7 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
         countfreq[t][i][j] = 0;
-  run_threaded(count_pairs_wdl, work, 0);
+  run_threaded(count_pairs_wdl, work, high, 0);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
@@ -539,7 +555,7 @@ lab:
         }
 
     adjust_work_replace_u8(work);
-    run_threaded(replace_pairs_u8, work, 0);
+    run_threaded(replace_pairs_u8, work, high, 0);
 
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num3; i++)

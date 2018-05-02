@@ -338,7 +338,7 @@ void NAME(estimate_compression_piece)(T *restrict table,
   T *dst0 = dst;
 
   if (num_segs > 1)
-    run_threaded(NAME(convert_est_data_piece), work_est, 0);
+    run_threaded(NAME(convert_est_data_piece), work_est, LOW, 0);
   else
     run_single(NAME(convert_est_data_piece), work_est, 0);
 
@@ -375,7 +375,7 @@ void NAME(estimate_compression_pawn)(T *restrict table, int *restrict pcs,
   T *dst0 = dst;
 
   if (num_segs > 1)
-    run_threaded(NAME(convert_est_data_pawn), work_est, 0);
+    run_threaded(NAME(convert_est_data_pawn), work_est, LOW, 0);
   else
     run_single(NAME(convert_est_data_pawn), work_est, 0);
 
@@ -409,9 +409,8 @@ uint64_t NAME(estimate_compression)(T *restrict table, int *restrict bestp,
     return 0;
   }
 
-  if (!work_est)
-    work_est = alloc_work(total_work);
-  fill_work(total_work, num_segs, 0, work_est);
+  fill_work(num_segs, 0, work_est);
+  fill_work(num_segs * seg_size, 0, work_sample);
 
   for (i = 0; i < num_type_perms; i++)
     compest[i] = 0;
@@ -502,7 +501,7 @@ void NAME(permute_piece_dtz)(T *tb_table, int *pcs, T *table, int bestp, T *v)
   NAME(convert_data).pcs = pcs;
   NAME(convert_data).p = bestp;
 
-  run_threaded(NAME(convert_data_piece), work_convert, 1);
+  run_threaded(NAME(convert_data_piece), work_convert, HIGH, 1);
 }
 
 uint64_t NAME(estimate_pawn_dtz)(int *pcs, int *pt, T *table, uint8_t *best,
@@ -540,7 +539,7 @@ void NAME(permute_pawn_dtz)(T *tb_table, int *pcs, T *table, int bestp,
   NAME(convert_data).p = bestp;
   NAME(convert_data).file = file;
 
-  run_threaded(NAME(convert_data_pawn), work_convert, 1);
+  run_threaded(NAME(convert_data_pawn), work_convert, HIGH, 1);
 }
 
 #undef NAME

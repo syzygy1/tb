@@ -34,6 +34,8 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
+enum { HIGH = 0, LOW = 1 };
+
 extern int numa;
 extern int num_nodes[4];
 
@@ -45,30 +47,35 @@ struct thread_data {
   int *p;
   int thread;
   int node;
-//  uint8_t dummy[64 - 2*sizeof(uint64_t) - 2*sizeof(void *) - sizeof(bitboard) - sizeof(int)];
+  int low;
 };
 
 struct Work {
+  uint64_t *work;
   int numa;
-  uint64_t *work[8];
+  int total;
+  int allocated;
 };
 
+typedef void (*WorkerFunc)(struct thread_data *);
+
 void init_threads(int pawns);
-void run_threaded(void (*func)(struct thread_data *), struct Work *work,
+void run_threaded(WorkerFunc func, struct Work *work, int threading,
     int report_time);
-void run_single(void (*func)(struct thread_data *), struct Work *work,
-    int report_time);
-void fill_work(int n, uint64_t size, uint64_t mask, struct Work *w);
-void fill_work_offset(int n, uint64_t size, uint64_t mask, struct Work *w,
+void run_single(WorkerFunc func, struct Work *work, int report_time);
+void fill_work(uint64_t size, uint64_t mask, struct Work *w);
+void fill_work_offset(uint64_t size, uint64_t mask, struct Work *w,
     uint64_t offset);
 struct Work *alloc_work(int n);
 struct Work *create_work(int n, uint64_t size, uint64_t mask);
 struct Work *create_work_numa(int n, uint64_t *partition, uint64_t step,
     uint64_t mask);
+struct Work *create_work_numa2(int n, uint64_t *stop);
+void copy_work(struct Work **dst, struct Work *src);
+void free_work(struct Work *work);
 
-extern int numthreads;
+extern int numthreads, numthreads_low;
 extern int thread_affinity;
-extern int total_work;
 extern struct thread_data *thread_data;
 extern struct timeval start_time, cur_time;
 

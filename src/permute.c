@@ -21,12 +21,10 @@
 #include "threads.h"
 #include "util.h"
 
-static struct Work *work_convert = NULL;
-static struct Work *work_est = NULL;
+extern struct Work *work_convert, *work_est, *work_sample;
 
 extern char *tablename;
 
-extern int total_work;
 extern int numthreads;
 extern uint64_t sq_mask[64];
 extern int compress_type;
@@ -436,7 +434,6 @@ uint64_t init_permute_piece(int *pcs, int *pt)
   generate_test_list(tb_size, entry_piece.num);
 
   init_0x40(entry_piece.num);
-  work_convert = create_work(total_work, tb_size, 0);
 
   return tb_size;
 }
@@ -453,14 +450,9 @@ uint64_t init_permute_file(int *pcs, int file)
 
   generate_test_list(tb_size, entry_pawn.num);
 
-/*
-  if (!tb_table && !(tb_table = malloc(TB_SIZE(*tb_table)))) {
-    fprintf(stderr, "Out of memory.\n");
-    exit(1);
-  }
-*/
-
-  fill_work(total_work, tb_size, 0, work_convert);
+  fprintf(stderr, "do something here!\n");
+  exit(1);
+//  fill_work(total_work, tb_size, 0, work_convert);
 
   return tb_size;
 }
@@ -499,7 +491,7 @@ void permute_piece_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
   convert_data_u8.pcs = pcs;
   convert_data_u8.p = bestp;
 
-  run_threaded(convert_data_piece_u8, work_convert, 1);
+  run_threaded(convert_data_piece_u8, work_convert, HIGH, 1);
 }
 
 void init_permute_pawn(int *pcs, int *pt)
@@ -606,7 +598,9 @@ void init_permute_pawn(int *pcs, int *pt)
     for (j = 0; j < entry_pawn.num; j++)
       pidx_list[i][piece_perm_list[i][j]] = j;
 
-  work_convert = alloc_work(total_work);
+  fprintf(stderr, "do something here too!\n");
+  exit(1);
+//  work_convert = alloc_work(total_work);
 }
 
 void permute_pawn_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
@@ -639,7 +633,7 @@ void permute_pawn_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
   convert_data_u8.p = bestp;
   convert_data_u8.file = file;
 
-  run_threaded(convert_data_pawn_u8, work_convert, 1);
+  run_threaded(convert_data_pawn_u8, work_convert, HIGH, 1);
 }
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -660,7 +654,7 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
   uint64_t begin = 0;
   while (1) {
     uint64_t end = min(begin + tb_step, tb_size);
-    fill_work_offset(total_work, end - begin, 0, work_convert, begin);
+    fill_work_offset(end - begin, 0, work_convert, begin);
     permute_piece_dtz_u16(tb_table - begin, pcs, table, bestp, v);
 
     if (end == tb_size) break;
