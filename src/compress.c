@@ -274,7 +274,7 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
   }
 
   adjust_work_dontcares_wdl(work, work_adj);
-  run_threaded(remove_wdl_worker, work_adj, 0);
+  run_threaded2(remove_wdl_worker, work_adj, 0, 64);
 
   num_syms = 9;
 
@@ -304,7 +304,7 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
         countfreq[t][i][j] = 0;
-  run_threaded(count_pairs_wdl, work, 0);
+  run_threaded2(count_pairs_wdl, work, 0, 64);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
@@ -539,7 +539,7 @@ lab:
         }
 
     adjust_work_replace_u8(work);
-    run_threaded(replace_pairs_u8, work, 0);
+    run_threaded2(replace_pairs_u8, work, 0, 64);
 
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num3; i++)

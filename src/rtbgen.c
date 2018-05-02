@@ -972,7 +972,7 @@ static void fix_closs_w(void)
   }
 
   printf("fixing cursed white losses.\n");
-  run_threaded(fix_closs_worker_w, work_g, 1);
+  run_threaded2(fix_closs_worker_w, work_g, 1, 64);
 }
 
 static void fix_closs_b(void)
@@ -999,5 +999,5 @@ static void fix_closs_b(void)
   }
 
   printf("fixing cursed black losses.\n");
-  run_threaded(fix_closs_worker_b, work_g, 1);
+  run_threaded2(fix_closs_worker_b, work_g, 1, 64);
 }

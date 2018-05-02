@@ -22,6 +22,7 @@
 
 int numa = 0;
 int num_nodes[4] = { 1, 2, 4, 8 };
+int th_limit = 0;
 
 struct thread_data *thread_data;
 
@@ -272,13 +273,14 @@ THREAD_FUNC worker(void *arg)
     struct Queue *queue = &queues[numa_threading ? thread->node : 0];
     int total = queue->total;
     WorkerFunc func = worker_func;
-
-    while (1) {
-      w = __sync_fetch_and_add(&queue->counter, 1);
-      if (w >= total) break;
-      thread->begin = queue->work[w];
-      thread->end = queue->work[w + 1];
-      func(thread);
+    if(th_limit == 0 || (!numa_threading && t < (th_limit - 1)) || (numa_threading && (t - (thread->node * numthreads / num_nodes[numa])) < (th_limit / num_nodes[numa]))) {
+      while (1) {
+        w = __sync_fetch_and_add(&queue->counter, 1);
+        if (w >= total) break;
+        thread->begin = queue->work[w];
+        thread->end = queue->work[w + 1];
+        func(thread);
+      }
     }
 
 #ifndef __WIN32__
@@ -293,12 +295,15 @@ THREAD_FUNC worker(void *arg)
 
   return 0;
 }
-
 void run_threaded(WorkerFunc func, struct Work *work, int report_time)
+{
+  run_threaded2(func, work, report_time, 0);
+}
+void run_threaded2(WorkerFunc func, struct Work *work, int report_time, int limit)
 {
   int secs, usecs;
   struct timeval stop_time;
-
+  th_limit = limit;
   worker_func = func;
   if (!work->numa) {
     numa_threading = 0;

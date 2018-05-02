@@ -144,7 +144,7 @@ static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
 
   NAME(transform_v) = v;
   NAME(transform_tbl) = table;
-  run_threaded(NAME(transform_table), work_g, 0);
+  run_threaded2(NAME(transform_table), work_g, 0, 64);
 
   v[0] = 0;
   int red_cnt = 0;
