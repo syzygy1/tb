@@ -307,7 +307,7 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
   }
 
   NAME(adjust_work_dontcares_dtz)(work, work_adj);
-  run_threaded(NAME(remove_dtz_worker), work_adj, 0);
+  run_threaded2(NAME(remove_dtz_worker), work_adj, 0, 64);
 
   // first round of freq counting, to fill in dont cares
   for (i = 0; i < num_syms; i++)
@@ -318,7 +318,7 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
         NAME(countfreq_dtz)[t][i][j] = 0;
-  run_threaded(NAME(count_pairs_dtz), work, 0);
+  run_threaded2(NAME(count_pairs_dtz), work, 0, 64);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
@@ -348,7 +348,7 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
       newtest[i][j] = 0;
 
   NAME(adjust_work_dontcares)(work, work_adj);
-  run_threaded(NAME(fill_dontcares), work_adj, 0);
+  run_threaded2(NAME(fill_dontcares), work_adj, 0, 64);
 
   for (i = 0; i < num_syms; i++)
     for (j = 0; j < num_syms; j++)
@@ -358,7 +358,7 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
         NAME(countfreq_dtz)[t][i][j] = 0;
-  run_threaded(NAME(count_pairs_dtz), work, 0);
+  run_threaded2(NAME(count_pairs_dtz), work, 0, 64);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
@@ -456,7 +456,7 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
         }
 
     NAME(adjust_work_replace)(work);
-    run_threaded(NAME(replace_pairs), work, 0);
+    run_threaded2(NAME(replace_pairs), work, 0, 64);
 
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num; i++)

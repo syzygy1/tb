@@ -56,6 +56,8 @@ struct Work {
 void init_threads(int pawns);
 void run_threaded(void (*func)(struct thread_data *), struct Work *work,
     int report_time);
+void run_threaded2(void (*func)(struct thread_data *), struct Work *work,
+    int report_time, int limit);
 void run_single(void (*func)(struct thread_data *), struct Work *work,
     int report_time);
 void fill_work(int n, uint64_t size, uint64_t mask, struct Work *w);
