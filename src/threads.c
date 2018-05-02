@@ -273,7 +273,7 @@ THREAD_FUNC worker(void *arg)
     struct Queue *queue = &queues[numa_threading ? thread->node : 0];
     int total = queue->total;
     WorkerFunc func = worker_func;
-    if(th_limit == 0 || t < th_limit - 1) {
+    if(numa || th_limit == 0 || t < th_limit - 1) {
       while (1) {
         w = __sync_fetch_and_add(&queue->counter, 1);
         if (w >= total) break;
