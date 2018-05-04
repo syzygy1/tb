@@ -8,6 +8,7 @@
 #define PROBE_H
 
 #include "defs.h"
+#include "types.h"
 
 #define TBPIECES 7
 
