@@ -501,7 +501,7 @@ static void NAME(calc_block_sizes)(T *data, uint64_t size, struct HuffCode *c,
   int i, s, t;
   int64_t block;
   int maxbits, bits, numpos;
-  uint32_t avg;
+  uint64_t avg;
 
   uint64_t rawsize = calc_size(c);
   printf("calc_size: %"PRIu64"\n", rawsize);
