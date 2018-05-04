@@ -79,8 +79,8 @@ struct {
 } paircands[MAX_NEW];
 
 static uint8_t newtest[MAXSYMB][MAXSYMB];
-static uint32_t (*countfirst)[MAX_NEW][MAXSYMB];
-static uint32_t (*countsecond)[MAX_NEW][MAXSYMB];
+static uint64_t (*countfirst)[MAX_NEW][MAXSYMB];
+static uint64_t (*countsecond)[MAX_NEW][MAXSYMB];
 
 static struct Work *work = NULL, *work_adj = NULL;
 
