@@ -11,8 +11,9 @@
 #include <windows.h>
 #endif
 
-#include "defs.h"
 #include "lz4.h"
+
+#include "defs.h"
 #include "util.h"
 
 void *map_file(char *name, int shared, uint64_t *size)
@@ -160,41 +161,6 @@ void write_u8(FILE *F, uint8_t v)
 
 static uint8_t buf[8192];
 
-#if 0
-int write_to_buf(uint32_t bits, int n)
-{
-  static int numBytes, numBits;
-
-  if (n < 0) {
-    numBytes = numBits = 0;
-  } else if (n == 0)
-    return numBytes;
-  else {
-    if (numBits) {
-      buf[numBytes-1] |= (bits<<numBits);
-      if (numBits+n < 8) {
-	numBits += n;
-	n = 0;
-      } else {
-	n -= (8-numBits);
-	bits >>= 8-numBits;
-	numBits = 0;
-      }
-    }
-    while (n >= 8) {
-      buf[numBytes++] = bits;
-      bits >>= 8;
-      n -= 8;
-    }
-    if (n > 0) {
-      buf[numBytes++] = bits;
-      numBits = n;
-    }
-  }
-  return 0;
-}
-#endif
-
 void write_bits(FILE *F, uint32_t bits, int n)
 {
   static int numBytes, numBits;
@@ -232,32 +198,173 @@ void write_bits(FILE *F, uint32_t bits, int n)
   }
 }
 
-uint8_t *copybuf;
+#define COPYSIZE (10*1024*1024)
 
-void copy_bytes(FILE *F, FILE *G, uint64_t num)
-{
-  if (!copybuf)
-    copybuf = malloc(COPYSIZE);
-
-  while (num > COPYSIZE) {
-    fread(copybuf, 1, COPYSIZE, G);
-    fwrite(copybuf, 1, COPYSIZE, F);
-    num -= COPYSIZE;
-  }
-  fread(copybuf, 1, num, G);
-  fwrite(copybuf, 1, num, F);
-}
-
+static uint8_t *copybuf = NULL;
 static char *lz4_buf = NULL;
 
-char *get_lz4_buf(void)
+static void init(void)
 {
-  if (!lz4_buf)
-    lz4_buf = malloc(4 + LZ4_compressBound(COPYSIZE));
-  if (!lz4_buf) {
-    fprintf(stderr, "Out of memory.\n");
+  if (!copybuf) {
+    copybuf = malloc(COPYSIZE);
+    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
+  }
+}
+
+static void file_read(void *ptr, size_t size, FILE *F)
+{
+  if (fread(ptr, 1, size, F) != size) {
+    fprintf(stderr, "Error reading data from disk.\n");
     exit(EXIT_FAILURE);
   }
+}
 
-  return lz4_buf;
+static void file_write(void *ptr, size_t size, FILE *F)
+{
+  if (fwrite(ptr, 1, size, F) != size) {
+    fprintf(stderr, "Error writing data to disk.\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void copy_data(FILE *F, FILE *G, uint64_t size)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    file_read(copybuf, chunk, G);
+    file_write(copybuf, chunk, F);
+    size -= chunk;
+  }
+}
+
+void write_data(FILE *F, uint8_t *src, uint64_t size)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    uint32_t lz4_size = LZ4_compress((char *)src, lz4_buf + 4, chunk);
+    *(uint32_t *)lz4_buf = lz4_size;
+    file_write(lz4_buf, lz4_size + 4, F);
+    src += chunk;
+    size -= chunk;
+  }
+}
+
+void write_mapped_data(FILE *F, uint8_t *src, uint64_t size, uint8_t *v)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    for (size_t i = 0; i < chunk; i++)
+      copybuf[i] = v[src[i]];
+    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 4, chunk);
+    *(uint32_t *)lz4_buf = lz4_size;
+    file_write(lz4_buf, lz4_size + 4, F);
+    src += chunk;
+    size -= chunk;
+  }
+}
+
+void write_mapped_data_p(FILE *F, uint8_t *src, uint64_t size, uint8_t *v)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    for (size_t i = 0; i < chunk; i++)
+      copybuf[i] = v[src[i]];
+    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
+    ((uint32_t *)lz4_buf)[0] = lz4_size;
+    ((uint32_t *)lz4_buf)[1] = chunk;
+    file_write(lz4_buf, lz4_size + 8, F);
+    src += chunk;
+    size -= chunk;
+  }
+}
+
+void read_data_u8(FILE *F, uint8_t *dst, uint64_t size)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    uint32_t lz4_size;
+    file_read(&lz4_size, 4, F);
+    file_read(lz4_buf, lz4_size, F);
+    LZ4_uncompress(lz4_buf, (char *)dst, chunk);
+    dst += chunk;
+    size -= chunk;
+  }
+}
+
+void read_data_u16(FILE *F, uint16_t *dst, uint64_t size)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    uint32_t lz4_size;
+    file_read(&lz4_size, 4, F);
+    file_read(lz4_buf, lz4_size, F);
+    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
+    for (size_t i = 0; i < chunk; i++)
+      dst[i] = copybuf[i];
+    dst += chunk;
+    size -= chunk;
+  }
+}
+
+void read_mapped_data_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    uint32_t lz4_size;
+    file_read(&lz4_size, 4, F);
+    file_read(lz4_buf, lz4_size, F);
+    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
+    for (size_t i = 0; i < chunk; i++)
+      dst[i] |= v[copybuf[i]];
+    dst += chunk;
+    size -= chunk;
+  }
+}
+
+void read_mapped_data_u16(FILE *F, uint16_t *dst, uint64_t size, uint16_t *v)
+{
+  init();
+
+  while (size) {
+    uint32_t chunk = min(COPYSIZE, size);
+    uint32_t lz4_size;
+    file_read(&lz4_size, 4, F);
+    file_read(lz4_buf, lz4_size, F);
+    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
+    for (size_t i = 0; i < chunk; i++)
+      dst[i] |= v[copybuf[i]];
+    dst += chunk;
+    size -= chunk;
+  }
+}
+
+void read_mapped_data_p_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v)
+{
+  init();
+
+  while (size) {
+    uint32_t lz4_size, chunk;
+    file_read(&lz4_size, 4, F);
+    file_read(&chunk, 4, F);
+    file_read(lz4_buf, lz4_size, F);
+    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
+    for (size_t i = 0; i < chunk; i++)
+      dst[i] |= v[copybuf[i]];
+    dst += chunk;
+    size -= chunk;
+  }
 }

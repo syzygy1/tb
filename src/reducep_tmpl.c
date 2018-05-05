@@ -8,11 +8,8 @@
 
 void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
 {
-  int i;
   FILE *F;
   char name[64];
-
-  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c.%d", tablename, color, k);
 
@@ -21,20 +18,7 @@ void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
     exit(1);
   }
 
-  T *ptr = table;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk;
-    uint32_t lz4_size;
-    fread(&lz4_size, 1, 4, F);
-    fread(&chunk, 1, 4, F);
-    fread(lz4_buf, 1, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (i = 0; i < chunk; i++)
-      ptr[i] |= v[copybuf[i]];
-    ptr += chunk;
-    total -= chunk;
-  }
+  NAME(read_mapped_data_p)(F, table, size, v);
 
   fclose(F);
 }
@@ -213,8 +197,6 @@ void NAME(load_table)(T *table, char color)
   FILE *F;
   char name[64];
 
-  char *lz4_buf = get_lz4_buf();
-
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "rb"))) {
@@ -222,24 +204,7 @@ void NAME(load_table)(T *table, char color)
     exit(1);
   }
 
-  T *ptr = table;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    uint32_t lz4size;
-    fread(&lz4size, 1, 4, F);
-    fread(lz4_buf, 1, lz4size, F);
-    if (sizeof(T) == 1)
-      LZ4_uncompress(lz4_buf, (char *)ptr, chunk);
-    else {
-      LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-      for (int i = 0; i < chunk; i++)
-        ptr[i] = copybuf[i];
-    }
-    ptr += chunk;
-  }
+  NAME(read_data)(F, table, size);
 
   fclose(F);
 }

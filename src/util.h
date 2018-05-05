@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define min(a,b) ((a) < (b) ? (a) : (b))
+
 void *map_file(char *name, int shared, uint64_t *size);
 void unmap_file(void *data, uint64_t size);
 
@@ -16,10 +18,14 @@ void write_u8(FILE *F, uint8_t v);
 
 void write_bits(FILE *F, uint32_t bits, int n);
 
-#define COPYSIZE 10*1024*1024
-extern uint8_t *copybuf;
-
-void copy_bytes(FILE *F, FILE *G, uint64_t num);
-char *get_lz4_buf(void);
+void copy_data(FILE *F, FILE *G, uint64_t num);
+void write_data(FILE *F, uint8_t *src, uint64_t size);
+void write_mapped_data(FILE *F, uint8_t *src, uint64_t size, uint8_t *v);
+void write_mapped_data_p(FILE *F, uint8_t *src, uint64_t size, uint8_t *v);
+void read_data_u8(FILE *F, uint8_t *dst, uint64_t size);
+void read_data_u16(FILE *F, uint16_t *dst, uint64_t size);
+void read_mapped_data_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v);
+void read_mapped_data_u16(FILE *F, uint16_t *dst, uint64_t size, uint16_t *v);
+void read_mapped_data_p_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v);
 
 #endif

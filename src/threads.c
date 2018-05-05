@@ -144,7 +144,7 @@ void init_threads(int pawns)
   }
 
 #ifndef __WIN32__
-  threads = malloc((numthreads - 1) * sizeof(*threads));
+  threads = malloc(numthreads * sizeof(*threads));
   pthread_attr_init(&thread_attr);
   pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   pthread_barrier_init(&barrier_start, NULL, numthreads);
@@ -158,18 +158,14 @@ void init_threads(int pawns)
       exit(EXIT_FAILURE);
     }
   }
+  threads[numthreads - 1] = pthread_self();
 
   if (thread_affinity) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(0, &cpuset);
-    int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
-    if (rc)
-      fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
-    CPU_CLR(0, &cpuset);
-    for (i = 1; i < numthreads; i++) {
+    for (i = 0; i < numthreads; i++) {
       CPU_SET(i, &cpuset);
-      rc = pthread_setaffinity_np(threads[i - 1], sizeof(cpuset), &cpuset);
+      int rc = pthread_setaffinity_np(threads[i], sizeof(cpuset), &cpuset);
       CPU_CLR(i, &cpuset);
       if (rc)
         fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
