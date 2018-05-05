@@ -79,8 +79,8 @@ struct {
 } paircands[MAX_NEW];
 
 static uint8_t newtest[MAXSYMB][MAXSYMB];
-static uint64_t (*countfirst)[MAX_NEW][MAXSYMB];
-static uint64_t (*countsecond)[MAX_NEW][MAXSYMB];
+static uint64_t (**countfirst)[MAX_NEW][MAXSYMB];
+static uint64_t (**countsecond)[MAX_NEW][MAXSYMB];
 
 static struct Work *work = NULL, *work_adj = NULL;
 
@@ -99,9 +99,12 @@ static uint8_t wdl_flags;
 int compress_type;
 static uint8_t dc_to_val[4];
 
-static int64_t (*countfreq)[9][16];
-static int64_t (*countfreq_dtz_u8)[255][255];
-static int64_t (*countfreq_dtz_u16)[MAX_VALS][MAX_VALS];
+typedef int64_t Countfreq_dtz_u8[255][255];
+typedef int64_t Countfreq_dtz_u16[MAX_VALS][MAX_VALS];
+
+static int64_t (**countfreq)[9][16];
+static Countfreq_dtz_u8 **countfreq_dtz_u8;
+static Countfreq_dtz_u16 **countfreq_dtz_u16;
 
 #define read_symbol(x) _Generic((x), \
   u8: symcode[x][(&(x))[1]], \
@@ -126,6 +129,22 @@ void compress_alloc_wdl()
   countfirst = malloc(numthreads * sizeof(*countfirst));
   countsecond = malloc(numthreads * sizeof(*countsecond));
   countfreq = malloc(numthreads * sizeof(*countfreq));
+  if (!numa) {
+    for (int t = 0; t < numthreads; t++) {
+      countfirst[t] = malloc(sizeof(*(countfirst[t])));
+      countsecond[t] = malloc(sizeof(*(countsecond[t])));
+      countfreq[t] = malloc(sizeof(*(countfreq[t])));
+    }
+  } else {
+#ifdef NUMA
+    for (int t = 0; t < numthreads; t++) {
+      int node = thread_data[t].node;
+      countfirst[t] = numa_alloc_onnode(sizeof(*(countfirst[t])), node);
+      countsecond[t] = numa_alloc_onnode(sizeof(*(countsecond[t])), node);
+      countfreq[t] = numa_alloc_onnode(sizeof(*(countfreq[t])), node);
+#endif
+    }
+  }
 }
 
 void compress_init_wdl(int *vals, int flags)
@@ -158,13 +177,13 @@ static void count_pairs_wdl(struct thread_data *thread)
   uint64_t idx = thread->begin;
   uint64_t end = thread->end;
   uint8_t *restrict data = compress_state.data;
-  int t = thread->thread;
+  int64_t (*count)[9][16] = countfreq[thread->thread];
 
   if (idx == 0) idx = 1;
   s1 = data[idx - 1];
   for (; idx < end; idx++) {
     s2 = data[idx];
-    countfreq[t][s1][s2]++;
+    (*count)[s1][s2]++;
     s1 = s2;
   }
 }
@@ -319,12 +338,12 @@ struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        countfreq[t][i][j] = 0;
+        (*countfreq[t])[i][j] = 0;
   run_threaded(count_pairs_wdl, work, high, 0);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] += countfreq[t][i][j];
+        pairfreq[i][j] += (*countfreq[t])[i][j];
 
   while (num_syms < maxsymbols) {
 
@@ -550,8 +569,8 @@ lab:
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num3; i++)
         for (j = 0; j < num_syms; j++) {
-          countfirst[t][i][j] = 0;
-          countsecond[t][i][j] = 0;
+          (*countfirst[t])[i][j] = 0;
+          (*countsecond[t])[i][j] = 0;
         }
 
     adjust_work_replace_u8(work);
@@ -560,10 +579,10 @@ lab:
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num3; i++)
         for (j = 0; j < num_syms; j++) {
-          pairfreq[j][newpairs[i].s1] -= countfirst[t][i][j];
-          pairfreq[j][newpairs[i].sym] += countfirst[t][i][j];
-          pairfreq[newpairs[i].s2][j] -= countsecond[t][i][j];
-          pairfreq[newpairs[i].sym][j] += countsecond[t][i][j];
+          pairfreq[j][newpairs[i].s1] -= (*countfirst[t])[i][j];
+          pairfreq[j][newpairs[i].sym] += (*countfirst[t])[i][j];
+          pairfreq[newpairs[i].s2][j] -= (*countsecond[t])[i][j];
+          pairfreq[newpairs[i].sym][j] += (*countsecond[t])[i][j];
         }
 
     for (i = 0; i < num3; i++) {

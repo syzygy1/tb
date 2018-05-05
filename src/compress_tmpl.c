@@ -33,6 +33,15 @@ void NAME(compress_init_dtz)(struct dtz_map *map)
 void NAME(compress_alloc_dtz)(void)
 {
   NAME(countfreq_dtz) = malloc(numthreads * sizeof(*NAME(countfreq_dtz)));
+  if (!numa) {
+    for (int t = 0; t < numthreads; t++)
+      (NAME(countfreq_dtz))[t] = malloc(numthreads * sizeof((*NAME(countfreq_dtz))[t]));
+  } else {
+    for (int t = 0; t < numthreads; t++) {
+      int node = thread_data[t].node;
+      (NAME(countfreq_dtz))[t] = numa_alloc_onnode(numthreads * sizeof((*NAME(countfreq_dtz))[t]), node);
+    }
+  }
 }
 
 // used only for dtz
@@ -139,13 +148,13 @@ static void NAME(count_pairs_dtz)(struct thread_data *thread)
   uint64_t idx = thread->begin;
   uint64_t end = thread->end;
   T *data = compress_state.data;
-  int t = thread->thread;
+  NAME(Countfreq_dtz) *countfreq = NAME(countfreq_dtz)[thread->thread];
 
   if (idx == 0) idx = 1;
   s1 = data[idx - 1];
   for (; idx < end; idx++) {
     s2 = data[idx];
-    NAME(countfreq_dtz)[t][s1][s2]++;
+    (*countfreq)[s1][s2]++;
     s1 = s2;
   }
 }
@@ -191,7 +200,8 @@ static void NAME(replace_pairs)(struct thread_data *thread)
   uint64_t end = thread->end;
   T *restrict data = compress_state.data;
   int s1, s2, a;
-  int t = thread->thread;
+  uint64_t (*first)[MAX_NEW][MAXSYMB] = countfirst[thread->thread];
+  uint64_t (*second)[MAX_NEW][MAXSYMB] = countsecond[thread->thread];
 
   a = -1;
   s1 = read_symbol(data[idx]);
@@ -202,12 +212,12 @@ static void NAME(replace_pairs)(struct thread_data *thread)
     if (newtest[s1][s2]) {
       struct Symbol *sym = &symtable[newpairs[newtest[s1][s2] - 1].sym];
       write_symbol(data[idx - sym->len], sym);
-      if (likely(a >= 0)) countfirst[t][newtest[s1][s2] - 1][a]++;
+      if (likely(a >= 0)) (*first)[newtest[s1][s2] - 1][a]++;
       a = newtest[s1][s2] - 1;
       if (unlikely(idx == compress_state.size)) break;
       s1 = read_symbol(data[idx]);
       idx += symtable[s1].len;
-      countsecond[t][a][s1]++;
+      (*second)[a][s1]++;
       a = newpairs[a].sym;
     } else {
       a = s1;
@@ -336,12 +346,12 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        NAME(countfreq_dtz)[t][i][j] = 0;
+        (*NAME(countfreq_dtz)[t])[i][j] = 0;
   run_threaded(NAME(count_pairs_dtz), work, high, 0);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] += NAME(countfreq_dtz)[t][i][j];
+        pairfreq[i][j] += (*NAME(countfreq_dtz)[t])[i][j];
 
   for (j = 0; j < num_syms; j++)
     pairfirst[0][j] = pairsecond[0][j] = 0;
@@ -376,12 +386,12 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        NAME(countfreq_dtz)[t][i][j] = 0;
+        (*NAME(countfreq_dtz)[t])[i][j] = 0;
   run_threaded(NAME(count_pairs_dtz), work, high, 0);
   for (t = 0; t < numthreads; t++)
     for (i = 0; i < num_syms; i++)
       for (j = 0; j < num_syms; j++)
-        pairfreq[i][j] += NAME(countfreq_dtz)[t][i][j];
+        pairfreq[i][j] += (*NAME(countfreq_dtz)[t])[i][j];
 
   if (sizeof(T) == 1) {
     for (i = 0; i < num_syms; i++)
@@ -470,8 +480,8 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num; i++)
         for (j = 0; j < num_syms; j++) {
-          countfirst[t][i][j] = 0;
-          countsecond[t][i][j] = 0;
+          (*countfirst[t])[i][j] = 0;
+          (*countsecond[t])[i][j] = 0;
         }
 
     NAME(adjust_work_replace)(work);
@@ -480,10 +490,10 @@ static struct HuffCode *NAME(construct_pairs_dtz)(T *data, uint64_t size,
     for (t = 0; t < numthreads; t++)
       for (i = 0; i < num; i++)
         for (j = 0; j < num_syms; j++) {
-          pairfreq[j][newpairs[i].s1] -= countfirst[t][i][j];
-          pairfreq[j][newpairs[i].sym] += countfirst[t][i][j];
-          pairfreq[newpairs[i].s2][j] -= countsecond[t][i][j];
-          pairfreq[newpairs[i].sym][j] += countsecond[t][i][j];
+          pairfreq[j][newpairs[i].s1] -= (*countfirst[t])[i][j];
+          pairfreq[j][newpairs[i].sym] += (*countfirst[t])[i][j];
+          pairfreq[newpairs[i].s2][j] -= (*countsecond[t])[i][j];
+          pairfreq[newpairs[i].sym][j] += (*countsecond[t])[i][j];
         }
 
     for (i = 0; i < num; i++)
