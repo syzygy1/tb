@@ -37,10 +37,12 @@ void NAME(compress_alloc_dtz)(void)
     for (int t = 0; t < numthreads; t++)
       (NAME(countfreq_dtz))[t] = malloc(numthreads * sizeof((*NAME(countfreq_dtz))[t]));
   } else {
+#ifdef NUMA
     for (int t = 0; t < numthreads; t++) {
       int node = thread_data[t].node;
       (NAME(countfreq_dtz))[t] = numa_alloc_onnode(numthreads * sizeof((*NAME(countfreq_dtz))[t]), node);
     }
+#endif
   }
 }
 

@@ -142,8 +142,8 @@ void compress_alloc_wdl()
       countfirst[t] = numa_alloc_onnode(sizeof(*(countfirst[t])), node);
       countsecond[t] = numa_alloc_onnode(sizeof(*(countsecond[t])), node);
       countfreq[t] = numa_alloc_onnode(sizeof(*(countfreq[t])), node);
-#endif
     }
+#endif
   }
 }
 
