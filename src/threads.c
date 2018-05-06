@@ -92,7 +92,7 @@ typedef void (*WorkerFunc)(struct thread_data *);
 
 static WorkerFunc worker_func;
 static int numa_threading;
-static int low_threading;
+static int threads_per_node;
 static uint64_t *work_queue;
 
 struct Counter {
@@ -210,12 +210,11 @@ void init_threads(int pawns)
   thread_data = alloc_aligned(numthreads * sizeof(*thread_data), 64);
 
   int per_node = numthreads / num_nodes[numa];
-  int per_node_low = numthreads_low / num_nodes[numa];
 
   for (i = 0; i < numthreads; i++) {
     thread_data[i].thread = i;
     thread_data[i].node = i / per_node;
-    thread_data[i].low = (i % per_node) < per_node_low;
+    thread_data[i].thread_on_node = i % per_node;
   }
 
   if (pawns) {
@@ -309,7 +308,7 @@ THREAD_FUNC worker(void *arg)
     }
 #endif
 
-    if (!low_threading || thread->low) {
+    if (thread->thread_on_node < threads_per_node) {
 
       int node = numa_threading ? thread->node : 0;
       struct Counter *counter = &counters[node];
@@ -340,13 +339,13 @@ THREAD_FUNC worker(void *arg)
   return 0;
 }
 
-void run_threaded(WorkerFunc func, struct Work *work, int threading,
+void run_threaded(WorkerFunc func, struct Work *work, int max_threads,
     int report_time)
 {
   int secs, usecs;
   struct timeval stop_time;
 
-  low_threading = (threading == LOW);
+  threads_per_node = (max_threads + num_nodes[numa] - 1) / num_nodes[numa];
   worker_func = func;
   work_queue = work->work;
   if (!work->numa) {

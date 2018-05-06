@@ -36,7 +36,8 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-enum { HIGH = 0, LOW = 1 };
+#define HIGH numthreads
+#define LOW numthreads_low
 
 extern int numa;
 extern int num_nodes[4];
@@ -49,7 +50,7 @@ struct thread_data {
   int *p;
   int thread;
   int node;
-  int low;
+  int thread_on_node;
 };
 
 struct Work {
@@ -62,7 +63,7 @@ struct Work {
 typedef void (*WorkerFunc)(struct thread_data *);
 
 void init_threads(int pawns);
-void run_threaded(WorkerFunc func, struct Work *work, int threading,
+void run_threaded(WorkerFunc func, struct Work *work, int max_threads,
     int report_time);
 void run_single(WorkerFunc func, struct Work *work, int report_time);
 void fill_work(uint64_t size, uint64_t mask, struct Work *w);
