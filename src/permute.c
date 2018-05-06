@@ -16,7 +16,6 @@
 
 #include "compress.h"
 #include "defs.h"
-#include "lz4.h"
 #include "probe.h"
 #include "threads.h"
 #include "util.h"
@@ -636,15 +635,12 @@ void permute_pawn_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
   run_threaded(convert_data_pawn_u8, work_convert, HIGH, 1);
 }
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
     u16 *v, uint64_t tb_step)
 {
   char name[64];
   FILE *F;
 
-  char *lz4_buf = get_lz4_buf();
   sprintf(name, "%s.perm", tablename);
   if (!(F = fopen(name, "wb"))) {
     fprintf(stderr, "Could not open %s for writing.\n", name);
@@ -659,16 +655,7 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
 
     if (end == tb_size) break;
 
-    uint16_t *ptr = tb_table;
-    uint64_t total = end - begin;
-    while (total > 0) {
-      int chunk = min(COPYSIZE / 2, total);
-      total -= chunk;
-      uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, 2 * chunk);
-      ptr += chunk;
-      *(uint32_t *)lz4_buf = lz4_size;
-      fwrite(lz4_buf, 1, lz4_size + 4, F);
-    }
+    write_data(F, (uint8_t *)tb_table, 0, 2 * (end - begin), NULL);
 
     begin = end;
   }
@@ -680,9 +667,6 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
     exit(EXIT_FAILURE);
   }
 
-  if (!copybuf)
-    copybuf = malloc(COPYSIZE);
-
   begin = 0;
   uint16_t *ptr = table;
   while (1) {
@@ -690,16 +674,8 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
 
     if (end < tb_size) {
       uint64_t total = end - begin;
-      while (total > 0) {
-        int chunk = min(COPYSIZE / 2, total);
-        total -= chunk;
-        uint32_t lz4size;
-        fread(&lz4size, 1, 4, F);
-        fread(lz4_buf, 1, lz4size, F);
-        LZ4_uncompress(lz4_buf, (char *)copybuf, 2 * chunk);
-        memcpy(ptr, copybuf, 2 * chunk);
-        ptr += chunk;
-      }
+      read_data_u8(F, (uint8_t *)ptr, 2 * total, NULL);
+      ptr += total;
     } else {
       memcpy(ptr, tb_table, 2 * (end - begin));
       break;

@@ -4,7 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#include "lz4.h"
 #include "util.h"
 
 static int reduce_cnt;
@@ -15,8 +14,6 @@ static void save_table(uint8_t *table, char color)
   FILE *F;
   char name[64];
   uint8_t v[256];
-
-  char *lz4_buf = get_lz4_buf();
 
   sprintf(name, "%s.%c.%d", tablename, color, num_saves);
 
@@ -66,19 +63,7 @@ static void save_table(uint8_t *table, char color)
   }
 #endif
 
-  uint8_t *ptr = table;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    for (i = 0; i < chunk; i++)
-      copybuf[i] = v[ptr[i]];
-    ptr += chunk;
-    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 4, chunk);
-    *(uint32_t *)lz4_buf = lz4_size;
-    fwrite(lz4_buf, 1, lz4_size + 4, F);
-  }
+  write_data(F, table, 0, size, v);
 
   fclose(F);
 }
@@ -87,9 +72,6 @@ static void reduce_tables(void)
 {
   int i;
   uint8_t v[256];
-
-  if (!copybuf)
-    copybuf = malloc(COPYSIZE);
 
   collect_stats(0);
 
@@ -196,8 +178,6 @@ static void store_table(uint8_t *table, char color)
   FILE *F;
   char name[64];
 
-  char *lz4_buf = get_lz4_buf();
-
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "wb"))) {
@@ -205,17 +185,7 @@ static void store_table(uint8_t *table, char color)
     exit(EXIT_FAILURE);
   }
 
-  uint8_t *ptr = table;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
-    ptr += chunk;
-    *(uint32_t *)lz4_buf = lz4_size;
-    fwrite(lz4_buf, 1, lz4_size + 4, F);
-  }
+  write_data(F, table, 0, size, NULL);
 
   fclose(F);
 }

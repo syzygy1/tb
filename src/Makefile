@@ -18,6 +18,13 @@ FLAGS += -DTBPIECES=7
 FLAGS += -DNUMA
 LDFLAGS = -lnuma
 
+# Use libzstd instead of LZ4 for compression of temporary files.
+FLAGS += -DUSE_ZSTD
+LDFLAGS += -lzstd
+
+# Specify number of threads used for compression of temporary files.
+FLAGS += -DCOMPRESSION_THREADS=6
+
 # Specify the compiler
 # regular linux
 #CC = /usr/bin/gcc -pthread

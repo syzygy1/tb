@@ -1,8 +1,10 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
+
+#include <stdalign.h>
 
 #ifndef THREADS_H
 #define THREADS_H
@@ -73,6 +75,9 @@ struct Work *create_work_numa(int n, uint64_t *partition, uint64_t step,
 struct Work *create_work_numa2(int n, uint64_t *stop);
 void copy_work(struct Work **dst, struct Work *src);
 void free_work(struct Work *work);
+
+void create_compression_threads(void);
+void run_compression(void (*func)(int t));
 
 extern int numthreads, numthreads_low;
 extern int thread_affinity;

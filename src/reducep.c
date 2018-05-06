@@ -4,7 +4,6 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#include "lz4.h"
 #include "util.h"
 
 #define MAX_SAVES 32
@@ -25,8 +24,6 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin,
   FILE *F;
   char name[64];
   uint8_t v[256];
-
-  char *lz4_buf = get_lz4_buf();
 
   if (local == num_saves) {
     sprintf(name, "%s.%c.%d", tablename, color, num_saves);
@@ -82,20 +79,7 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin,
   }
 #endif
 
-  uint8_t *ptr = table + begin;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    for (i = 0; i < chunk; i++)
-      copybuf[i] = v[ptr[i]];
-    ptr += chunk;
-    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
-    ((uint32_t *)lz4_buf)[0] = lz4_size;
-    ((uint32_t *)lz4_buf)[1] = chunk;
-    fwrite(lz4_buf, 1, lz4_size + 8, F);
-  }
+  write_data(F, table, begin, size, v);
 }
 
 void reduce_tables(int local)
@@ -104,9 +88,6 @@ void reduce_tables(int local)
   uint8_t v[256];
   uint64_t *work;
   uint64_t save_begin = begin;
-
-  if (!copybuf)
-    copybuf = malloc(COPYSIZE);
 
   if (local == num_saves) {
     work = work_part;
@@ -234,8 +215,6 @@ void store_table(uint8_t *table, char color)
   FILE *F;
   char name[64];
 
-  char *lz4_buf = get_lz4_buf();
-
   sprintf(name, "%s.%c", tablename, color);
 
   if (!(F = fopen(name, "wb"))) {
@@ -243,17 +222,7 @@ void store_table(uint8_t *table, char color)
     exit(1);
   }
 
-  uint8_t *ptr = table;
-  uint64_t total = size;
-  while (total > 0) {
-    int chunk = COPYSIZE;
-    if (total < chunk) chunk = total;
-    total -= chunk;
-    uint32_t lz4_size = LZ4_compress((char *)ptr, lz4_buf + 4, chunk);
-    ptr += chunk;
-    *(uint32_t *)lz4_buf = lz4_size;
-    fwrite(lz4_buf, 1, lz4_size + 4, F);
-  }
+  write_data(F, table, 0, size, NULL);
 
   fclose(F);
 }
@@ -285,6 +254,8 @@ void unlink_saves(char color)
 #include "reducep_tmpl.c"
 #undef T
 
+#if 0
 #define T u16
 #include "reducep_tmpl.c"
 #undef T
+#endif

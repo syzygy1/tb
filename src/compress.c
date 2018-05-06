@@ -793,12 +793,12 @@ void write_final(struct tb_handle *F, FILE *G)
 
   for (i = 0; i < F->num_tables; i++) {
     if (F->flags[i] & 0x80) continue;
-    copy_bytes(G, F->H[i], 6 * F->num_indices[i]);
+    copy_data(G, F->H[i], 6 * F->num_indices[i]);
   }
 
   for (i = 0; i < F->num_tables; i++) {
     if (F->flags[i] & 0x80) continue;
-    copy_bytes(G, F->H[i], 2 * F->num_blocks[i]);
+    copy_data(G, F->H[i], 2 * F->num_blocks[i]);
   }
 
 // align to 64-byte boundary
@@ -811,7 +811,7 @@ void write_final(struct tb_handle *F, FILE *G)
   for (i = 0; i < F->num_tables; i++) {
     if (F->flags[i] & 0x80) continue;
     uint64_t datasize = F->real_num_blocks[i] * (1 << F->blocksize[i]);
-    copy_bytes(G, F->H[i], datasize);
+    copy_data(G, F->H[i], datasize);
     while (datasize & 0x3f) {
       write_u8(G, 0);
       datasize++;
