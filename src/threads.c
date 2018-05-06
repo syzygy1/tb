@@ -12,6 +12,7 @@
 #include <windows.h>
 #endif
 #include <sys/time.h>
+
 #include "threads.h"
 #include "util.h"
 
@@ -20,7 +21,7 @@ struct thread_data *thread_data;
 #ifndef __WIN32__ /* pthread */
 
 // implementation of pthread_barrier in case it is missing
-#if !defined(_POSIX_BARRIERS) || !((_POSIX_BARRIERS - 20012L) >= 0)
+#if !defined(_POSIX_BARRIERS)
 #define pthread_barrier_t barrier_t
 #define pthread_barrier_attr_t barrier_attr_t
 #define pthread_barrier_init(b,a,n) barrier_init(b,n)
@@ -66,8 +67,7 @@ int barrier_wait(barrier_t *barrier)
 #endif
 
 pthread_t *threads;
-static pthread_attr_t thread_attr;
-static pthread_barrier_t barrier_start, barrier_end;
+static pthread_barrier_t barrier;
 #define THREAD_FUNC void*
 
 #else /* WIN32 */
@@ -145,10 +145,7 @@ void init_threads(int pawns)
 
 #ifndef __WIN32__
   threads = malloc(numthreads * sizeof(*threads));
-  pthread_attr_init(&thread_attr);
-  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
-  pthread_barrier_init(&barrier_start, NULL, numthreads);
-  pthread_barrier_init(&barrier_end, NULL, numthreads);
+  pthread_barrier_init(&barrier, NULL, numthreads);
 
   for (i = 0; i < numthreads - 1; i++) {
     int rc = pthread_create(&threads[i], NULL, worker,
@@ -205,7 +202,7 @@ THREAD_FUNC worker(void *arg)
 
   do {
 #ifndef __WIN32__
-    pthread_barrier_wait(&barrier_start);
+    pthread_barrier_wait(&barrier);
 #else
     if (t != numthreads - 1)
       WaitForSingleObject(start_event[t], INFINITE);
@@ -227,7 +224,7 @@ THREAD_FUNC worker(void *arg)
     }
 
 #ifndef __WIN32__
-    pthread_barrier_wait(&barrier_end);
+    pthread_barrier_wait(&barrier);
 #else
   if (t != numthreads - 1)
     SetEvent(stop_event[t]);
@@ -283,4 +280,46 @@ void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_t
   if (report_time)
     printf("time taken = %3d:%02d.%03d\n", secs / 60, secs % 60, usecs/1000);
   cur_time = stop_time;
+}
+
+static pthread_t cmprs_threads[COMPRESSION_THREADS];
+static struct thread_data cmprs_data[COMPRESSION_THREADS];
+static pthread_barrier_t cmprs_barrier;
+static void (*cmprs_func)(int t);
+
+static void *cmprs_worker(void *arg)
+{
+  struct thread_data *thread = arg;
+  do {
+    pthread_barrier_wait(&cmprs_barrier);
+
+    cmprs_func(thread->thread);
+
+    pthread_barrier_wait(&cmprs_barrier);
+  } while (thread->thread != 0);
+
+  return 0;
+}
+
+void create_compression_threads(void)
+{
+  for (int i = 0; i < COMPRESSION_THREADS; i++) {
+    cmprs_data[i].thread = i;
+  }
+
+  pthread_barrier_init(&cmprs_barrier, NULL, COMPRESSION_THREADS);
+
+  for (int i = 1; i < COMPRESSION_THREADS; i++) {
+    int rc = pthread_create(&cmprs_threads[i], NULL, cmprs_worker, &cmprs_data[i]);
+    if (rc) {
+      fprintf(stderr, "ERROR: phtread_create() return %d\n", rc);
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
+void run_compression(void (*func)(int t))
+{
+  cmprs_func = func;
+  cmprs_worker(&cmprs_data[0]);
 }

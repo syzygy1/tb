@@ -79,7 +79,7 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin,
   }
 #endif
 
-  write_mapped_data_p(F, table + begin, size, v);
+  write_data(F, table, begin, size, v);
 }
 
 void reduce_tables(int local)
@@ -222,7 +222,7 @@ void store_table(uint8_t *table, char color)
     exit(1);
   }
 
-  write_data(F, table, size);
+  write_data(F, table, 0, size, NULL);
 
   fclose(F);
 }

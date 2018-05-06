@@ -661,7 +661,7 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
 
     if (end == tb_size) break;
 
-    write_data(F, (uint8_t *)tb_table, 2 * (end - begin));
+    write_data(F, (uint8_t *)tb_table, 0, 2 * (end - begin), NULL);
 
     begin = end;
   }
@@ -680,7 +680,7 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
 
     if (end < tb_size) {
       uint64_t total = end - begin;
-      read_data_u8(F, (uint8_t *)ptr, 2 * total);
+      read_data_u8(F, (uint8_t *)ptr, 2 * total, NULL);
       ptr += total;
     } else {
       memcpy(ptr, tb_table, 2 * (end - begin));

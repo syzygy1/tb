@@ -18,7 +18,7 @@ static void NAME(reconstruct_table_pass)(T *table, char color, int k, T *v)
     exit(EXIT_FAILURE);
   }
 
-  NAME(read_mapped_data)(F, table, size, v);
+  NAME(read_data)(F, table, size, v);
 
   fclose(F);
 }
@@ -214,7 +214,7 @@ static void NAME(load_table)(T *table, char color)
     exit(EXIT_FAILURE);
   }
 
-  NAME(read_data)(F, table, size);
+  NAME(read_data)(F, table, size, NULL);
 
   fclose(F);
 }

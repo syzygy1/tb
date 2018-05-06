@@ -63,7 +63,7 @@ static void save_table(uint8_t *table, char color)
   }
 #endif
 
-  write_mapped_data(F, table, size, v);
+  write_data(F, table, 0, size, v);
 
   fclose(F);
 }
@@ -185,7 +185,7 @@ static void store_table(uint8_t *table, char color)
     exit(EXIT_FAILURE);
   }
 
-  write_data(F, table, size);
+  write_data(F, table, 0, size, NULL);
 
   fclose(F);
 }

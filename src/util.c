@@ -1,3 +1,5 @@
+#include <stdatomic.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -11,9 +13,14 @@
 #include <windows.h>
 #endif
 
+#ifdef USE_ZSTD
+#include <zstd.h>
+#else
 #include "lz4.h"
+#endif
 
 #include "defs.h"
+#include "threads.h"
 #include "util.h"
 
 void *map_file(char *name, int shared, uint64_t *size)
@@ -24,7 +31,7 @@ void *map_file(char *name, int shared, uint64_t *size)
   int fd = open(name, O_RDONLY);
   if (fd < 0) {
     fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   fstat(fd, &statbuf);
   *size = statbuf.st_size;
@@ -35,8 +42,8 @@ void *map_file(char *name, int shared, uint64_t *size)
   void *data = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 #endif
   if (data == MAP_FAILED) {
-    printf("Could not mmap() %s.\n", name);
-    exit(1);
+    fprintf(stderr, "Could not mmap() %s.\n", name);
+    exit(EXIT_FAILURE);
   }
   close(fd);
   return data;
@@ -47,7 +54,7 @@ void *map_file(char *name, int shared, uint64_t *size)
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (h == INVALID_HANDLE_VALUE) {
     fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   DWORD size_low, size_high;
   size_low = GetFileSize(h, &size_high);
@@ -56,12 +63,12 @@ void *map_file(char *name, int shared, uint64_t *size)
                                  NULL);
   if (map == NULL) {
     fprintf(stderr, "CreateFileMapping() failed.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
     fprintf(stderr, "MapViewOfFile() failed.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   CloseHandle(h);
   return data;
@@ -91,7 +98,7 @@ void *alloc_aligned(uint64_t size, uintptr_t alignment)
   posix_memalign(&ptr, alignment, size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   return ptr;
@@ -103,7 +110,7 @@ void *alloc_aligned(uint64_t size, uintptr_t alignment)
   ptr = malloc(size + alignment - 1);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   ptr = (void *)((uintptr_t)(ptr + alignment - 1) & ~(alignment - 1));
 
@@ -121,7 +128,7 @@ void *alloc_huge(uint64_t size)
   posix_memalign(&ptr, 2 * 1024 * 1024, size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #ifdef MADV_HUGEPAGE
   madvise(ptr, size, MADV_HUGEPAGE);
@@ -132,7 +139,7 @@ void *alloc_huge(uint64_t size)
   ptr = malloc(size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
 #endif
@@ -200,14 +207,57 @@ void write_bits(FILE *F, uint32_t bits, int n)
 
 #define COPYSIZE (10*1024*1024)
 
-static uint8_t *copybuf = NULL;
-static char *lz4_buf = NULL;
+static size_t compress_bound;
+
+static LOCK_T cmprs_mutex;
+
+static FILE *cmprs_F;
+static void *cmprs_ptr;
+static size_t cmprs_size;
+static void *cmprs_v;
+static size_t cmprs_idx;
+
+struct CompressFrame {
+  uint32_t cmprs_chunk;
+  uint32_t chunk;
+  size_t idx;
+  uint8_t data[];
+};
+
+#define HEADER_SIZE offsetof(struct CompressFrame, data)
+
+struct CompressState {
+  uint8_t *buffer;
+  struct CompressFrame *frame;
+#ifdef USE_ZSTD
+  ZSTD_CCtx *c_ctx;
+  ZSTD_DCtx *d_ctx;
+#endif
+};
+
+static struct CompressState cmprs_state[COMPRESSION_THREADS];
 
 static void init(void)
 {
-  if (!copybuf) {
-    copybuf = malloc(COPYSIZE);
-    lz4_buf = malloc(8 + LZ4_compressBound(COPYSIZE));
+  static int initialised = 0;
+
+  if (!initialised) {
+    initialised = 1;
+    LOCK_INIT(cmprs_mutex);
+#ifdef USE_ZSTD
+    compress_bound = ZSTD_compressBound(COPYSIZE);
+#else
+    compress_bound = LZ4_compressBound(COPYSIZE);
+#endif
+    for (int i = 0; i < COMPRESSION_THREADS; i++) {
+      cmprs_state[i].buffer = malloc(COPYSIZE);
+      cmprs_state[i].frame = malloc(HEADER_SIZE + compress_bound);
+#ifdef USE_ZSTD
+      cmprs_state[i].c_ctx = ZSTD_createCCtx();
+      cmprs_state[i].d_ctx = ZSTD_createDCtx();
+#endif
+    }
+    create_compression_threads();
   }
 }
 
@@ -227,144 +277,183 @@ static void file_write(void *ptr, size_t size, FILE *F)
   }
 }
 
+#ifdef USE_ZSTD
+
+static size_t compress(struct CompressState *state, void *dst, void *src,
+    size_t chunk)
+{
+  return ZSTD_compressCCtx(state->c_ctx, dst, compress_bound, src, chunk, 1);
+}
+
+static void decompress(struct CompressState *state, void *dst, size_t chunk,
+    void *src, size_t compressed)
+{
+  ZSTD_decompressDCtx(state->d_ctx, dst, chunk, src, compressed);
+}
+
+#else
+
+static size_t compress(struct CompressState *state, void *dst, void *src,
+    size_t chunk)
+{
+  (void)state;
+  return LZ4_compress(src, dst, chunk);
+}
+
+static void decompress(struct CompressState *state, void *dst, sizt_t chunk,
+    void *src, size_t compressed)
+{
+  (void)state;
+  (void)compressed;
+  LZ4_uncompress(src, dst, chunk);
+}
+
+#endif
+
 void copy_data(FILE *F, FILE *G, uint64_t size)
 {
   init();
 
+  uint8_t *buffer = cmprs_state[0].buffer;
+
   while (size) {
     uint32_t chunk = min(COPYSIZE, size);
-    file_read(copybuf, chunk, G);
-    file_write(copybuf, chunk, F);
+    file_read(buffer, chunk, G);
+    file_write(buffer, chunk, F);
     size -= chunk;
   }
 }
 
-void write_data(FILE *F, uint8_t *src, uint64_t size)
+static void write_data_worker(int t)
 {
-  init();
+  struct CompressState *state = &cmprs_state[t];
 
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    uint32_t lz4_size = LZ4_compress((char *)src, lz4_buf + 4, chunk);
-    *(uint32_t *)lz4_buf = lz4_size;
-    file_write(lz4_buf, lz4_size + 4, F);
-    src += chunk;
-    size -= chunk;
+  FILE *F = cmprs_F;
+  uint8_t *src = cmprs_ptr;
+  uint8_t *v = cmprs_v;
+  while (1) {
+    LOCK(cmprs_mutex);
+    size_t idx = cmprs_idx;
+    uint32_t chunk = min(COPYSIZE, cmprs_size - idx);
+    cmprs_idx += chunk;
+    UNLOCK(cmprs_mutex);
+    if (chunk == 0)
+      break;
+    uint8_t *buf;
+    if (v) {
+      for (size_t i = 0; i < chunk; i++)
+        state->buffer[i] = v[src[idx + i]];
+      buf = state->buffer;
+    } else
+      buf = src + idx;
+    uint32_t cmprs_chunk = compress(state, state->frame->data, buf, chunk);
+    state->frame->cmprs_chunk = cmprs_chunk;
+    state->frame->chunk = chunk;
+    state->frame->idx = idx;
+    file_write(state->frame, cmprs_chunk + HEADER_SIZE, F);
   }
 }
 
-void write_mapped_data(FILE *F, uint8_t *src, uint64_t size, uint8_t *v)
+void write_data(FILE *F, uint8_t *src, uint64_t offset, uint64_t size,
+    uint8_t *v)
 {
   init();
 
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    for (size_t i = 0; i < chunk; i++)
-      copybuf[i] = v[src[i]];
-    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 4, chunk);
-    *(uint32_t *)lz4_buf = lz4_size;
-    file_write(lz4_buf, lz4_size + 4, F);
-    src += chunk;
-    size -= chunk;
+  cmprs_F = F;
+  cmprs_ptr = src;
+  cmprs_size = offset + size;
+  cmprs_v = v;
+  cmprs_idx = offset;
+  run_compression(write_data_worker);
+}
+
+static void read_data_worker_u8(int t)
+{
+  struct CompressState *state = &cmprs_state[t];
+
+  FILE *F = cmprs_F;
+  uint8_t *dst = cmprs_ptr;
+  uint8_t *v = cmprs_v;
+  while (1) {
+    uint32_t cmprs_chunk;
+    flockfile(F);
+    if (cmprs_size == 0) {
+      funlockfile(F);
+      break;
+    }
+    file_read(&cmprs_chunk, 4, F);
+    file_read(&state->frame->chunk, cmprs_chunk + HEADER_SIZE - 4, F);
+    uint32_t chunk = state->frame->chunk;
+    if (chunk > cmprs_size) {
+      fprintf(stderr, "Error in read_data_worker.\n");
+      exit(EXIT_FAILURE);
+    }
+    cmprs_size -= chunk;
+    funlockfile(F);
+    size_t idx = state->frame->idx;
+    if (!v)
+      decompress(state, dst + idx, chunk, state->frame->data, cmprs_chunk);
+    else {
+      decompress(state, state->buffer, chunk, state->frame->data, cmprs_chunk);
+      for (size_t i = 0; i < chunk; i++)
+        dst[idx + i] |= v[state->buffer[i]];
+    }
   }
 }
 
-void write_mapped_data_p(FILE *F, uint8_t *src, uint64_t size, uint8_t *v)
+void read_data_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v)
 {
   init();
 
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    for (size_t i = 0; i < chunk; i++)
-      copybuf[i] = v[src[i]];
-    uint32_t lz4_size = LZ4_compress((char *)copybuf, lz4_buf + 8, chunk);
-    ((uint32_t *)lz4_buf)[0] = lz4_size;
-    ((uint32_t *)lz4_buf)[1] = chunk;
-    file_write(lz4_buf, lz4_size + 8, F);
-    src += chunk;
-    size -= chunk;
+  cmprs_F = F;
+  cmprs_ptr = dst;
+  cmprs_size = size;
+  cmprs_v = v;
+  run_compression(read_data_worker_u8);
+}
+
+static void read_data_worker_u16(int t)
+{
+  struct CompressState *state = &cmprs_state[t];
+
+  FILE *F = cmprs_F;
+  uint16_t *dst = cmprs_ptr;
+  uint16_t *v = cmprs_v;
+  while (1) {
+    uint32_t cmprs_chunk;
+    flockfile(F);
+    if (cmprs_size == 0) {
+      funlockfile(F);
+      break;
+    }
+    file_read(&cmprs_chunk, 4, F);
+    file_read(&state->frame->chunk, cmprs_chunk + HEADER_SIZE - 4, F);
+    uint32_t chunk = state->frame->chunk;
+    if (chunk > cmprs_size) {
+      fprintf(stderr, "Error in read_data_worker.\n");
+      exit(EXIT_FAILURE);
+    }
+    cmprs_size -= chunk;
+    funlockfile(F);
+    size_t idx = state->frame->idx;
+    decompress(state, state->buffer, chunk, state->frame->data, cmprs_chunk);
+    if (!v)
+      for (size_t i = 0; i < chunk; i++)
+        dst[idx + i] = state->buffer[i];
+    else
+      for (size_t i = 0; i < chunk; i++)
+        dst[idx + i] |= v[state->buffer[i]];
   }
 }
 
-void read_data_u8(FILE *F, uint8_t *dst, uint64_t size)
+// Read 8-bit data into 16-bit array.
+void read_data_u16(FILE *F, uint16_t *dst, uint64_t size, uint16_t *v)
 {
   init();
 
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    uint32_t lz4_size;
-    file_read(&lz4_size, 4, F);
-    file_read(lz4_buf, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)dst, chunk);
-    dst += chunk;
-    size -= chunk;
-  }
-}
-
-void read_data_u16(FILE *F, uint16_t *dst, uint64_t size)
-{
-  init();
-
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    uint32_t lz4_size;
-    file_read(&lz4_size, 4, F);
-    file_read(lz4_buf, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (size_t i = 0; i < chunk; i++)
-      dst[i] = copybuf[i];
-    dst += chunk;
-    size -= chunk;
-  }
-}
-
-void read_mapped_data_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v)
-{
-  init();
-
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    uint32_t lz4_size;
-    file_read(&lz4_size, 4, F);
-    file_read(lz4_buf, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (size_t i = 0; i < chunk; i++)
-      dst[i] |= v[copybuf[i]];
-    dst += chunk;
-    size -= chunk;
-  }
-}
-
-void read_mapped_data_u16(FILE *F, uint16_t *dst, uint64_t size, uint16_t *v)
-{
-  init();
-
-  while (size) {
-    uint32_t chunk = min(COPYSIZE, size);
-    uint32_t lz4_size;
-    file_read(&lz4_size, 4, F);
-    file_read(lz4_buf, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (size_t i = 0; i < chunk; i++)
-      dst[i] |= v[copybuf[i]];
-    dst += chunk;
-    size -= chunk;
-  }
-}
-
-void read_mapped_data_p_u8(FILE *F, uint8_t *dst, uint64_t size, uint8_t *v)
-{
-  init();
-
-  while (size) {
-    uint32_t lz4_size, chunk;
-    file_read(&lz4_size, 4, F);
-    file_read(&chunk, 4, F);
-    file_read(lz4_buf, lz4_size, F);
-    LZ4_uncompress(lz4_buf, (char *)copybuf, chunk);
-    for (size_t i = 0; i < chunk; i++)
-      dst[i] |= v[copybuf[i]];
-    dst += chunk;
-    size -= chunk;
-  }
+  cmprs_F = F;
+  cmprs_ptr = dst;
+  cmprs_size = size;
+  cmprs_v = v;
+  run_compression(read_data_worker_u16);
 }

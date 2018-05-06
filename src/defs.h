@@ -21,6 +21,10 @@
 #define MAX_STATS 2560
 #endif
 
+#ifndef COMPRESSION_THREADS
+#define COMPRESSION_THREADS 1
+#endif
+
 #define MAX_VALS (((MAX_STATS / 2) - DRAW_RULE) / 2)
 
 enum { MAXSYMB = 4095 + 8 };

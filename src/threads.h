@@ -1,8 +1,10 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2018 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
+
+#include <stdalign.h>
 
 #ifndef THREADS_H
 #define THREADS_H
@@ -28,13 +30,12 @@
 #endif
 
 struct thread_data {
-  uint64_t begin;
+  alignas(64) uint64_t begin;
   uint64_t end;
   bitboard occ;
   uint64_t *stats;
   int *p;
   int thread;
-  uint8_t dummy[64 - 2*sizeof(uint64_t) - 2*sizeof(void *) - sizeof(bitboard) - sizeof(int)];
 };
 
 void init_threads(int pawns);
@@ -47,6 +48,9 @@ void fill_work_offset(int n, uint64_t size, uint64_t mask, uint64_t *w,
     uint64_t offset);
 uint64_t *alloc_work(int n);
 uint64_t *create_work(int n, uint64_t size, uint64_t mask);
+
+void create_compression_threads(void);
+void run_compression(void (*func)(int t));
 
 extern int numthreads;
 extern int thread_affinity;

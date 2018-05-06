@@ -14,6 +14,13 @@ FLAGS += -DUSE_POPCNT
 # Specify maximum number of pieces. More than 7 won't work.
 FLAGS += -DTBPIECES=7
 
+# Use libzstd instead of LZ4 for compression of temporary files.
+FLAGS += -DUSE_ZSTD
+LDFLAGS += -lzstd
+
+# Specify number of threads used for compression of temporary files.
+FLAGS += -DCOMPRESSION_THREADS=6
+
 # Specify the compiler
 # regular linux
 #CC = /usr/bin/gcc -pthread
@@ -26,7 +33,6 @@ CC = gcc -pthread
 #CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds
 CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds -flto
 #CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined -Wno-array-bounds
-LDFLAGS = 
 
 export FLAGS CC CFLAGS LDFLAGS
 
