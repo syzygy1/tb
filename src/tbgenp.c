@@ -34,8 +34,11 @@ static int white_king, black_king;
 
 static void reduce_tables(int local);
 
-static uint64_t *work_g, *work_piv;
-static uint64_t *work_p, *work_part;
+int total_work, total_work_numa;
+
+static struct Work *work_g, *work_piv, *work_p, *work_part;
+
+struct Work *work_convert = NULL, *work_est = NULL, *work_sample = NULL;
 
 uint8_t *restrict table_w, *restrict table_b;
 
@@ -94,8 +97,6 @@ static uint64_t global_stats_b[MAX_STATS];
 #include "ltbgenp.c"
 #endif
 
-#define HUGEPAGESIZE 2*1024*1024
-
 static int minfreq = 8;
 static int only_generate = 0;
 static int generate_dtz = 1;
@@ -147,107 +148,64 @@ void transform_table_u16(struct thread_data *thread)
 
 #include "reducep.c"
 
-void calc_pawn_table_unthreaded(void)
+void calc_pawn_table_worker(struct thread_group *group)
 {
   uint64_t idx, idx2;
   uint64_t size_p;
-  int i;
   int cnt = 0, cnt2 = 0;
   bitboard occ;
   int p[MAX_PIECES];
+  char tbl_to_wdl[256];
 
-  set_tbl_to_wdl(0);
+  group->tbl_to_wdl = tbl_to_wdl;
+  set_tbl_to_wdl(group, 0);
 
   size_p = 1ULL << shift[numpawns - 1];
   begin = 0;
 
-  int *old_p = thread_data[0].p;
-  thread_data[0].p = p;
-
-  // first perform 50 iterations for each slice
-  for (idx = 0; idx < pawnsize*6/6; idx++, begin += size_p) {
-    if (!cnt) {
-      printf("%c%c ", 'a' + file, '2' + (pw[0] ? 5-cnt2 : cnt2));
-      fflush(stdout);
-      cnt2++;
-      cnt = pawnsize / 6;
-    }
-    cnt--;
+  for (uint64_t p_idx = group->begin; p_idx < group->end; p_idx++) {
     FILL_OCC_PAWNS {
-      thread_data[0].occ = occ;
-      has_cursed_pawn_moves = 0;
+      for (int i = group->thread_begin; i < group->thread_end; i++) {
+        thread_data[i].occ = occ;
+        memcpy(thread_data[i].p, p, MAX_PIECES * sizeof(int));
+      }
+      group->has_cursed_pawn_moves = 0;
       if (has_white_pawns)
-        run_single(calc_pawn_moves_w, work_p, 0);
+        run_group(calc_pawn_moves_w, work_p, HIGH, 0);
       if (has_black_pawns)
-        run_single(calc_pawn_moves_b, work_p, 0);
+        run_group(calc_pawn_moves_b, work_p, HIGH, 0);
 #ifndef SUICIDE
-      run_single(calc_mates, work_p, 0);
+      run_group(calc_mates, work_p, HIGH, 0);
 #endif
-      iterate();
+      iterate(group);
     } else {
       int local;
-      for (local = 0; local < num_saves; local++)
+      for (local = 0; local < group->num_saves; local++)
         reduce_tables(local);
     }
   }
-  printf("\n");
-  thread_data[0].p = old_p;
-
-  if (generate_dtz)
-    for (i = 0; i < num_saves; i++) {
-      fclose(tmp_table[i][0]);
-      fclose(tmp_table[i][1]);
-    }
 
 #ifdef SUICIDE
-  set_draw_threats();
+  set_draw_threats(group);
 #endif
 }
 
-void calc_pawn_table_threaded(void)
+void calc_pawn_table(void)
 {
-  uint64_t idx, idx2;
-  uint64_t size_p;
-  int i;
-  int cnt = 0, cnt2 = 0;
-  bitboard occ;
-  int p[MAX_PIECES];
+  if (numpawns == 1) {
+    // 1 group with numthreads threads
+    init_groups(1, numthreads);
+  } else {
+  } if (numpawns == numpcs - 2) {
+    // each thread its own group
+    // split 
+    init_groups(numthreads, 1);
+    for (int t = 0; t < numthreads; t++) {
 
-  set_tbl_to_wdl(0);
-
-  size_p = 1ULL << shift[numpawns - 1];
-  begin = 0;
-
-  // first perform 50 iterations for each slice
-  for (idx = 0; idx < pawnsize * 6/6; idx++, begin += size_p) {
-    if (!cnt) {
-      printf("%c%c ", 'a' + file, '2' + (pw[0] ? 5-cnt2 : cnt2));
-      fflush(stdout);
-      cnt2++;
-      cnt = pawnsize / 6;
-    }
-    cnt--;
-    FILL_OCC_PAWNS {
-      for (i = 0; i < numthreads; i++)
-        thread_data[i].occ = occ;
-      for (i = 0; i < numthreads; i++)
-        memcpy(thread_data[i].p, p, MAX_PIECES * sizeof(int));
-      has_cursed_pawn_moves = 0;
-      if (has_white_pawns)
-        run_threaded(calc_pawn_moves_w, work_p, 0);
-      if (has_black_pawns)
-        run_threaded(calc_pawn_moves_b, work_p, 0);
-#ifndef SUICIDE
-      run_threaded(calc_mates, work_p, 0);
-#endif
-      iterate();
-    } else {
-      int local;
-      for (local = 0; local < num_saves; local++)
-        reduce_tables(local);
     }
   }
-  printf("\n");
+
+  run_groups(calc_pawn_table_worker);
 
   if (generate_dtz)
     for (i = 0; i < num_saves; i++) {
@@ -255,10 +213,6 @@ void calc_pawn_table_threaded(void)
       if (!symmetric)
         fclose(tmp_table[i][1]);
     }
-
-#ifdef SUICIDE
-  set_draw_threats();
-#endif
 }
 
 #ifndef SUICIDE
@@ -317,7 +271,7 @@ void test_closs(uint64_t *restrict stats, uint8_t *restrict table, int to_fix)
     else
       for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
         v[i] = 2;
-    run_threaded(tc_loop, work_g, 0);
+    run_threaded(tc_loop, work_g, HIGH, 0);
   } else {
     for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
       if (stats[STAT_MATE - i]) break;
@@ -619,11 +573,11 @@ extern char *optarg;
 
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
+  { "numa", 0, NULL, 'n' },
   { "wdl", 0, NULL, 'w' },
   { "dtz", 0, NULL, 'z' },
   { "stats", 0, NULL, 's' },
   { "disk", 0, NULL, 'd' },
-  { "affinity", 0, NULL, 'a' },
   { 0, 0, NULL, 0 }
 };
 
@@ -636,17 +590,22 @@ int main(int argc, char **argv)
   uint8_t v[256];
   int save_stats = 0;
   int save_to_disk = 0;
+  int try_numa = 0;
 
   numthreads = 1;
+  numthreads_low = 0;
   thread_affinity = 0;
   do {
-    val = getopt_long(argc, argv, "at:gwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "t:l:gwzsd", options, &longindex);
     switch (val) {
-    case 'a':
-      thread_affinity = 1;
-      break;
     case 't':
       numthreads = atoi(optarg);
+      break;
+    case 'l':
+      numthreads_low = atoi(optarg);
+      break;
+    case 'n':
+      try_numa = 1;
       break;
     case 'g':
       only_generate = 1;
@@ -759,14 +718,35 @@ int main(int argc, char **argv)
       pt[i] = WPAWN;
   }
 
+  if (try_numa) {
+#ifdef NUMA
+    numa_init();
+    printf("Number of NUMA nodes = %d\n", num_nodes[numa]);
+    if (numthreads < num_nodes[numa]) {
+      printf("Too few threads. NUMA disabled.\n");
+      numa = 0;
+    }
+    if (numthreads_low < num_nodes[numa])
+      numthreads_low = num_nodes[numa];
+#else
+    printf("Compiled without NUMA support.\n");
+#endif
+  }
+
   if (numthreads < 1) numthreads = 1;
+  if (numthreads_low < 1 || numthreads_low > numthreads)
+    numthreads_low = numthreads;
+  numthreads = (numthreads + num_nodes[numa] - 1) & ~(num_nodes[numa] - 1);
+  numthreads_low = (numthreads_low + num_nodes[numa] - 1) & ~(num_nodes[numa] - 1);
+  printf("number of threads = %d (%d)\n", numthreads, numthreads_low);
 
-  printf("number of threads = %d\n", numthreads);
-
-  if (numthreads == 1)
+  if (numthreads == 1) {
     total_work = 1;
-  else
+    total_work_numa = 1;
+  } else {
     total_work = 100 + 10 * numthreads;
+    total_work_numa = 100 + 10 * numthreads / num_nodes[numa];
+  }
 
   slice_threading_low = (numthreads > 1) && (numpcs - numpawns) >= 2;
   slice_threading_high = (numthreads > 1) && (numpcs - numpawns) >= 3;
@@ -779,7 +759,10 @@ int main(int argc, char **argv)
     mask[i] = 0x3fULL << shift[i];
   }
 
-  work_g = create_work(total_work, size, 0x3f);
+  if (!numa)
+    work_g = create_work(total_work, size, 0x3f);
+  else
+    work_g = create_work(total_work, size, 0x3f);
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
   work_p = create_work(total_work, 1ULL << shift[numpawns - 1], 0x3f);
   work_part = alloc_work(total_work);
@@ -920,6 +903,21 @@ int main(int argc, char **argv)
   table_w = alloc_huge(2 * size);
   table_b = table_w + size;
 
+#ifdef NUMA
+  if (numa) {
+    // Bind table memory regions to nodes.
+    uint64_t start = 0;
+    uint64_t step = (1ULL << shift[1]) / num_nodes[numa];
+    for (i = 0; i < 6; i++)
+      for (j = 0; j < num_nodes[numa]; j++, start += step) {
+        numa_tonode_memory(table_w + start, step, j);
+        numa_tonode_memory(table_b + start, step, j);
+      }
+  }
+  // So: work_g split accordingly -> need support in threads.c
+  // work_p NUMA if 1 pawn. else what?
+#endif
+
   init_threads(1);
   init_tables();
 
@@ -984,15 +982,15 @@ int main(int argc, char **argv)
     has_cursed_capts = 0;
 
     printf("Initialising broken positions.\n");
-    run_threaded(calc_broken, work_g, 1);
+    run_threaded(calc_broken, work_g, HIGH, 1);
     printf("Calculating white piece captures.\n");
     calc_captures_w();
     if (has_white_pawns) {
       printf("Calculating white pawn captures.\n");
 #ifdef SUICIDE
-      run_threaded(last_b >= 0 ? calc_last_pawn_capture_w : calc_pawn_captures_w, work_g, 1);
+      run_threaded(last_b >= 0 ? calc_last_pawn_capture_w : calc_pawn_captures_w, work_g, HIGH, 1);
 #else
-      run_threaded(calc_pawn_captures_w, work_g, 1);
+      run_threaded(calc_pawn_captures_w, work_g, HIGH, 1);
 #endif
     }
     printf("Calculating black piece captures.\n");
@@ -1000,9 +998,9 @@ int main(int argc, char **argv)
     if (has_black_pawns) {
       printf("Calculating black pawn captures.\n");
 #ifdef SUICIDE
-      run_threaded(last_w >= 0 ? calc_last_pawn_capture_b : calc_pawn_captures_b, work_g, 1);
+      run_threaded(last_w >= 0 ? calc_last_pawn_capture_b : calc_pawn_captures_b, work_g, HIGH, 1);
 #else
-      run_threaded(calc_pawn_captures_b, work_g, 1);
+      run_threaded(calc_pawn_captures_b, work_g, HIGH, 1);
 #endif
     }
     for (i = 0; i < numpcs; i++)
@@ -1046,11 +1044,11 @@ int main(int argc, char **argv)
       reset_piece_captures();
       if (cursed_pawn_capt_w) {
         printf("Resetting white cursed pawn captures.\n");
-        run_threaded(reset_pawn_captures_w, work_g, 1);
+        run_threaded(reset_pawn_captures_w, work_g, HIGH, 1);
       }
       if (cursed_pawn_capt_b) {
         printf("Resetting black cursed pawn captures.\n");
-        run_threaded(reset_pawn_captures_b, work_g, 1);
+        run_threaded(reset_pawn_captures_b, work_g, HIGH, 1);
       }
 #endif
 

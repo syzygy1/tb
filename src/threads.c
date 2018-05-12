@@ -8,12 +8,14 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <unistd.h>
+
 #ifndef __WIN32__
 #include <pthread.h>
 #else
 #include <windows.h>
 #endif
-#include <sys/time.h>
 
 #include "threads.h"
 #include "util.h"
@@ -28,13 +30,10 @@ int num_nodes[4] = { 1, 2, 4, 8 };
 struct thread_data *thread_data;
 
 #ifndef __WIN32__ /* pthread */
-
 // implementation of pthread_barrier in case it is missing
-#if !defined(_POSIX_BARRIERS)
+#if !defined(_POSIX_BARRIERS) || !((_POSIX_BARRIERS - 20012L) >= 0)
 #define pthread_barrier_t barrier_t
-#define pthread_barrier_attr_t barrier_attr_t
 #define pthread_barrier_init(b,a,n) barrier_init(b,n)
-#define pthread_barrier_destroy(b) barrier_destroy(b)
 #define pthread_barrier_wait(b) barrier_wait(b)
 
 typedef struct {
@@ -44,7 +43,7 @@ typedef struct {
   pthread_cond_t cond;
 } barrier_t;
 
-int barrier_init(barrier_t *barrier, int needed)
+static int barrier_init(barrier_t *barrier, int needed)
 {
   barrier->needed = needed;
   barrier->called = 0;
@@ -53,14 +52,7 @@ int barrier_init(barrier_t *barrier, int needed)
   return 0;
 }
 
-int barrier_destroy(barrier_t *barrier)
-{
-  pthread_mutex_destroy(&barrier->mutex);
-  pthread_cond_destroy(&barrier->cond);
-  return 0;
-}
-
-int barrier_wait(barrier_t *barrier)
+static int barrier_wait(barrier_t *barrier)
 {
   pthread_mutex_lock(&barrier->mutex);
   barrier->called++;
@@ -68,22 +60,22 @@ int barrier_wait(barrier_t *barrier)
     barrier->called = 0;
     pthread_cond_broadcast(&barrier->cond);
   } else {
-    pthread_cond_wait(&barrier->cond,&barrier->mutex);
+    pthread_cond_wait(&barrier->cond, &barrier->mutex);
   }
   pthread_mutex_unlock(&barrier->mutex);
   return 0;
 }
 #endif
 
-pthread_t *threads;
+static pthread_t *threads;
 static pthread_barrier_t barrier;
 #define THREAD_FUNC void*
 
 #else /* WIN32 */
 
-HANDLE *threads;
-HANDLE *start_event;
-HANDLE *stop_event;
+static HANDLE *threads;
+static HANDLE *start_event;
+static HANDLE *stop_event;
 #define THREAD_FUNC DWORD
 
 #endif
@@ -93,6 +85,7 @@ typedef void (*WorkerFunc)(struct thread_data *);
 static WorkerFunc worker_func;
 static int numa_threading;
 static int threads_per_node;
+static int group_work = 0;
 static uint64_t *work_queue;
 
 struct Counter {
@@ -103,7 +96,6 @@ struct Counter {
 static struct Counter counters[8];
 
 int numthreads, numthreads_low;
-int thread_affinity;
 
 struct timeval start_time, cur_time;
 
@@ -201,7 +193,7 @@ void free_work(struct Work *work)
   free(work);
 }
 
-THREAD_FUNC worker(void *arg);
+static THREAD_FUNC worker(void *arg);
 
 void init_threads(int pawns)
 {
@@ -229,8 +221,7 @@ void init_threads(int pawns)
   pthread_barrier_init(&barrier, NULL, numthreads);
 
   for (i = 0; i < numthreads - 1; i++) {
-    int rc = pthread_create(&threads[i], NULL, worker,
-                                  (void *)&(thread_data[i]));
+    int rc = pthread_create(&threads[i], NULL, worker, &thread_data[i]);
     if (rc) {
       fprintf(stderr, "ERROR: pthread_create() returned %d\n", rc);
       exit(EXIT_FAILURE);
@@ -241,19 +232,7 @@ void init_threads(int pawns)
 #ifdef NUMA
   if (numa)
     numa_run_on_node(thread_data[numthreads - 1].node);
-  else
 #endif
-  if (thread_affinity) {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    for (i = 0; i < numthreads; i++) {
-      CPU_SET(i, &cpuset);
-      int rc = pthread_setaffinity_np(threads[i], sizeof(cpuset), &cpuset);
-      CPU_CLR(i, &cpuset);
-      if (rc)
-        fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
-    }
-  }
 
 #else /* __WIN32__ */
 
@@ -269,8 +248,7 @@ void init_threads(int pawns)
     }
   }
   for (i = 0; i < numthreads - 1; i++) {
-    threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
-                                  0, NULL);
+    threads[i] = CreateThread(NULL, 0, worker, &thread_data[i], 0, NULL);
     if (threads[i] == NULL) {
       fprintf(stderr, "CreateThread() failed.\n");
       exit(EXIT_FAILURE);
@@ -278,17 +256,15 @@ void init_threads(int pawns)
   }
   threads[numthreads - 1] = GetCurrentThread();
 
-  if (thread_affinity)
-    fprintf(stderr, "Thread affinities not yet implemented on Windows.\n");
-
 #endif
 }
 
-THREAD_FUNC worker(void *arg)
+static void group_worker(struct thread_data *thread);
+
+static THREAD_FUNC worker(void *arg)
 {
-  struct thread_data *thread = (struct thread_data *)arg;
+  struct thread_data *thread = arg;
   int t = thread->thread;
-  int w;
 
 #ifdef NUMA
   if (numa)
@@ -308,7 +284,9 @@ THREAD_FUNC worker(void *arg)
     }
 #endif
 
-    if (thread->thread_on_node < threads_per_node) {
+    if (group_task)
+      group_worker(thread);
+    else if (thread->thread_on_node < threads_per_node) {
 
       int node = numa_threading ? thread->node : 0;
       struct Counter *counter = &counters[node];
@@ -317,7 +295,7 @@ THREAD_FUNC worker(void *arg)
       uint64_t *queue = work_queue;
 
       while (1) {
-        w = atomic_fetch_add_explicit(&counter->counter, 1, memory_order_relaxed);
+        int w = atomic_fetch_add_explicit(&counter->counter, 1, memory_order_relaxed);
         if (w >= stop) break;
         thread->begin = queue[w];
         thread->end = queue[w + 1];
@@ -329,10 +307,10 @@ THREAD_FUNC worker(void *arg)
 #ifndef __WIN32__
     pthread_barrier_wait(&barrier);
 #else
-  if (t != numthreads - 1)
-    SetEvent(stop_event[t]);
-  else
-    WaitForMultipleObjects(numthreads - 1, stop_event, TRUE, INFINITE);
+    if (t != numthreads - 1)
+      SetEvent(stop_event[t]);
+    else
+      WaitForMultipleObjects(numthreads - 1, stop_event, TRUE, INFINITE);
 #endif
   } while (t != numthreads - 1);
 
@@ -345,9 +323,9 @@ void run_threaded(WorkerFunc func, struct Work *work, int max_threads,
   int secs, usecs;
   struct timeval stop_time;
 
-  threads_per_node = (max_threads + num_nodes[numa] - 1) / num_nodes[numa];
   worker_func = func;
   work_queue = work->work;
+  threads_per_node = (max_threads + num_nodes[numa] - 1) / num_nodes[numa];
   if (!work->numa) {
     numa_threading = 0;
     counters[0].counter = 0;
@@ -362,7 +340,7 @@ void run_threaded(WorkerFunc func, struct Work *work, int max_threads,
     counters[num_nodes[numa] - 1].stop = work->total;
   }
 
-  worker((void *)&(thread_data[numthreads - 1]));
+  worker(&thread_data[numthreads - 1]);
 
   gettimeofday(&stop_time, NULL);
   secs = stop_time.tv_sec - cur_time.tv_sec;
@@ -396,6 +374,68 @@ void run_single(WorkerFunc func, struct Work *work, int report_time)
   if (report_time)
     printf("time taken = %3d:%02d.%03d\n", secs / 60, secs % 60, usecs/1000);
   cur_time = stop_time;
+}
+
+// 1 pawn
+// - 1 thread group
+// - split each pawn slice in 8 NUMA parts
+//
+// 2 pawns
+// - 8 thread groups, 1 for each file of the 2nd pawn
+// - each file correspond to NUMA part
+//
+// 3 pawns
+// - max 64 thread groups
+// - 8 numa parts
+// - divide threads over groups
+//
+// 4 pawns
+// - max 512 thread groups
+//
+// 5 pawns (e.g. KPPPvKPP)
+// - as many thread groups as threads (max 4096)
+//
+
+static void (*leader_func)(struct thread_group *);
+
+void group_worker(struct thread_data *thread)
+{
+  struct group_data *group = thread->group;
+
+  if (thread->group->leader == thread->thread) {
+    leader_func(group);
+  } else {
+    pthread_barrier_wait(group->barrier);
+
+    int node = group->numa_internal ? thread->node : 0;
+    struct Counter *counter = &group->counters[node];
+    int stop = counter->stop;
+    WorkerFunc func = worker_func;
+    uint64_t *queue = work_queue;
+
+    while (1) {
+      w = atomic_fetch_add_explicit(&counter->counter, 1, memory_order_relaxed);
+      if (w >= stop) break;
+      thread->begin = queue[w];
+      thread->end = queue[w + 1];
+      func(thread);
+    }
+  }
+}
+
+void run_group(struct thread_group *group, WorkerFunc func)
+{
+  group_work = 1;
+  pthread_barrier_wait(&barrier);
+  group_work = 0;
+}
+
+void run_groups(void (*func)(struct thread_group *))
+{
+  leader_func = func;
+  group_work = 1;
+  worker(&thread_data[numthreads - 1]);
+  group_work = 0;
 }
 
 #ifdef NUMA

@@ -32,8 +32,8 @@ static int white_king, black_king;
 
 static void reduce_tables(void);
 
-uint64_t total_stats_w[MAX_STATS];
-uint64_t total_stats_b[MAX_STATS];
+static uint64_t total_stats_w[MAX_STATS];
+static uint64_t total_stats_b[MAX_STATS];
 
 static void transform_table_u8(struct thread_data *thread);
 static void transform_table_u16(struct thread_data *thread);
@@ -644,11 +644,8 @@ int main(int argc, char **argv)
   numthreads = 1;
   numthreads_low = 0;
   do {
-    val = getopt_long(argc, argv, "at:l:ngwzsd", options, &longindex);
+    val = getopt_long(argc, argv, "t:l:ngwzsd", options, &longindex);
     switch (val) {
-    case 'a':
-      thread_affinity = 1;
-      break;
     case 't':
       numthreads = atoi(optarg);
       break;

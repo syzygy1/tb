@@ -74,13 +74,13 @@ void find_loop(struct thread_data *thread)
   }
 }
 
-uint64_t find_val(uint8_t *table, uint8_t v, uint64_t *work)
+uint64_t find_val(uint8_t *table, uint8_t v, struct Work *work)
 {
   found_idx = UINT64_MAX;
   find_val_table = table;
   find_val_v = v;
 
-  run_threaded(find_loop, work, 0);
+  run_threaded(find_loop, work, HIGH, 0);
 
   if (found_idx == UINT64_MAX) {
     fprintf(stderr, "find_val: not found!\n");
@@ -135,7 +135,7 @@ char glcb_fen[128];
 static int stats_val[];
 
 static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
-    int phase, int local, uint64_t *work)
+    int phase, int local, struct Work *work)
 {
   int i, j;
   int n;
@@ -147,7 +147,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     thread_stats[i] = 0;
 
   count_stats_table_u8 = table;
-  run_threaded(count_stats_u8, work, 0);
+  run_threaded(count_stats_u8, work, HIGH, 0);
 
   if (local == 0)
     n = REDUCE_PLY - 2;
@@ -329,7 +329,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
 #endif
 }
 
-void collect_stats(uint64_t *work, int phase, int local)
+void collect_stats(struct Work *work, int phase, int local)
 {
   int i;
 

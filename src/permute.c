@@ -449,9 +449,7 @@ uint64_t init_permute_file(int *pcs, int file)
 
   generate_test_list(tb_size, entry_pawn.num);
 
-  fprintf(stderr, "do something here!\n");
-  exit(1);
-//  fill_work(total_work, tb_size, 0, work_convert);
+  fill_work(tb_size, 0, work_convert);
 
   return tb_size;
 }
@@ -597,9 +595,7 @@ void init_permute_pawn(int *pcs, int *pt)
     for (j = 0; j < entry_pawn.num; j++)
       pidx_list[i][piece_perm_list[i][j]] = j;
 
-  fprintf(stderr, "do something here too!\n");
-  exit(1);
-//  work_convert = alloc_work(total_work);
+  work_convert = alloc_work(total_work);
 }
 
 void permute_pawn_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,

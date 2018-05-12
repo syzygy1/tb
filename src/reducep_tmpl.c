@@ -36,7 +36,7 @@ void NAME(verify_stats)(T *table, uint64_t *tot_stats, struct dtz_map *map)
   for (i = 0; i < MAX_VALS * numthreads; i++)
     thread_stats[i] = 0;
   NAME(count_stats_table) = table;
-  run_threaded(NAME(count_stats), work_g, 0);
+  run_threaded(NAME(count_stats), work_g, HIGH, 0);
   for (i = 0; i < numthreads; i++)
     for (j = 0; j < MAX_STAT(*table); j++)
       stats[j] += thread_data[i].stats[j];
@@ -115,7 +115,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
   begin = 0;
   NAME(transform_v) = v;
   NAME(transform_tbl) = table;
-  run_threaded(NAME(transform_table), work_g, 0);
+  run_threaded(NAME(transform_table), work_g, HIGH, 0);
 
   v[0] = 0;
   int red_cnt = 0;

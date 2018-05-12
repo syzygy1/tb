@@ -10,7 +10,7 @@
 
 void reduce_tables(int local);
 void count_stats(struct thread_data *thread);
-void collect_stats(uint64_t *work, int phase, int local);
+void collect_stats(struct Work *work, int phase, int local);
 
 static FILE *tmp_table[MAX_SAVES][2];
 static int reduce_cnt[MAX_SAVES];
@@ -86,12 +86,12 @@ void reduce_tables(int local)
 {
   int i;
   uint8_t v[256];
-  uint64_t *work;
+  struct Work *work;
   uint64_t save_begin = begin;
 
   if (local == num_saves) {
     work = work_part;
-    fill_work(total_work, begin + (1ULL << shift[numpawns - 1]), 0, work);
+    fill_work(begin + (1ULL << shift[numpawns - 1]), 0, work);
     begin = 0;
     reduce_val[local] = ply;
     work = work_part;
@@ -101,9 +101,9 @@ void reduce_tables(int local)
   collect_stats(work, 0, local);
 
   if (generate_dtz) {
-    save_table(table_w, 'w', local, begin, work[total_work]);
+    save_table(table_w, 'w', local, begin, work->work[work->total]);
     if (!symmetric)
-      save_table(table_b, 'b', local, begin, work[total_work]);
+      save_table(table_b, 'b', local, begin, work->work[work->total]);
   }
 
   for (i = 0; i < 256; i++)
@@ -198,7 +198,7 @@ void reduce_tables(int local)
 #endif
 
   transform_v_u8 = v;
-  run_threaded(transform, work, 0);
+  run_threaded(transform, work, HIGH, 0);
 
   if (local == num_saves) {
     if (num_saves == 0)

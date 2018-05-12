@@ -42,15 +42,32 @@
 extern int numa;
 extern int num_nodes[4];
 
+struct thread_group;
+
 struct thread_data {
   alignas(64) uint64_t begin;
   uint64_t end;
   bitboard occ;
   uint64_t *stats;
   int *p;
+  struct thread_group *group;
   int thread;
   int node;
   int thread_on_node;
+};
+
+// For pawns
+struct thread_group {
+  struct Counter[8] counters;
+  pthread_barrier_t barrier;
+  int internal_numa;
+  uint8_t *iter_table, *iter_table_opp;
+  int *iter_pcs, *iter_pcs_opp;
+  uint8_t *tbl, *win_loss, *loss_win, *tbl_to_wdl;
+  int has_cursed_pawn_moves;
+  int iter_wtm;
+  int finished;
+  int num_saves;
 };
 
 struct Work {
@@ -66,6 +83,8 @@ void init_threads(int pawns);
 void run_threaded(WorkerFunc func, struct Work *work, int max_threads,
     int report_time);
 void run_single(WorkerFunc func, struct Work *work, int report_time);
+void run_group(struct thread_group *group);
+
 void fill_work(uint64_t size, uint64_t mask, struct Work *w);
 void fill_work_offset(uint64_t size, uint64_t mask, struct Work *w,
     uint64_t offset);
@@ -81,7 +100,6 @@ void create_compression_threads(void);
 void run_compression(void (*func)(int t));
 
 extern int numthreads, numthreads_low;
-extern int thread_affinity;
 extern struct thread_data *thread_data;
 extern struct timeval start_time, cur_time;
 

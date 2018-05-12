@@ -71,6 +71,7 @@ static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
       bit_set(occ, p[k] = idx2 & 0x3f); \
       idx2 >>= 6; \
     } \
+  idx2 = CONVERT_PIDX(idx2); \
   for (; k > 0; k--) \
     if (k != i) { \
       bit_set(bb, p[k] = idx2 & 0x3f); \
@@ -86,6 +87,7 @@ static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
   assume(numpawns >= 0); \
   for (k = n - 1; k >= numpawns; k--, idx2 >>= 6) \
     bit_set(occ, p[k] = idx2 & 0x3f); \
+  idx2 = CONVERT_PIDX(idx2); \
   for (; k > 0; k--, idx2 >>= 6) \
     bit_set(bb, p[k] = idx2 & 0x3f); \
   occ |= bb; \
@@ -147,7 +149,7 @@ static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
 #ifdef USE_POPCNT
 #define FILL_OCC_PAWNS \
   occ = 0; \
-  for (idx2 = idx ^ pw_pawnmask, i = numpawns - 1; i > 0; i--, idx2 >>= 6) \
+  for (idx2 = CONVERT_PIDX(idx ^ pw_pawnmask), i = numpawns - 1; i > 0; i--, idx2 >>= 6) \
     bit_set(occ, p[i] = idx2 & 0x3f); \
   bit_set(occ, p[0] = piv_sq[idx2]); \
   if (PopCount(occ) == numpawns && !(occ & PAWN_MASK))
