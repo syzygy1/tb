@@ -647,6 +647,9 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
     exit(EXIT_FAILURE);
   }
 
+  struct Work *tmp_work_convert = work_convert;
+  work_convert = alloc_work(work_convert->total);
+
   uint64_t begin = 0;
   while (1) {
     uint64_t end = min(begin + tb_step, tb_size);
@@ -659,6 +662,9 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
 
     begin = end;
   }
+
+  free_work(work_convert);
+  work_convert = tmp_work_convert;
 
   fclose(F);
 
