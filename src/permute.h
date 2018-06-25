@@ -27,7 +27,9 @@ uint64_t estimate_pawn_dtz_u16(int *pcs, int *pt, u16 *table, uint8_t *best,
     int *bestp, int file, u16 *v);
 void permute_pawn_dtz_u8(u8 *tb_table, int *pcs, u8 *table, int bestp, int file,
     u8 *v);
-void permute_pawn_dtz_u16(u16 *tb_table, int *pcs, u16 *table, int bestp, int file,
-    u16 *v);
+void permute_pawn_dtz_u16(u16 *tb_table, int *pcs, u16 *table, int bestp,
+    int file, u16 *v);
+void permute_pawn_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
+    int file, u16 *v, uint64_t tb_step);
 
 #endif

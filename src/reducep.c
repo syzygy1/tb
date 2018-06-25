@@ -254,8 +254,6 @@ void unlink_saves(char color)
 #include "reducep_tmpl.c"
 #undef T
 
-#if 0
 #define T u16
 #include "reducep_tmpl.c"
 #undef T
-#endif

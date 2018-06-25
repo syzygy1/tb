@@ -693,3 +693,56 @@ void permute_piece_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
   fclose(F);
   unlink(name);
 }
+
+void permute_pawn_dtz_u16_full(u16 *tb_table, int *pcs, u16 *table, int bestp,
+    int file, u16 *v, uint64_t tb_step)
+{
+  char name[64];
+  FILE *F;
+
+  sprintf(name, "%s.perm", tablename);
+  if (!(F = fopen(name, "wb"))) {
+    fprintf(stderr, "Could not open %s for writing.\n", name);
+    exit(EXIT_FAILURE);
+  }
+
+  uint64_t begin = 0;
+  while (1) {
+    uint64_t end = min(begin + tb_step, tb_size);
+    fill_work_offset(total_work, end - begin, 0, work_convert, begin);
+    permute_pawn_dtz_u16(tb_table - begin, pcs, table, bestp, file, v);
+
+    if (end == tb_size) break;
+
+    write_data(F, (uint8_t *)tb_table, 0, 2 * (end - begin), NULL);
+
+    begin = end;
+  }
+
+  fclose(F);
+
+  if (!(F = fopen(name, "rb"))) {
+    fprintf(stderr, "Could not open %s for reading.\n", name);
+    exit(EXIT_FAILURE);
+  }
+
+  begin = 0;
+  uint16_t *ptr = table;
+  while (1) {
+    uint64_t end = min(begin + tb_step, tb_size);
+
+    if (end < tb_size) {
+      uint64_t total = end - begin;
+      read_data_u8(F, (uint8_t *)ptr, 2 * total, NULL);
+      ptr += total;
+    } else {
+      memcpy(ptr, tb_table, 2 * (end - begin));
+      break;
+    }
+
+    begin = end;
+  }
+
+  fclose(F);
+  unlink(name);
+}
