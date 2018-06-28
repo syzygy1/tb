@@ -545,6 +545,16 @@ void sort_values(uint64_t *stats, struct dtz_map *dtzmap, int side, int pa_w, in
     if (f < tot) break;
   }
   dtzmap->high_freq_max = i;
+
+  dtzmap->wide = 0;
+  if (num >= 256)
+    dtzmap->wide = 1;
+  else {
+    for (j = 0; j < 4; j++)
+      for (i = 0; i < dtzmap->num[j]; i++)
+        if (dtzmap->map[j][i] >= 256)
+          dtzmap->wide = 1;
+  }
 }
 
 void prepare_dtz_map_u8(uint8_t *v, struct dtz_map *map)
@@ -1023,11 +1033,10 @@ int main(int argc, char **argv)
   for (i = 0; i < MAX_STATS; i++)
     global_stats_w[i] = global_stats_b[i] = 0;
 
-  if (G || H)
+  if (G || H) {
     init_permute_pawn(pcs, pt);
-
-  if (G)
     compress_alloc_wdl();
+  }
 
   if (H) {
     if (!compress_wide)
