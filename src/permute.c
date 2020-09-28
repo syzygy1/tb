@@ -37,7 +37,7 @@ extern uint64_t diagonal;
 extern int shift[];
 #endif
 
-char name[64];
+extern char name[64];
 
 struct TBEntry_piece entry_piece;
 struct TBEntry_pawn entry_pawn;
@@ -66,8 +66,8 @@ uint64_t compest[MAX_PERMS];
 
 int trylist[MAX_CANDS];
 
-int numpawns;
-int numpcs;
+extern int numpawns;
+extern int numpcs;
 
 static int pw[TBPIECES];
 int cmp[16];
