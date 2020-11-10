@@ -300,7 +300,7 @@ static size_t compress(struct CompressState *state, void *dst, void *src,
   return LZ4_compress(src, dst, chunk);
 }
 
-static void decompress(struct CompressState *state, void *dst, sizt_t chunk,
+static void decompress(struct CompressState *state, void *dst, size_t chunk,
     void *src, size_t compressed)
 {
   (void)state;
