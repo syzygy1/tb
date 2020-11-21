@@ -1970,14 +1970,12 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
 
 static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {
-  int s1, s2;
-
-  int w = *(int *)(d->sympat + 3 * s);
-  s2 = (w >> 12) & 0x0fff;
+  uint8_t *w = d->sympat + 3 * s;
+  uint32_t s2 = (w[2] << 4) | (w[1] >> 4);
   if (s2 == 0x0fff)
     d->symlen[s] = 0;
   else {
-    s1 = w & 0x0fff;
+    uint32_t s1 = ((w[1] & 0xf) << 8) | w[0];
     if (!tmp[s1]) calc_symlen(d, s1, tmp);
     if (!tmp[s2]) calc_symlen(d, s2, tmp);
     d->symlen[s] = d->symlen[s1] + d->symlen[s2] + 1;
@@ -2322,7 +2320,8 @@ uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
 
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
-  uint32_t block = *(uint32_t *)(d->indextable + 6 * mainidx);
+  uint32_t block;
+  memcpy(&block, d->indextable + 6 * mainidx, sizeof(block));
   litidx += *(uint16_t *)(d->indextable + 6 * mainidx + 4);
   if (litidx < 0) {
     do {
@@ -2396,16 +2395,16 @@ uint8_t decompress_pairs(struct PairsData *d, uint64_t idx)
 
   uint8_t *sympat = d->sympat;
   while (symlen[sym] != 0) {
-    int w = *(int *)(sympat + 3 * sym);
-    int s1 = w & 0x0fff;
+    uint8_t *w = sympat + 3 * sym;
+    int s1 = ((w[1] & 0xf) << 8) | w[0];
     if (litidx < (int)symlen[s1] + 1)
       sym = s1;
     else {
       litidx -= (int)symlen[s1] + 1;
-      sym = (w >> 12) & 0x0fff;
+      sym = (w[2] << 4) | (w[1] >> 4);
     }
   }
-//  return (int)((char)((*(int *)(sympat + 3 * sym)) & 0x0fff));
+
   return *(sympat + 3 * sym);
 }
 

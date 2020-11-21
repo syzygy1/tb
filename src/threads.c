@@ -132,7 +132,7 @@ void init_threads(int pawns)
 {
   int i;
 
-  thread_data = malloc(numthreads * sizeof(*thread_data));
+  thread_data = alloc_aligned(numthreads * sizeof(*thread_data), 64);
 
   for (i = 0; i < numthreads; i++)
     thread_data[i].thread = i;

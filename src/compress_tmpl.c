@@ -644,7 +644,8 @@ static void NAME(calc_block_sizes)(T *data, uint64_t size, struct HuffCode *c,
         sizetable[num_blocks++] = 65535;
       }
     }
-    *(uint32_t *)(indextable + 6 * i) = block;
+    uint32_t block32 = block;
+    memcpy(indextable + 6 * i, &block32, sizeof(block32));
     *(uint16_t *)(indextable + 6 * i + 4) = idx2 - idx;
     idx2 += 1ULL << idxbits;
   }
@@ -780,7 +781,9 @@ static void NAME(compress_data)(struct tb_handle *F, int num, FILE *G, T *data,
   }
 
   for (i = 0; i < num_indices; i++) {
-    write_u32(G, *(uint32_t *)(indextable + 6 * i));
+    uint32_t block;
+    memcpy(&block, indextable + 6 * i, sizeof(block));
+    write_u32(G, block);
     write_u16(G, *(uint16_t *)(indextable + 6 * i + 4));
   }
 
