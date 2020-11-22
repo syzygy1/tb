@@ -743,7 +743,7 @@ uint8_t PP_sq[278][2];
 uint8_t invmtwist[64];
 #endif
 
-static uint64_t binomial[6][64];
+static uint64_t binomial[7][64];
 static uint64_t pawnidx[6][24];
 static uint64_t pfactor[6][4];
 #ifdef CONNECTED_KINGS
@@ -753,7 +753,7 @@ static uint64_t mfactor[6];
 
 void init_indices(void)
 {
-  int i, j, k;
+  int i, j;
 
 #ifndef CONNECTED_KINGS
   for (i = 0; i < 10; i++)
@@ -779,41 +779,36 @@ void init_indices(void)
     invmtwist[mtwist[i]] = i;
 #endif
 
-// binomial[k-1][n] = Bin(n, k)
-  for (i = 0; i < 6; i++)
-    for (j = 0; j < 64; j++) {
-      uint64_t f = j;
-      uint64_t l = 1;
-      for (k = 1; k <= i; k++) {
-        f *= (j - k);
-        l *= (k + 1);
-      }
-      binomial[i][j] = f / l;
-    }
+  // binomial[k][n] = Bin(n, k)
+  for (j = 0; j < 64; j++)
+    binomial[0][j] = 1;
+  for (i = 1; i < 7; i++)
+    for (j = 1; j < 64; j++)
+      binomial[i][j] = binomial[i - 1][j - 1] + binomial[i][j - 1];
 
   for (i = 0; i < 6; i++) {
     uint64_t s = 0;
     for (j = 0; j < 6; j++) {
       pawnidx[i][j] = s;
-      s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
+      s += binomial[i][ptwist[invflap[j]]];
     }
     pfactor[i][0] = s;
     s = 0;
     for (; j < 12; j++) {
       pawnidx[i][j] = s;
-      s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
+      s += binomial[i][ptwist[invflap[j]]];
     }
     pfactor[i][1] = s;
     s = 0;
     for (; j < 18; j++) {
       pawnidx[i][j] = s;
-      s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
+      s += binomial[i][ptwist[invflap[j]]];
     }
     pfactor[i][2] = s;
     s = 0;
     for (; j < 24; j++) {
       pawnidx[i][j] = s;
-      s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
+      s += binomial[i][ptwist[invflap[j]]];
     }
     pfactor[i][3] = s;
   }
@@ -824,7 +819,7 @@ void init_indices(void)
     uint64_t s = 0;
     for (j = 0; j < 10; j++) {
       multidx[i][j] = s;
-      s += (i == 0) ? 1 : binomial[i - 1][mtwist[invtriangle[j]]];
+      s += binomial[i][mtwist[invtriangle[j]]];
     }
     mfactor[i] = s;
   }
@@ -907,7 +902,7 @@ uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
         j += (p > pos[l]);
-      s += binomial[m - i][p - j];
+      s += binomial[m - i + 1][p - j];
     }
     idx += s * factor[i];
     i += t;
@@ -1013,7 +1008,7 @@ uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
 
     idx = multidx[norm[0] - 1][triangle[pos[0]]];
     for (i = 1; i < norm[0]; i++)
-      idx += binomial[i - 1][mtwist[pos[i]]];
+      idx += binomial[i][mtwist[pos[i]]];
   }
   idx *= factor[0];
 
@@ -1027,7 +1022,7 @@ uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
       p = pos[m];
       for (l = 0, j = 0; l < i; l++)
         j += (p > pos[l]);
-      s += binomial[m - i][p - j];
+      s += binomial[m - i + 1][p - j];
     }
     idx += s * factor[i];
     i += t;
@@ -1153,7 +1148,7 @@ uint64_t encode_piece(struct TBEntry *ptr, int *pos, uint64_t *factor)
       for (l = m; l > j; l--)
         sort[l] = sort[l - 1];
       sort[j] = p;
-      s += binomial[m - i][p - j + m - i];
+      s += binomial[m - i + 1][p - j + m - i];
     }
     idx += s * factor[i];
     i += t;
@@ -1502,7 +1497,7 @@ void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm,
     for (i = norm[0] - 1; i > 1; i--) {
       p = i - 1;
       while (1) {
-        int f = binomial[i - 2][p];
+        int f = binomial[i - 1][p];
         if (f > q) break;
         q -= f;
         p++;
@@ -1523,7 +1518,7 @@ void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm,
     for (j = norm[i] - 1; j > 0; j--) {
       p = j;
       while (1) {
-        int f = binomial[j - 1][p];
+        int f = binomial[j][p];
         if (f > q) break;
         q -= f;
         p++;
@@ -1578,7 +1573,7 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
   t = ptr->pawns[0] - 1;
   idx = pawnidx[t][flap[pos[0]]];
   for (i = t; i > 0; i--)
-    idx += binomial[t - i][ptwist[pos[i]]];
+    idx += binomial[t - i + 1][ptwist[pos[i]]];
   idx *= factor[0];
 
 // remaining pawns
@@ -1593,7 +1588,7 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
-      s += binomial[m - i][p - j - 8];
+      s += binomial[m - i + 1][p - j - 8];
     }
     idx += s * factor[i];
     i = t;
@@ -1609,7 +1604,7 @@ uint64_t encode_pawn(struct TBEntry_pawn *restrict ptr, uint8_t *restrict norm,
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
-      s += binomial[m - i][p - j];
+      s += binomial[m - i + 1][p - j];
     }
     idx += s * factor[i];
     i += t;
@@ -1643,7 +1638,7 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
   t = ptr->pawns[0] - 1;
   idx = pawnidx[t][flap[pos[0]]];
   for (i = t; i > 0; i--)
-    idx += binomial[t - i][ptwist[pos[i]]];
+    idx += binomial[t - i + 1][ptwist[pos[i]]];
   idx *= factor[0];
 
 // remaining pawns
@@ -1658,7 +1653,7 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
-      s += binomial[m - i][p - j - 8];
+      s += binomial[m - i + 1][p - j - 8];
     }
     idx += s * factor[i];
     i = t;
@@ -1674,7 +1669,7 @@ uint64_t encode_pawn_ver(struct TBEntry_pawn *restrict ptr,
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
         j += (p > pos[k]);
-      s += binomial[m - i][p - j];
+      s += binomial[m - i + 1][p - j];
     }
     idx += s * factor[i];
     i += t;
@@ -1713,7 +1708,7 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = t; j > 1; j--) {
       p = j - 1;
       while (1) {
-        int f = binomial[j - 2][p];
+        int f = binomial[j - 1][p];
         if (f > q) break;
         q -= f;
         p++;
@@ -1733,7 +1728,7 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = ptr->pawns[1] - 1; j > 0; j--) {
       p = j;
       while (1) {
-        int f = binomial[j - 1][p];
+        int f = binomial[j][p];
         if (f > q) break;
         q -= f;
         p++;
@@ -1772,7 +1767,7 @@ assume(ptr->pawns[0] <= TBPIECES);
     for (j = norm[i] - 1; j > 0; j--) {
       p = j;
       while (1) {
-        int f = binomial[j - 1][p];
+        int f = binomial[j][p];
         if (f > q) break;
         q -= f;
         p++;
