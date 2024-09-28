@@ -196,6 +196,7 @@ static void calc_broken(struct thread_data *thread)
   }
 }
 
+#if 0
 static void calc_mates(struct thread_data *thread)
 {
   uint64_t idx, idx2;
@@ -222,6 +223,51 @@ static void calc_mates(struct thread_data *thread)
             table_b[idx + i] = MATE;
         }
       }
+    }
+  }
+}
+#endif
+
+static void calc_mates_w(struct thread_data *thread)
+{
+  uint64_t idx, idx2;
+  bitboard occ, bb;
+  int i;
+  int n = numpcs;
+  assume(n >= 3 && n <= TBPIECES);
+  int p[MAX_PIECES];
+  uint64_t end = thread->end;
+
+  for (idx = thread->begin; idx < end; idx += 64) {
+    FILL_OCC64 {
+      for (i = 0, bb = 1; i < 64; i++, bb <<= 1)
+        if (table_w[idx + i] == UNKNOWN) {
+          p[n - 1] = i;
+          if (check_mate(white_pcs, idx + i, table_b, occ | bb, p))
+            table_w[idx + i] = MATE;
+        }
+    }
+  }
+}
+
+static void calc_mates_b(struct thread_data *thread)
+{
+  uint64_t idx, idx2;
+  bitboard occ, bb;
+  int i;
+  int n = numpcs;
+  assume(n >= 3 && n <= TBPIECES);
+  int p[MAX_PIECES];
+  uint64_t end = thread->end;
+
+  for (idx = thread->begin; idx < end; idx += 64) {
+    FILL_OCC64 {
+      for (i = 0, bb = 1; i < 64; i++, bb <<= 1)
+        if (table_b[idx + i] == UNKNOWN) {
+          p[n - 1] = i;
+          if (check_mate(black_pcs, idx + i, table_w, occ | bb, p))
+            table_b[idx + i] = MATE;
+        }
     }
   }
 }

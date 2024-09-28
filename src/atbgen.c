@@ -805,6 +805,8 @@ static void reset_captures_w(void)
     captured_piece = i;
     run_threaded(reset_captures_worker_w, work_g, 1);
   }
+
+  reset_v = NULL;
 }
 
 static void reset_captures_b(void)
@@ -841,6 +843,8 @@ static void reset_captures_b(void)
     captured_piece = i;
     run_threaded(reset_captures_worker_b, work_g, 1);
   }
+
+  reset_v = NULL;
 }
 
 // CAPT_CLOSS means there is a capture into a cursed win, preventing a loss

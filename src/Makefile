@@ -31,7 +31,7 @@ CC = gcc -pthread
 # Compilation flags
 # For Haswell add -mbmi2 and select -DBMI2 above.
 #CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds
-CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds -flto
+CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds -flto=auto
 #CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined -Wno-array-bounds
 
 export FLAGS CC CFLAGS LDFLAGS
@@ -50,13 +50,20 @@ stbgen stbgenp sclean:
 gtbgen gtbgenp gclean:
 	@$(MAKE) -f Makefile.giveaway $@
 
+jtbgen jtbgenp jclean:
+	@$(MAKE) -f Makefile.shatranj $@
+
+#atbgen atbgenp atbver atbverp aclean:
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
 suicide: stbgen stbgenp tbcheck
 
 giveaway: gtbgen gtbgenp tbcheck
 
+shatranj: jtbgen jtbgenp tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp sclean \
-	gtbgen gtbgenp gclean
+	gtbgen gtbgenp gclean \
+	jtbgen jtbgenp jclean

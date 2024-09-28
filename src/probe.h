@@ -49,6 +49,13 @@
 #define DTZDIR "ATBZDIR"
 #define STATSDIR "ATBSTATSDIR"
 #define LOGFILE "atblog.txt"
+#elif defined(SHATRANJ)
+#define WDLSUFFIX ".jtbw"
+#define DTZSUFFIX ".jtbz"
+#define WDLDIR "JTBWDIR"
+#define DTZDIR "JTBZDIR"
+#define STATSDIR "JTBSTATSDIR"
+#define LOGFILE "jtblog.txt"
 #else
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
@@ -66,6 +73,9 @@
 #elif defined(ATOMIC)
 #define WDL_MAGIC 0x49a48d55
 #define DTZ_MAGIC 0xeb5ea991
+#elif defined(SHATRANJ)
+#define WDL_MAGIC 0xb4e9b3b7
+#define DTZ_MAGIC 0x87c126fc
 #elif defined(SUICIDE) && !defined(GIVEAWAY)
 #define WDL_MAGIC 0x1593f67b
 #define DTZ_MAGIC 0x23e7cfe4

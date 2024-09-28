@@ -11,6 +11,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include "board.h"
 #include "defs.h"
@@ -32,6 +33,10 @@
 #define TBMAX_PIECE 1260
 #define TBMAX_PAWN 1386
 #define HSHMAX 12
+#elif defined(SHATRANJ)
+#define TBMAX_PIECE 590
+#define TBMAX_PAWN 570
+#define HSHMAX 12
 #else
 #if TBPIECES <= 6
 #define TBMAX_PIECE 254
@@ -48,7 +53,7 @@
 #define CONNECTED_KINGS
 #endif
 
-#if defined(REGULAR) || defined(ATOMIC) || defined(LOSER)
+#if defined(REGULAR) || defined(ATOMIC) || defined(LOSER) || defined(SHATRANJ)
 uint64_t tb_piece_key[] = {
   0ULL,
   0x5ced000000000001ULL,
@@ -335,10 +340,12 @@ void init_tablebases(void)
               init_tb(str);
             }
 #else
+#ifndef SHATRANJ
   for (i = 1; i < 6; i++) {
     sprintf(str, "K%cvK", pchr[i]);
     init_tb(str);
   }
+#endif
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++) {
@@ -346,18 +353,22 @@ void init_tablebases(void)
       init_tb(str);
     }
 
+#ifndef SHATRANJ
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++) {
       sprintf(str, "K%c%cvK", pchr[i], pchr[j]);
       init_tb(str);
     }
+#endif
 
+#ifndef SHATRANJ
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++) {
         sprintf(str, "K%c%c%cvK", pchr[i], pchr[j], pchr[k]);
         init_tb(str);
       }
+#endif
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
@@ -366,6 +377,7 @@ void init_tablebases(void)
         init_tb(str);
       }
 
+#ifndef SHATRANJ
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
@@ -373,6 +385,7 @@ void init_tablebases(void)
           sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
           init_tb(str);
         }
+#endif
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
@@ -392,6 +405,7 @@ void init_tablebases(void)
 
 #if TBPIECES == 7
 
+#ifndef SHATRANJ
   for (i = 1; i < 6; i ++)
     for (j = i; j < 6; j++)
       for (k = j; k < 6; k++)
@@ -401,6 +415,7 @@ void init_tablebases(void)
                                           pchr[l], pchr[m]);
             init_tb(str);
           }
+#endif
 
   for (i = 1; i < 6; i++)
     for (j = i; j < 6; j++)
@@ -2598,6 +2613,139 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
             if (v > alpha)
               alpha = v;
           }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
+      }
+    }
+  }
+
+  int v = probe_table(pieces, gpos, wtm);
+  return alpha > v ? alpha : v;
+}
+#elif defined(SHATRANJ)
+int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
+             int alpha, int beta)
+{
+  int i, j, k, s, t;
+  int sq, sq2;
+  bitboard bb;
+
+  if (wtm) {
+#ifndef HAS_PAWNS
+    for (i = 2; i < numpcs; i++)
+      if (pieces[i] && !(pieces[i] & 0x08))
+        break;
+#else
+    for (i = 0; i < numpcs; i++)
+      if (pieces[i] && pieces[i] < WKING)
+        break;
+#endif
+    if (i == numpcs) { // bare white king
+      if (PopCount(occ) > 3)
+        return -2;
+      assert(PopCount(occ) == 3);
+      if (king_range[gpos[white_king]] & ~king_range[gpos[black_king]] & occ)
+        return 0;
+      else
+        return -2;
+    }
+    for (i = 0; i < numpcs; i++) {
+      if (i == black_king) continue;
+      s = pieces[i];
+      if (!(s & 0x08)) continue;
+      sq = gpos[i];     /* square of piece to be captured */
+      for (j = 0; j < numpcs; j++) {
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+// alternatively, change pieces around
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
+// now check whether move was legal, i.e. white king not in check
+        int king_sq = gpos[white_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!(t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) { // not in check
+          int v;
+          if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
+            pieces[j] = WQUEEN;
+            v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+            pieces[j] = WPAWN;
+          } else {
+            v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+          }
+          if (v > alpha)
+            alpha = v;
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
+      }
+    }
+  } else {
+#ifndef HAS_PAWNS
+    for (i = 2; i < numpcs; i++)
+      if (pieces[i] & 0x08)
+        break;
+#else
+    for (i = 0; i < numpcs; i++)
+      if ((pieces[i] & 0x08) && pieces[i] != BKING)
+        break;
+#endif
+    if (i == numpcs) { // bare black king
+      if (PopCount(occ) > 3)
+        return -2;
+      assert(PopCount(occ) == 3);
+      if (king_range[gpos[black_king]] & ~king_range[gpos[white_king]] & occ)
+        return 0;
+      else
+        return -2;
+    }
+    for (i = 0; i < numpcs; i++) {
+      if (i == white_king) continue;
+      s = pieces[i];
+      if (!s || (s & 0x08)) continue;
+      sq = gpos[i];     /* square of piece to be captured */
+      for (j = 0; j < numpcs; j++) {
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+// alternatively, change pieces around
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
+// now check whether move was legal, i.e. white king not in check
+        int king_sq = gpos[black_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!t || (t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          int v;
+          if (pieces[j] == BPAWN && gpos[j] < 0x08) {
+            pieces[j] = BQUEEN;
+            v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+            pieces[j] = BPAWN;
+          } else {
+            v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+          }
+          if (v > alpha)
+            alpha = v;
         }
         gpos[j] = tmp;
         pieces[i] = s;

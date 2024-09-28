@@ -97,6 +97,8 @@ u16 *transform_tbl_u16;
 #include "atbgen.c"
 #elif defined(LOSER)
 #include "ltbgen.c"
+#elif defined(SHATRANJ)
+#include "jtbgen.c"
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -701,10 +703,22 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+#ifndef SHATRANJ
   if (numpcs < 3) {
     fprintf(stderr, "Need at least 3 pieces.\n");
     exit(1);
   }
+#else
+  int numw = 0, numb = 0;
+  for (int i = PAWN; i <= QUEEN; i++) {
+    numw += pcs[i];
+    numb += pcs[i | 8];
+  }
+  if (numw == 0 || numb == 0) {
+    fprintf(stderr, "Bare king.\n");
+    exit(1);
+  }
+#endif
 #else
   if (numpcs < 2) {
     fprintf(stderr, "Need at least 2 pieces.\n");
@@ -867,8 +881,15 @@ int main(int argc, char **argv)
       break;
     }
 #ifndef SUICIDE
+#ifndef SHATRANJ
   printf("Calculating mate positions.\n");
   run_threaded(calc_mates, work_g, 1);
+#else
+  printf("Calculating white mate positions.\n");
+  run_threaded(calc_mates_w, work_g, 1);
+  printf("Calculating black mate positions.\n");
+  run_threaded(calc_mates_b, work_g, 1);
+#endif
 #endif
 
   iterate();
@@ -996,7 +1017,7 @@ int main(int argc, char **argv)
         load_table_u8(table_w, 'w');
         unlink_table('w');
       }
-#if defined(REGULAR) || defined(ATOMIC)
+#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
       else
         fix_closs_w();
 

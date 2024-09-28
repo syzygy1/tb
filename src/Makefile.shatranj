@@ -1,0 +1,13 @@
+GENTBNAME = jtbgen
+GENTBPNAME = jtbgenp
+VERTBNAME = jtbver
+VERTBPNAME = jtbverp
+CLEAN = jclean
+
+DEPDIR = .depsj
+OBJDIR = objsj
+
+FLAGS += -DSHATRANJ
+
+include Makefile.general
+

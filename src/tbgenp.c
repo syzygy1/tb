@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2016, 2018 Ronald de Man
+  Copyright (c) 2011-2016, 2018, 2024 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -92,6 +92,8 @@ static uint64_t global_stats_b[MAX_STATS];
 #include "atbgenp.c"
 #elif defined(LOSER)
 #include "ltbgenp.c"
+#elif defined(SHATRANJ)
+#include "jtbgenp.c"
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -181,7 +183,12 @@ void calc_pawn_table_unthreaded(void)
       if (has_black_pawns)
         run_single(calc_pawn_moves_b, work_p, 0);
 #ifndef SUICIDE
+#ifndef SHATRANJ
       run_single(calc_mates, work_p, 0);
+#else
+      run_single(calc_mates_w, work_p, 0);
+      run_single(calc_mates_b, work_p, 0);
+#endif
 #endif
       iterate();
     } else {
@@ -238,7 +245,12 @@ void calc_pawn_table_threaded(void)
       if (has_black_pawns)
         run_threaded(calc_pawn_moves_b, work_p, 0);
 #ifndef SUICIDE
+#ifndef SHATRANJ
       run_threaded(calc_mates, work_p, 0);
+#else
+      run_threaded(calc_mates_w, work_p, 0);
+      run_threaded(calc_mates_b, work_p, 0);
+#endif
 #endif
       iterate();
     } else {
@@ -806,10 +818,22 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+#ifndef SHATRANJ
   if (numpcs < 3) {
     fprintf(stderr, "Need at least 3 pawns or pieces.\n");
     exit(1);
   }
+#else
+  int numw = 0, numb = 0;
+  for (int i = PAWN; i <= QUEEN; i++) {
+    numw += pcs[i];
+    numb += pcs[i | 8];
+  }
+  if (numw == 0 || numb == 0) {
+    fprintf(stderr, "Bare king.\n");
+    exit(1);
+  }
+#endif
 #else
   if (numpcs < 2) {
     fprintf(stderr, "Need at least 2 pawns or pieces.\n");
@@ -1139,7 +1163,7 @@ int main(int argc, char **argv)
       }
 
       tb_size = init_permute_file(pcs, file);
-#if defined(REGULAR) || defined(ATOMIC)
+#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
       if (save_to_disk || !G
                 || (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
         tb_table = table_b;
@@ -1180,7 +1204,7 @@ int main(int argc, char **argv)
 
       uint8_t v[256];
 
-#if defined(REGULAR) || defined(ATOMIC)
+#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
       reset_piece_captures_w();
       if (cursed_pawn_capt_w) {
         printf("Resetting white cursed pawn captures.\n");
@@ -1199,7 +1223,7 @@ int main(int argc, char **argv)
           load_table_u8(table_b, 'b');
           tb_table = table_w;
         }
-#if defined(REGULAR) || defined(ATOMIC)
+#if defined(REGULAR) || defined(ATOMIC) || defined (SHATRANJ)
         reset_piece_captures_b();
         if (cursed_pawn_capt_b) {
           printf("Resetting black cursed pawn captures.\n");
@@ -1231,7 +1255,7 @@ int main(int argc, char **argv)
         load_table_u8(table_w, 'w');
         unlink_table('w');
       }
-#if defined(REGULAR) || defined(ATOMIC)
+#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
       else
         fix_closs_w();
 

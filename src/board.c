@@ -13,6 +13,9 @@
 
 bitboard bit[64];
 bitboard knight_range[64], king_range[64];
+#ifdef SHATRANJ
+bitboard bishop_range[64], queen_range[64];
+#endif
 #ifdef HAS_PAWNS
 bitboard pawn_range[2][64];
 bitboard sides_mask[64];
@@ -33,6 +36,13 @@ void set_up_tables(void)
 	     Ny[] = {2, 1, -1, -2, -2, -1, 1, 2},
 	     Kx[] = {-1, 0, 1, 1, 1, 0, -1, -1},
 	     Ky[] = {1, 1, 1, 0, -1, -1, -1, 0};
+
+#ifdef SHATRANJ
+  static int Bx[] = {2, 2, -2, -2},
+	     By[] = {2, -2, 2, -2},
+	     Qx[] = {1, 1, -1, -1},
+	     Qy[] = {1, -1, 1, -1};
+#endif
 
   for (sq = 0; sq < 64; sq++)
     bit[sq] = 1ULL << sq;
@@ -73,6 +83,20 @@ void set_up_tables(void)
       if (x + Kx[i] >= 0 && x + Kx[i] < 8 && y + Ky[i] >= 0 && y + Ky[i] < 8) 
 	bits |= bit[x + Kx[i] + 8 * (y + Ky[i])];
     king_range[sq] = bits;
+
+#ifdef SHATRANJ
+    bits = 0;
+    for (i = 0; i < 4; i++)
+      if (x + Bx[i] >= 0 && x + Bx[i] < 8 && y + By[i] >= 0 && y + By[i] < 8)
+	bits |= bit[x + Bx[i] + 8 * (y + By[i])];
+    bishop_range[sq] = bits;
+
+    bits = 0;
+    for (i = 0; i < 4; i++)
+      if (x + Qx[i] >= 0 && x + Qx[i] < 8 && y + Qy[i] >= 0 && y + Qy[i] < 8)
+	bits |= bit[x + Qx[i] + 8 * (y + Qy[i])];
+    queen_range[sq] = bits;
+#endif
 
 #ifdef ATOMIC
     atom_mask[sq] = bits | bit[sq];

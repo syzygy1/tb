@@ -35,6 +35,9 @@ static __inline__ int PopCount(bitboard x)
 #include "bmi2.h"
 
 extern bitboard knight_range[64], king_range[64];
+#ifdef SHATRANJ
+extern bitboard queen_range[64], bishop_range[64];
+#endif
 #ifdef HAS_PAWNS
 extern bitboard pawn_range[2][64];
 #define white_pawn_range pawn_range[0]
@@ -49,6 +52,12 @@ extern bitboard atom_mask[64];
 
 #define KnightRange(x) knight_range[x]
 #define KingRange(x) king_range[x]
+#ifdef SHATRANJ
+#undef QueenRange
+#define QueenRange(x,occ) queen_range[x]
+#undef BishopRange
+#define BishopRange(x,occ) bishop_range[x]
+#endif
 
 #define PAWN 1
 #define KNIGHT 2

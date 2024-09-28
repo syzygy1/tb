@@ -9,7 +9,7 @@
 
 #include <inttypes.h>
 
-#ifdef REGULAR
+#if defined(REGULAR) || defined (SHATRANJ)
 #define SMALL
 #endif
 
