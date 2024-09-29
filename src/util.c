@@ -213,7 +213,7 @@ static LOCK_T cmprs_mutex;
 
 static FILE *cmprs_F;
 static void *cmprs_ptr;
-static size_t cmprs_size;
+static volatile size_t cmprs_size;
 static void *cmprs_v;
 static size_t cmprs_idx;
 
