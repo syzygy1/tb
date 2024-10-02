@@ -282,21 +282,46 @@ void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_t
   cur_time = stop_time;
 }
 
-static pthread_t cmprs_threads[COMPRESSION_THREADS];
 static struct thread_data cmprs_data[COMPRESSION_THREADS];
-static pthread_barrier_t cmprs_barrier;
 static void (*cmprs_func)(int t);
+
+#ifndef __WIN32__
+static pthread_t cmprs_threads[COMPRESSION_THREADS];
+static pthread_barrier_t cmprs_barrier;
+#else
+HANDLE cmprs_threads[COMPRESSION_THREADS];
+HANDLE *cmprs_start_event;
+HANDLE *cmprs_stop_event;
+#endif
 
 static void *cmprs_worker(void *arg)
 {
   struct thread_data *thread = arg;
+  int t = thread->thread;
   do {
+#ifndef __WIN32__
     pthread_barrier_wait(&cmprs_barrier);
+#else
+    if (t != COMPRESSION_THREADS - 1)
+      WaitForSingleObject(cmprs_start_event[t], INFINITE);
+    else {
+      int i;
+      for (i = 0; i < COMPRESSION_THREADS - 1; i++)
+        SetEvent(cmprs_start_event[i]);
+    }
+#endif
 
-    cmprs_func(thread->thread);
+    cmprs_func(t);
 
+#ifndef __WIN32__
     pthread_barrier_wait(&cmprs_barrier);
-  } while (thread->thread != 0);
+#else
+  if (t != COMPRESSION_THREADS - 1)
+    SetEvent(cmprs_stop_event[t]);
+  else
+    WaitForMultipleObjects(COMPRESSION_THREADS - 1, cmprs_stop_event, TRUE, INFINITE);
+#endif
+  } while (t != COMPRESSION_THREADS - 1);
 
   return 0;
 }
@@ -307,6 +332,7 @@ void create_compression_threads(void)
     cmprs_data[i].thread = i;
   }
 
+#ifndef __WIN32__
   pthread_barrier_init(&cmprs_barrier, NULL, COMPRESSION_THREADS);
 
   for (int i = 1; i < COMPRESSION_THREADS; i++) {
@@ -316,6 +342,26 @@ void create_compression_threads(void)
       exit(EXIT_FAILURE);
     }
   }
+#else
+  cmprs_start_event = malloc((COMPRESSION_THREADS - 1) * sizeof(*cmprs_start_event));
+  cmprs_stop_event = malloc((COMPRESSION_THREADS - 1) * sizeof(*cmprs_stop_event));
+  for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
+    cmprs_start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+    cmprs_stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!cmprs_start_event[i] || !cmprs_stop_event[i]) {
+      fprintf(stderr, "CreateEvent() failed.\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+  for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
+    cmprs_threads[i] = CreateThread(NULL, 0, cmprs_worker, (void *)&(cmprs_data[i]),
+                                  0, NULL);
+    if (cmprs_threads[i] == NULL) {
+      fprintf(stderr, "CreateThread() failed.\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+#endif
 }
 
 void run_compression(void (*func)(int t))
