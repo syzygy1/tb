@@ -2,9 +2,9 @@
 # -DBMI2 only works on Haswell processors.
 # -DHYPER requires a processor with SSE3 support.
 # -DMAGIC and -DHYPER are about equally fast on my system.
-FLAGS = -DMAGIC
+#FLAGS = -DMAGIC
 #FLAGS = -DHYPER
-#FLAGS = -DBMI2
+FLAGS = -DBMI2
 
 # Specify -DUSE_POPCNT on a machine with popcnt support.
 # For pawnful tables this seems slightly faster. For pawnless tables it

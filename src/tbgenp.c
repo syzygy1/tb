@@ -1164,11 +1164,11 @@ int main(int argc, char **argv)
 
       tb_size = init_permute_file(pcs, file);
 #if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
-      if (save_to_disk || !G || (symmetric && !H))
+      if (save_to_disk || symmetric || !G)
         tb_table = table_b;
       else if (!tb_table)
         tb_table = malloc(tb_size + 1);
-      if ((save_to_disk && G && !symmetric) || compress_wide) {
+      if ((save_to_disk && !symmetric && G) || compress_wide) {
         store_table(table_w, 'w');
         if (!symmetric)
           store_table(table_b, 'b');

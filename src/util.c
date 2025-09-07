@@ -213,7 +213,7 @@ static LOCK_T cmprs_mutex;
 
 static FILE *cmprs_F;
 static void *cmprs_ptr;
-static volatile size_t cmprs_size;
+static size_t cmprs_size;
 static void *cmprs_v;
 static size_t cmprs_idx;
 
@@ -376,9 +376,9 @@ static void read_data_worker_u8(int t)
   uint8_t *v = cmprs_v;
   while (1) {
     uint32_t cmprs_chunk;
-    flockfile(F);
+    LOCK(cmprs_mutex);
     if (cmprs_size == 0) {
-      funlockfile(F);
+      UNLOCK(cmprs_mutex);
       break;
     }
     file_read(&cmprs_chunk, 4, F);
@@ -389,7 +389,7 @@ static void read_data_worker_u8(int t)
       exit(EXIT_FAILURE);
     }
     cmprs_size -= chunk;
-    funlockfile(F);
+    UNLOCK(cmprs_mutex);
     size_t idx = state->frame->idx;
     if (!v)
       decompress(state, dst + idx, chunk, state->frame->data, cmprs_chunk);
@@ -421,9 +421,9 @@ static void read_data_worker_u16(int t)
   uint16_t *v = cmprs_v;
   while (1) {
     uint32_t cmprs_chunk;
-    flockfile(F);
+    LOCK(cmprs_mutex);
     if (cmprs_size == 0) {
-      funlockfile(F);
+      UNLOCK(cmprs_mutex);
       break;
     }
     file_read(&cmprs_chunk, 4, F);
@@ -434,7 +434,7 @@ static void read_data_worker_u16(int t)
       exit(EXIT_FAILURE);
     }
     cmprs_size -= chunk;
-    funlockfile(F);
+    UNLOCK(cmprs_mutex);
     size_t idx = state->frame->idx;
     decompress(state, state->buffer, chunk, state->frame->data, cmprs_chunk);
     if (!v)

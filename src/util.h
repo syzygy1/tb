@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#undef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 void *map_file(char *name, int shared, uint64_t *size);

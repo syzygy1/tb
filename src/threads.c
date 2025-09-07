@@ -132,6 +132,8 @@ void init_threads(int pawns)
 {
   int i;
 
+  assume(numthreads >= 1); // to get rid of some warnings
+
   thread_data = alloc_aligned(numthreads * sizeof(*thread_data), 64);
 
   for (i = 0; i < numthreads; i++)
@@ -294,10 +296,11 @@ HANDLE *cmprs_start_event;
 HANDLE *cmprs_stop_event;
 #endif
 
-static void *cmprs_worker(void *arg)
+static THREAD_FUNC cmprs_worker(void *arg)
 {
   struct thread_data *thread = arg;
   int t = thread->thread;
+
   do {
 #ifndef __WIN32__
     pthread_barrier_wait(&cmprs_barrier);
