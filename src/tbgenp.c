@@ -1164,8 +1164,7 @@ int main(int argc, char **argv)
 
       tb_size = init_permute_file(pcs, file);
 #if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
-      if (save_to_disk || !G
-                || (symmetric && (!H || !(to_fix_w || cursed_pawn_capt_w))))
+      if (save_to_disk || !G || (symmetric && !H))
         tb_table = table_b;
       else if (!tb_table)
         tb_table = malloc(tb_size + 1);
@@ -1173,7 +1172,7 @@ int main(int argc, char **argv)
         store_table(table_w, 'w');
         if (!symmetric)
           store_table(table_b, 'b');
-      } else if (save_to_disk && G && H && (to_fix_w || cursed_pawn_capt_w)) {
+      } else if (save_to_disk && G && H) {
         store_table(table_b, 'b');
       }
       if (H && compress_wide) {
@@ -1256,10 +1255,13 @@ int main(int argc, char **argv)
         unlink_table('w');
       }
 #if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
-      else
-        fix_closs_w();
-
-      fix_closs_b();
+      else if (save_to_disk) {
+        load_table_u8(table_b, 'b');
+        unlink_table('b');
+      }
+      fix_closs_w();
+      if (!symmetric)
+        fix_closs_b();
 #endif
 
       if (num_saves > 0) {
