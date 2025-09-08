@@ -28,15 +28,6 @@ extern int split;
 extern int numpcs;
 extern int numpawns;
 
-int blockbits = 8;
-
-uint8_t pieces[TBPIECES];
-
-int freq[MAXSYMB];
-int low, high;
-
-char name[64];
-
 static void calc_symbol_tweaks(struct HuffCode *restrict c);
 struct HuffCode *construct_pairs_wdl(uint8_t *restrict data, uint64_t size,
     int minfreq, int maxsymbols);
