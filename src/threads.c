@@ -292,8 +292,8 @@ static pthread_t cmprs_threads[COMPRESSION_THREADS];
 static pthread_barrier_t cmprs_barrier;
 #else
 HANDLE cmprs_threads[COMPRESSION_THREADS];
-HANDLE *cmprs_start_event;
-HANDLE *cmprs_stop_event;
+HANDLE cmprs_start_event[COMPRESSION_THREADS - 1];
+HANDLE cmprs_stop_event[COMPRESSION_THREADS - 1];
 #endif
 
 static THREAD_FUNC cmprs_worker(void *arg)
@@ -319,10 +319,10 @@ static THREAD_FUNC cmprs_worker(void *arg)
 #ifndef __WIN32__
     pthread_barrier_wait(&cmprs_barrier);
 #else
-  if (t != COMPRESSION_THREADS - 1)
-    SetEvent(cmprs_stop_event[t]);
-  else
-    WaitForMultipleObjects(COMPRESSION_THREADS - 1, cmprs_stop_event, TRUE, INFINITE);
+    if (t != COMPRESSION_THREADS - 1)
+      SetEvent(cmprs_stop_event[t]);
+    else
+      WaitForMultipleObjects(COMPRESSION_THREADS - 1, cmprs_stop_event, TRUE, INFINITE);
 #endif
   } while (t != COMPRESSION_THREADS - 1);
 
@@ -331,14 +331,13 @@ static THREAD_FUNC cmprs_worker(void *arg)
 
 void create_compression_threads(void)
 {
-  for (int i = 0; i < COMPRESSION_THREADS; i++) {
+  for (int i = 0; i < COMPRESSION_THREADS; i++)
     cmprs_data[i].thread = i;
-  }
 
 #ifndef __WIN32__
   pthread_barrier_init(&cmprs_barrier, NULL, COMPRESSION_THREADS);
 
-  for (int i = 1; i < COMPRESSION_THREADS; i++) {
+  for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
     int rc = pthread_create(&cmprs_threads[i], NULL, cmprs_worker, &cmprs_data[i]);
     if (rc) {
       fprintf(stderr, "ERROR: phtread_create() return %d\n", rc);
@@ -346,8 +345,6 @@ void create_compression_threads(void)
     }
   }
 #else
-  cmprs_start_event = malloc((COMPRESSION_THREADS - 1) * sizeof(*cmprs_start_event));
-  cmprs_stop_event = malloc((COMPRESSION_THREADS - 1) * sizeof(*cmprs_stop_event));
   for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
     cmprs_start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
     cmprs_stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
@@ -370,5 +367,5 @@ void create_compression_threads(void)
 void run_compression(void (*func)(int t))
 {
   cmprs_func = func;
-  cmprs_worker(&cmprs_data[0]);
+  cmprs_worker(&cmprs_data[COMPRESSION_THREADS - 1]);
 }
