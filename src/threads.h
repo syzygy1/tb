@@ -5,6 +5,7 @@
 */
 
 #include <stdalign.h>
+#include <stdatomic.h>
 
 #ifndef THREADS_H
 #define THREADS_H
@@ -20,13 +21,13 @@
 #ifndef __WIN32__
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
-#define LOCK(x) pthread_mutex_lock(&(x))
-#define UNLOCK(x) pthread_mutex_unlock(&(x))
+#define LOCK(x) do { atomic_signal_fence(memory_order_seq_cst); pthread_mutex_lock(&(x)); } while (0)
+#define UNLOCK(x) do { pthread_mutex_unlock(&(x)); atomic_signal_fence(memory_order_seq_cst); } while (0)
 #else
 #define LOCK_T HANDLE
 #define LOCK_INIT(x) do { x = CreateMutex(NULL, FALSE, NULL); } while (0)
-#define LOCK(x) WaitForSingleObject(x, INFINITE)
-#define UNLOCK(x) ReleaseMutex(x)
+#define LOCK(x) do { atomic_signal_fence(memory_order_seq_cst); WaitForSingleObject(x, INFINITE); } while (0)
+#define UNLOCK(x) do { ReleaseMutex(x); atomic_signal_fence(memory_order_seq_cst); } while (0)
 #endif
 
 struct thread_data {
