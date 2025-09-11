@@ -15,7 +15,7 @@ GENTBPOBJS = tbgenp.o permute.o compress.o huffman.o threads.o lz4.o checksum.o 
 VERTBOBJS = tbver.o decompress.o threads.o checksum.o city-c.o util.o
 VERTBPOBJS = tbverp.o decompress.o threads.o checksum.o city-c.o util.o
 
-TBCHECKOBJS = tbcheck.o threads.o checksum.o city-c.o util.o
+TBCHECKOBJS = tbcheck.o threads.o checksum.o city-c.o lz4.o util.o
 
 CFILES = $(filter $(wildcard *.c), $(OBJS:%.o=%.c))
 

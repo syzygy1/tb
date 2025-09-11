@@ -1,83 +1,78 @@
 /*
-  Copyright (c) 2011-2013, 2018 Ronald de Man
+  Copyright (c) 2011-2013, 2018, 2025 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifndef __WIN32__
-#include <pthread.h>
-#else
-#include <windows.h>
-#endif
 #include <sys/time.h>
 
 #include "threads.h"
 #include "util.h"
 
+#if defined(__STDC_NO_THREADS__) || !__has_include(<threads.h>)
+#include "c11threads_win32.c"
+#endif
+
+#ifdef __linux__
+#include <sched.h>
+#endif
+
 struct thread_data *thread_data;
-
-#ifndef __WIN32__ /* pthread */
-
-// implementation of pthread_barrier in case it is missing
-#if !defined(_POSIX_BARRIERS)
-#define pthread_barrier_t barrier_t
-#define pthread_barrier_attr_t barrier_attr_t
-#define pthread_barrier_init(b,a,n) barrier_init(b,n)
-#define pthread_barrier_destroy(b) barrier_destroy(b)
-#define pthread_barrier_wait(b) barrier_wait(b)
 
 typedef struct {
   int needed;
   int called;
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
+  mtx_t mutex;
+  cnd_t cond;
 } barrier_t;
 
 int barrier_init(barrier_t *barrier, int needed)
 {
   barrier->needed = needed;
   barrier->called = 0;
-  pthread_mutex_init(&barrier->mutex, NULL);
-  pthread_cond_init(&barrier->cond, NULL);
+  mtx_init(&barrier->mutex, mtx_plain);
+  cnd_init(&barrier->cond);
   return 0;
 }
 
 int barrier_destroy(barrier_t *barrier)
 {
-  pthread_mutex_destroy(&barrier->mutex);
-  pthread_cond_destroy(&barrier->cond);
+  mtx_destroy(&barrier->mutex);
+  cnd_destroy(&barrier->cond);
   return 0;
 }
 
 int barrier_wait(barrier_t *barrier)
 {
-  pthread_mutex_lock(&barrier->mutex);
+  mtx_lock(&barrier->mutex);
   barrier->called++;
   if (barrier->called == barrier->needed) {
     barrier->called = 0;
-    pthread_cond_broadcast(&barrier->cond);
+    cnd_broadcast(&barrier->cond);
   } else {
-    pthread_cond_wait(&barrier->cond,&barrier->mutex);
+    cnd_wait(&barrier->cond,&barrier->mutex);
   }
-  pthread_mutex_unlock(&barrier->mutex);
+  mtx_unlock(&barrier->mutex);
   return 0;
 }
+
+static void setaffinity(int i)
+{
+#ifdef __linux__
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(i, &cpuset);
+  if (sched_setaffinity(0, sizeof(cpuset), &cpuset))
+    perror("sched_setaffinity");
+#else
+  (void)i;
 #endif
+}
 
-pthread_t *threads;
-static pthread_barrier_t barrier;
-#define THREAD_FUNC void*
-
-#else /* WIN32 */
-
-HANDLE *threads;
-HANDLE *start_event;
-HANDLE *stop_event;
-#define THREAD_FUNC DWORD
-
-#endif
+thrd_t *threads;
+static barrier_t barrier;
 
 static struct {
   void (*func)(struct thread_data *);
@@ -126,7 +121,7 @@ uint64_t *create_work(int n, uint64_t size, uint64_t mask)
   return w;
 }
 
-THREAD_FUNC worker(void *arg);
+int worker(void *arg);
 
 void init_threads(int pawns)
 {
@@ -136,8 +131,10 @@ void init_threads(int pawns)
 
   thread_data = alloc_aligned(numthreads * sizeof(*thread_data), 64);
 
-  for (i = 0; i < numthreads; i++)
+  for (i = 0; i < numthreads; i++) {
     thread_data[i].thread = i;
+    thread_data[i].affinity = -1;
+  }
 
   if (pawns) {
     uint8_t *p = alloc_aligned(64 * numthreads, 64);
@@ -145,75 +142,37 @@ void init_threads(int pawns)
       thread_data[i].p = (int *)(p + 64 * i);
   }
 
-#ifndef __WIN32__
   threads = malloc(numthreads * sizeof(*threads));
-  pthread_barrier_init(&barrier, NULL, numthreads);
+  barrier_init(&barrier, numthreads);
 
   for (i = 0; i < numthreads - 1; i++) {
-    int rc = pthread_create(&threads[i], NULL, worker,
-                                  (void *)&(thread_data[i]));
+    int rc = thrd_create(&threads[i], worker, (void *)&(thread_data[i]));
     if (rc) {
-      fprintf(stderr, "ERROR: pthread_create() returned %d\n", rc);
+      fprintf(stderr, "ERROR: thrd_create() returned %d\n", rc);
       exit(EXIT_FAILURE);
     }
   }
-  threads[numthreads - 1] = pthread_self();
+  threads[numthreads - 1] = thrd_current();
 
   if (thread_affinity) {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    for (i = 0; i < numthreads; i++) {
-      CPU_SET(i, &cpuset);
-      int rc = pthread_setaffinity_np(threads[i], sizeof(cpuset), &cpuset);
-      CPU_CLR(i, &cpuset);
-      if (rc)
-        fprintf(stderr, "pthread_setaffinity_np() returned %d.\n", rc);
-    }
+    for (i = 0; i < numthreads; i++)
+      thread_data[i].affinity = i;
+    setaffinity(thread_data[numthreads - 1].affinity);
   }
-#else
-  threads = malloc((numthreads - 1) * sizeof(*threads));
-  start_event = malloc((numthreads - 1) * sizeof(*start_event));
-  stop_event = malloc((numthreads - 1) * sizeof(*stop_event));
-  for (i = 0; i < numthreads - 1; i++) {
-    start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
-    stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
-    if (!start_event[i] || !stop_event[i]) {
-      fprintf(stderr, "CreateEvent() failed.\n");
-      exit(EXIT_FAILURE);
-    }
-  }
-  for (i = 0; i < numthreads - 1; i++) {
-    threads[i] = CreateThread(NULL, 0, worker, (void *)&(thread_data[i]),
-                                  0, NULL);
-    if (threads[i] == NULL) {
-      fprintf(stderr, "CreateThread() failed.\n");
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  if (thread_affinity)
-    fprintf(stderr, "Thread affinities not yet implemented on Windows.\n");
-#endif
 }
-
-THREAD_FUNC worker(void *arg)
+int worker(void *arg)
 {
   struct thread_data *thread = (struct thread_data *)arg;
   int t = thread->thread;
   int w;
 
+  if (t != numthreads - 1) {
+    if (thread->affinity >= 0)
+      setaffinity(thread->affinity);
+  }
+
   do {
-#ifndef __WIN32__
-    pthread_barrier_wait(&barrier);
-#else
-    if (t != numthreads - 1)
-      WaitForSingleObject(start_event[t], INFINITE);
-    else {
-      int i;
-      for (i = 0; i < numthreads - 1; i++)
-        SetEvent(start_event[i]);
-    }
-#endif
+    barrier_wait(&barrier);
 
     int total = queue.total;
 
@@ -225,14 +184,7 @@ THREAD_FUNC worker(void *arg)
       queue.func(thread);
     }
 
-#ifndef __WIN32__
-    pthread_barrier_wait(&barrier);
-#else
-  if (t != numthreads - 1)
-    SetEvent(stop_event[t]);
-  else
-    WaitForMultipleObjects(numthreads - 1, stop_event, TRUE, INFINITE);
-#endif
+    barrier_wait(&barrier);
   } while (t != numthreads - 1);
 
   return 0;
@@ -287,43 +239,20 @@ void run_single(void (*func)(struct thread_data *), uint64_t *work, int report_t
 static struct thread_data cmprs_data[COMPRESSION_THREADS];
 static void (*cmprs_func)(int t);
 
-#ifndef __WIN32__
-static pthread_t cmprs_threads[COMPRESSION_THREADS];
-static pthread_barrier_t cmprs_barrier;
-#else
-HANDLE cmprs_threads[COMPRESSION_THREADS];
-HANDLE cmprs_start_event[COMPRESSION_THREADS - 1];
-HANDLE cmprs_stop_event[COMPRESSION_THREADS - 1];
-#endif
+static thrd_t cmprs_threads[COMPRESSION_THREADS];
+static barrier_t cmprs_barrier;
 
-static THREAD_FUNC cmprs_worker(void *arg)
+static int cmprs_worker(void *arg)
 {
   struct thread_data *thread = arg;
   int t = thread->thread;
 
   do {
-#ifndef __WIN32__
-    pthread_barrier_wait(&cmprs_barrier);
-#else
-    if (t != COMPRESSION_THREADS - 1)
-      WaitForSingleObject(cmprs_start_event[t], INFINITE);
-    else {
-      int i;
-      for (i = 0; i < COMPRESSION_THREADS - 1; i++)
-        SetEvent(cmprs_start_event[i]);
-    }
-#endif
+    barrier_wait(&cmprs_barrier);
 
     cmprs_func(t);
 
-#ifndef __WIN32__
-    pthread_barrier_wait(&cmprs_barrier);
-#else
-    if (t != COMPRESSION_THREADS - 1)
-      SetEvent(cmprs_stop_event[t]);
-    else
-      WaitForMultipleObjects(COMPRESSION_THREADS - 1, cmprs_stop_event, TRUE, INFINITE);
-#endif
+    barrier_wait(&cmprs_barrier);
   } while (t != COMPRESSION_THREADS - 1);
 
   return 0;
@@ -334,34 +263,15 @@ void create_compression_threads(void)
   for (int i = 0; i < COMPRESSION_THREADS; i++)
     cmprs_data[i].thread = i;
 
-#ifndef __WIN32__
-  pthread_barrier_init(&cmprs_barrier, NULL, COMPRESSION_THREADS);
+  barrier_init(&cmprs_barrier, COMPRESSION_THREADS);
 
   for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
-    int rc = pthread_create(&cmprs_threads[i], NULL, cmprs_worker, &cmprs_data[i]);
+    int rc = thrd_create(&cmprs_threads[i], cmprs_worker, &cmprs_data[i]);
     if (rc) {
       fprintf(stderr, "ERROR: phtread_create() return %d\n", rc);
       exit(EXIT_FAILURE);
     }
   }
-#else
-  for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
-    cmprs_start_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
-    cmprs_stop_event[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
-    if (!cmprs_start_event[i] || !cmprs_stop_event[i]) {
-      fprintf(stderr, "CreateEvent() failed.\n");
-      exit(EXIT_FAILURE);
-    }
-  }
-  for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
-    cmprs_threads[i] = CreateThread(NULL, 0, cmprs_worker, (void *)&(cmprs_data[i]),
-                                  0, NULL);
-    if (cmprs_threads[i] == NULL) {
-      fprintf(stderr, "CreateThread() failed.\n");
-      exit(EXIT_FAILURE);
-    }
-  }
-#endif
 }
 
 void run_compression(void (*func)(int t))

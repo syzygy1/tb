@@ -23,16 +23,14 @@ FLAGS += -DCOMPRESSION_THREADS=6
 
 # Specify the compiler
 # regular linux
-#CC = /usr/bin/gcc -pthread
 CC = gcc -pthread
 # cross compiling from Linux to Windows
-#CC = x86_64-w64-mingw32-gcc
+#CC = x86_64-w64-mingw32-gcc -pthread
 
 # Compilation flags
-# For Haswell add -mbmi2 and select -DBMI2 above.
-#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -Wno-array-bounds
+#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11
 CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -flto=auto
-#CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined -Wno-array-bounds
+#CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined
 
 export FLAGS CC CFLAGS LDFLAGS
 
