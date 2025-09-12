@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2018 Ronald de Man
+  Copyright (c) 2011-2018, 2024 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -26,6 +26,7 @@ static void save_table(uint8_t *table, char color)
     v[i] = 0;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   if (num_saves == 0) {
     v[MATE] = 255;
     for (i = 0; i < DRAW_RULE; i++) {
@@ -43,7 +44,30 @@ static void save_table(uint8_t *table, char color)
       v[LOSS_IN_ONE - i - 1] = 255 - ((reduce_cnt & 1) + i + 1) / 2;
     }
   }
-#else
+#else /* SHATRANJ */
+  if (num_saves == 0) {
+    v[MATE] = 255;
+    for (i = 0; i < REDUCE_PLY - 1; i++) {
+      v[WIN_IN_ONE + i] = 1 + i;
+      v[LOSS_IN_ONE - i] = 254 - i;
+    }
+  } else if (num_saves == 1) {
+    for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++) {
+      v[WIN_IN_ONE + 1 + i] = 1 + i;
+      v[LOSS_IN_ONE - i] = 255 - i;
+    }
+    for (; i < REDUCE_PLY_RED1; i++) {
+      v[WIN_IN_ONE + 2 + i] = 1 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2;
+      v[LOSS_IN_ONE - i] = 255 - (DRAW_RULE - REDUCE_PLY + 1) - (i - DRAW_RULE + REDUCE_PLY - 1) / 2;
+    }
+  } else {
+    for (i = 0; i < REDUCE_PLY_RED2; i++) {
+      v[CAPT_CWIN_RED2 + i + 2] = 1 + ((reduce_cnt & 1) + i) / 2;
+      v[LOSS_IN_ONE - i - 1] = 255 - ((reduce_cnt & 1) + i) / 2;
+    }
+  }
+#endif
+#else /* SUICIDE */
   if (num_saves == 0) {
     for (i = 3; i <= DRAW_RULE; i++)
       v[BASE_WIN + i] = 1 + (i - 3);
@@ -85,6 +109,7 @@ static void reduce_tables(void)
     v[i] = 0;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   v[BROKEN] = BROKEN;
   v[UNKNOWN] = UNKNOWN;
   v[CHANGED] = CHANGED;
@@ -121,6 +146,57 @@ static void reduce_tables(void)
     v[CAPT_CWIN_RED + REDUCE_PLY_RED + 4] = CAPT_CWIN_RED + 4;
     v[LOSS_IN_ONE - REDUCE_PLY_RED - 1] = LOSS_IN_ONE - 1;
   }
+#else /* SHATRANJ */
+  v[BROKEN] = BROKEN;
+  v[UNKNOWN] = UNKNOWN;
+  v[CHANGED] = CHANGED;
+  v[CAPT_DRAW] = CAPT_DRAW;
+  v[MATE] = MATE;
+  v[ILLEGAL] = ILLEGAL;
+  v[CAPT_WIN] = CAPT_WIN;
+  if (num_saves == 0) {
+    for (i = 0; i < REDUCE_PLY - 1; i++) {
+      v[WIN_IN_ONE + i] = WIN_IN_ONE;
+      v[LOSS_IN_ONE - i] = MATE;
+    }
+    v[CAPT_CWIN] = CAPT_CWIN_RED1;
+    v[LOSS_IN_ONE - REDUCE_PLY + 1] = LOSS_IN_ONE;
+    v[LOSS_IN_ONE - REDUCE_PLY] = LOSS_IN_ONE - 1;
+    v[WIN_IN_ONE + REDUCE_PLY - 1] = WIN_IN_ONE + 1;
+    v[WIN_IN_ONE + REDUCE_PLY] = WIN_IN_ONE + 2;
+    v[WIN_IN_ONE + REDUCE_PLY + 1] = WIN_IN_ONE + 3;
+  } else if (num_saves == 1) {
+    v[WIN_IN_ONE] = WIN_IN_ONE;
+    for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++) {
+      v[WIN_IN_ONE +  i + 1] = WIN_IN_ONE;
+      v[LOSS_IN_ONE - i] = MATE;
+    }
+    v[CAPT_CWIN_RED1] = CAPT_CWIN_RED2;
+    for (; i < REDUCE_PLY_RED1; i++) {
+      v[WIN_IN_ONE + i + 2] = CAPT_CWIN_RED2 + 1;
+      v[LOSS_IN_ONE - i] = LOSS_IN_ONE;
+    }
+    v[LOSS_IN_ONE - REDUCE_PLY_RED1] = LOSS_IN_ONE - 1;
+    v[LOSS_IN_ONE - REDUCE_PLY_RED1 - 1] = LOSS_IN_ONE - 2;
+    v[WIN_IN_ONE + REDUCE_PLY_RED1 + 2] = CAPT_CWIN_RED2 + 2;
+    v[WIN_IN_ONE + REDUCE_PLY_RED1 + 3] = CAPT_CWIN_RED2 + 3;
+    v[WIN_IN_ONE + REDUCE_PLY_RED1 + 4] = CAPT_CWIN_RED2 + 4;
+  } else {
+    v[WIN_IN_ONE] = WIN_IN_ONE;
+    v[LOSS_IN_ONE] = LOSS_IN_ONE;
+    v[CAPT_CWIN_RED2] = CAPT_CWIN_RED2;
+    v[CAPT_CWIN_RED2 + 1] = CAPT_CWIN_RED2 + 1;
+    for (i = 0; i < REDUCE_PLY_RED2; i++) {
+      v[CAPT_CWIN_RED2 + i + 2] = CAPT_CWIN_RED2 + 1;
+      v[LOSS_IN_ONE - 1 - i] = LOSS_IN_ONE;
+    }
+    v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 1] = LOSS_IN_ONE - 1;
+    v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 2] = LOSS_IN_ONE - 2;
+    v[CAPT_CWIN_RED2 + REDUCE_PLY_RED2 + 2] = CAPT_CWIN_RED2 + 2;
+    v[CAPT_CWIN_RED2 + REDUCE_PLY_RED2 + 3] = CAPT_CWIN_RED2 + 3;
+    v[CAPT_CWIN_RED2 + REDUCE_PLY_RED2 + 4] = CAPT_CWIN_RED2 + 4;
+  }
+#endif
 #else
   v[BROKEN] = BROKEN;
   v[UNKNOWN] = UNKNOWN;
@@ -167,10 +243,19 @@ static void reduce_tables(void)
   transform_v_u8 = v;
   run_threaded(transform, work_g, 1);
 
+#ifndef SHATRANJ
   if (num_saves == 0)
     reduce_cnt = REDUCE_PLY - DRAW_RULE - 2;
   else
     reduce_cnt += REDUCE_PLY_RED;
+#else
+  if (num_saves == 0)
+    reduce_cnt = 0;
+  else if (num_saves == 1)
+    reduce_cnt = REDUCE_PLY_RED1 - (DRAW_RULE - REDUCE_PLY + 1);
+  else
+    reduce_cnt += REDUCE_PLY_RED2;
+#endif
 }
 
 static void store_table(uint8_t *table, char color)

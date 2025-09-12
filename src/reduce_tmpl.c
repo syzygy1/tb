@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018 Ronald de Man
+  Copyright (c) 2018, 2024 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -102,6 +102,7 @@ static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     v[i] = 0;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   v[ILLEGAL] = num;
   v[BROKEN] = num;
   v[UNKNOWN] = num;
@@ -113,7 +114,39 @@ static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     v[LOSS_IN_ONE - i - 1] = inv_map[3][(reduce_cnt + i + 1) / 2];
   }
   v[CAPT_CWIN_RED + i + 2] = inv_map[2][(reduce_cnt + i) / 2];
-#else
+#else /* SHATRANJ */
+  v[ILLEGAL] = num;
+  v[BROKEN] = num;
+  v[UNKNOWN] = num;
+  v[CAPT_DRAW] = num;
+  v[CAPT_WIN] = num;
+  if (num_saves == 1) {
+    if (map->ply_accurate_win)
+      for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+        v[WIN_IN_ONE + i + 1] = inv_map[0][i + REDUCE_PLY - 1];
+    else
+      for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+        v[WIN_IN_ONE + i + 1] = inv_map[0][(i + REDUCE_PLY - 1) / 2];
+    if (map->ply_accurate_loss)
+      for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i + REDUCE_PLY - 1];
+    else
+      for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][(i + REDUCE_PLY - 1) / 2];
+    v[CAPT_CWIN_RED1] = num;
+    for (i = 0; i < REDUCE_PLY_RED1 - DRAW_RULE + REDUCE_PLY - 1; i++) {
+      v[WIN_IN_ONE + i + 2 + DRAW_RULE - REDUCE_PLY + 1] = inv_map[2][(reduce_cnt + i) / 2];
+      v[LOSS_IN_ONE - i - DRAW_RULE + REDUCE_PLY - 1] = inv_map[3][(reduce_cnt + i) / 2];
+    }
+  } else {
+    v[CAPT_CWIN_RED2] = num;
+    for (i = 0; i <= REDUCE_PLY_RED2; i++) {
+      v[CAPT_CWIN_RED2 + i + 2] = inv_map[2][(reduce_cnt + i) / 2];
+      v[LOSS_IN_ONE - i - 1] = inv_map[3][(reduce_cnt + i) / 2];
+    }
+  }
+#endif
+#else /* SUICIDE */
   v[BROKEN] = num;
   v[UNKNOWN] = num;
   v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
@@ -133,6 +166,7 @@ static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
   v[0] = 0;
   int red_cnt = 0;
 #ifndef SUICIDE
+#ifndef SHATRANJ
   for (k = 0; k < num_saves; k++) {
     if (k == 0) {
       v[255] = inv_map[1][0];
@@ -162,7 +196,52 @@ static void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     }
     NAME(reconstruct_table_pass)(table, color, k, v);
   }
-#else
+#else /* SHATRANJ */
+  for (k = 0; k < num_saves; k++) {
+    if (k == 0) {
+      v[255] = inv_map[1][0];
+      if (map->ply_accurate_win)
+        for (i = 0; i < REDUCE_PLY - 1; i++)
+          v[i + 1] = inv_map[0][i];
+      else
+        for (i = 0; i < REDUCE_PLY - 1; i++)
+          v[i + 1] = inv_map[0][i / 2];
+      if (map->ply_accurate_loss)
+        for (i = 0; i < REDUCE_PLY - 1; i++)
+          v[254 - i] = inv_map[1][i];
+      else
+        for (i = 0; i < REDUCE_PLY - 1; i++)
+          v[254 - i] = inv_map[1][i / 2];
+      red_cnt = 0;
+    } else if (k == 1) {
+      if (map->ply_accurate_win)
+        for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+          v[i + 1] = inv_map[0][i + REDUCE_PLY - 1];
+      else
+        for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+          v[i + 1] = inv_map[0][(i + REDUCE_PLY - 1) / 2];
+      if (map->ply_accurate_loss)
+        for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+          v[255 - i] = inv_map[1][i + REDUCE_PLY - 1];
+      else
+        for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
+          v[255 - i] = inv_map[1][(i + REDUCE_PLY - 1) / 2];
+      for (; i < REDUCE_PLY_RED1; i += 2) {
+        v[1 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2] = inv_map[2][(i - DRAW_RULE + REDUCE_PLY - 1) / 2];
+        v[255 - (DRAW_RULE - REDUCE_PLY + 1) - (i - DRAW_RULE + REDUCE_PLY - 1) / 2] = inv_map[3][(i - DRAW_RULE + REDUCE_PLY - 1) / 2];
+      }
+      red_cnt = REDUCE_PLY_RED1 - (DRAW_RULE - REDUCE_PLY + 1);
+    } else {
+      for (i = 0; i <= REDUCE_PLY_RED2 + 1; i += 2) {
+        v[1 + ((red_cnt & 1) + i) / 2] = inv_map[2][(red_cnt + i) / 2];
+        v[255 - ((red_cnt & 1) + i) / 2] = inv_map[3][(red_cnt + i) / 2];
+      }
+      red_cnt += REDUCE_PLY_RED2;
+    }
+    NAME(reconstruct_table_pass)(table, color, k, v);
+  }
+#endif
+#else /* SUICIDE */
   for (k = 0; k < num_saves; k++) {
     if (k == 0) {
       if (map->ply_accurate_win)

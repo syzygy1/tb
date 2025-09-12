@@ -1,7 +1,6 @@
 # Specify sliding attacks generation method. One of -DMAGIC, -DHYPER, -DBMI2.
-# -DBMI2 only works on Haswell processors.
+# -DBMI2 requires a processor with (fast) BMI2 support.
 # -DHYPER requires a processor with SSE3 support.
-# -DMAGIC and -DHYPER are about equally fast on my system.
 #FLAGS = -DMAGIC
 #FLAGS = -DHYPER
 FLAGS = -DBMI2
@@ -14,11 +13,12 @@ FLAGS += -DUSE_POPCNT
 # Specify maximum number of pieces. More than 7 won't work.
 FLAGS += -DTBPIECES=7
 
-# Use libzstd instead of LZ4 for compression of temporary files.
-FLAGS += -DUSE_ZSTD
+# Use libzstd instead of LZ4 for compression of temporary files, and set
+# compression level.
+FLAGS += -DUSE_ZSTD -DZSTD_LEVEL=6
 LDFLAGS += -lzstd
 
-# Specify number of threads used for compression of temporary files.
+# Specify number of threads used for (de)compression of temporary files.
 FLAGS += -DCOMPRESSION_THREADS=6
 
 # Specify the compiler
@@ -28,7 +28,7 @@ CC = gcc -pthread
 #CC = x86_64-w64-mingw32-gcc -pthread
 
 # Compilation flags
-#CFLAGS = -g -march=native -pipe -D_GNU_SOURCE -Wall -std=c11
+#CFLAGS = -g3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11
 CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -flto=auto
 #CFLAGS = -O3 -march=native -pipe -D_GNU_SOURCE -Wall -std=c11 -fsanitize=undefined
 

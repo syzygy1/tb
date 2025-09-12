@@ -147,6 +147,8 @@ static int lcb_ply = -1;
 static int lw_clr, lb_clr, lcw_clr, lcb_clr;
 static uint64_t lw_idx, lb_idx, lcw_idx, lcb_idx;
 
+// phase = 0: at the start of a reduction step
+// phase = 1: at the end of generation -> include last few plies
 static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     int phase)
 {
@@ -158,13 +160,23 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
   count_stats_table_u8 = table;
   run_threaded(count_stats_u8, work_g, 0);
 
+#ifndef SHATRANJ
   if (num_saves == 0)
     n = REDUCE_PLY - 2;
   else
     n = REDUCE_PLY_RED;
+#else
+  if (num_saves == 0)
+    n = REDUCE_PLY - 1;
+  else if (num_saves == 1)
+    n = REDUCE_PLY_RED1;
+  else
+    n = REDUCE_PLY_RED2;
+#endif
   if (phase == 1) n += 2;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   for (i = 0; i < numthreads; i++) {
     uint64_t *stats = thread_data[i].stats;
     if (num_saves == 0) {
@@ -187,7 +199,35 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
       }
     }
   }
-#else
+#else /* SHATRANJ */
+  for (i = 0; i < numthreads; i++) {
+    uint64_t *stats = thread_data[i].stats;
+    if (num_saves == 0) {
+      total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
+      total_stats[STAT_MATE] += stats[MATE];
+      for (j = 0; j < n; j++) {
+        total_stats[1 + j] += stats[WIN_IN_ONE + j];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+      }
+    } else if (num_saves == 1) {
+      for (j = 0; j < DRAW_RULE - REDUCE_PLY + 1; j++) {
+        total_stats[1 + stats_val +  j] += stats[WIN_IN_ONE + j + 1];
+        total_stats[STAT_MATE - 1 - stats_val - j] += stats[LOSS_IN_ONE - j];
+      }
+      total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN_RED1];
+      for (; j < n; j++) {
+        total_stats[1 + stats_val + j] += stats[WIN_IN_ONE + 2 + j];
+        total_stats[STAT_MATE - 1 - stats_val - j] += stats[LOSS_IN_ONE - j];
+      }
+    } else {
+      for (j = 0; j < n; j++) {
+        total_stats[1 + stats_val + j] += stats[CAPT_CWIN_RED2 + j + 2];
+        total_stats[STAT_MATE - 1 - stats_val - j] += stats[LOSS_IN_ONE - j - 1];
+      }
+    }
+  }
+#endif
+#else /* SUICIDE */
   for (i = 0; i < numthreads; i++) {
     uint64_t *stats = thread_data[i].stats;
     if (num_saves == 0) {
@@ -213,12 +253,24 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
   }
 #endif
 
+#ifndef SHATRANJ
   if (num_saves == 0) {
     for (i = DRAW_RULE; i >= MIN_PLY_WIN; i--)
       if (total_stats[i]) break;
+#else
+  if (num_saves < 2) {
+    if (num_saves == 0) {
+      for (i = REDUCE_PLY - 2; i >= MIN_PLY_WIN; i--)
+        if (total_stats[i]) break;
+    }  else {
+      for (i = DRAW_RULE; i >= REDUCE_PLY - 1; i--)
+        if (total_stats[i]) break;
+      if (i < REDUCE_PLY - 1) i = -1;
+    }
+#endif
     if (i >= MIN_PLY_WIN) {
 #ifndef SUICIDE
-      j = CAPT_WIN + i;
+      j = num_saves == 0 ? CAPT_WIN + i : WIN_IN_ONE + i - stats_val;
 #else
       j = BASE_WIN + i;
 #endif
@@ -236,11 +288,22 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
         }
       }
     }
+#ifndef SHATRANJ
     for (i = DRAW_RULE; i >= MIN_PLY_LOSS; i--)
       if (total_stats[STAT_MATE - i]) break;
+#else
+    if (num_saves == 0) {
+      for (i = REDUCE_PLY - 2; i >= MIN_PLY_LOSS; i--)
+        if (total_stats[STAT_MATE - i]) break;
+    } else {
+      for (i = DRAW_RULE; i >= REDUCE_PLY - 1; i--)
+        if (total_stats[STAT_MATE - i]) break;
+      if (i < REDUCE_PLY - 1) i = -1;
+    }
+#endif
     if (i >= MIN_PLY_LOSS) {
 #ifndef SUICIDE
-      j = MATE - i;
+      j = num_saves == 0 ? MATE - i : LOSS_IN_ONE + REDUCE_PLY - i;
 #else
       j = BASE_LOSS - i;
 #endif
@@ -264,10 +327,12 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     if (total_stats[i]) break;
   if (i > DRAW_RULE) {
 #ifndef SUICIDE
-    if (num_saves == 0)
-      j = WIN_IN_ONE + i;
-    else
-      j = CAPT_CWIN_RED + 1 + i - stats_val;
+#ifndef SHATRANJ
+    j = num_saves == 0 ? WIN_IN_ONE + i : CAPT_CWIN_RED + 1 + i - stats_val;
+#else
+    j = num_saves == 1 ? WIN_IN_ONE + 1 + i - stats_val
+                       : CAPT_CWIN_RED2 + 1 + i - stats_val;
+#endif
 #else
     if (num_saves == 0)
       j = (i == DRAW_RULE + 1) ? BASE_WIN + i : BASE_WIN + i + 2;
@@ -293,9 +358,13 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     if (total_stats[STAT_MATE - i]) break;
   if (i > DRAW_RULE) {
 #ifndef SUICIDE
+#ifndef SHATRANJ
     j = MATE - i + stats_val;
 #else
-    j = (num_saves == 0) ? BASE_LOSS - i : BASE_LOSS - i - 2 + stats_val;
+    j = num_saves == 1 ? MATE - i + stats_val : LOSS_IN_ONE + stats_val - i;
+#endif
+#else
+    j = num_saves == 0 ? BASE_LOSS - i : BASE_LOSS - i - 2 + stats_val;
 #endif
     if (wtm) {
       if (i > lcb_ply) {
@@ -338,10 +407,19 @@ static void collect_stats(int phase)
   collect_stats_table(total_stats_w, table_w, 1, phase);
   collect_stats_table(total_stats_b, table_b, 0, phase);
 
+#ifndef SHATRANJ
   if (num_saves == 0)
     stats_val = REDUCE_PLY - 2;
   else
     stats_val += REDUCE_PLY_RED;
+#else
+  if (num_saves == 0)
+    stats_val = REDUCE_PLY - 1;
+  else if (num_saves == 1)
+    stats_val += REDUCE_PLY_RED1;
+  else
+    stats_val += REDUCE_PLY_RED2;
+#endif
 }
 
 static void print_stats(FILE *F, uint64_t *stats, int wtm)
@@ -364,7 +442,7 @@ static void print_stats(FILE *F, uint64_t *stats, int wtm)
     if (stats[i])
       fprintf(F, "%"PRIu64" positions win in %d ply.\n", stats[i] >> 1, i);
 #ifndef SUICIDE
-  if (stats[i] + stats[510])
+  if (stats[i] + stats[STAT_CAPT_CWIN])
     fprintf(F, "%"PRIu64" positions win in %d ply.\n", (stats[i] + stats[STAT_CAPT_CWIN]) >> 1, i);
   i++;
 #else

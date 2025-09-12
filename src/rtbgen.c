@@ -662,8 +662,7 @@ static void iterate(void)
   tbl[WIN_IN_ONE + ply - 2] = 0;
   if (!finished) {
     finished = 1;
-    // ply = 100
-    ply++;
+    ply++;   // ply = 100
     tbl[WIN_IN_ONE + ply - 1] = 2;
     win_loss[WIN_IN_ONE + ply - 2] = LOSS_IN_ONE - ply + 1;
     // skip WIN_IN_ONE + 100, which is CAPT_CWIN

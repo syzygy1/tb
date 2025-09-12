@@ -9,11 +9,15 @@
 
 #include <inttypes.h>
 
-#if defined(REGULAR) || defined (SHATRANJ)
+#if defined(REGULAR) || defined(SHATRANJ)
 #define SMALL
 #endif
 
+#ifndef SHATRANJ
 #define DRAW_RULE (2 * 50)
+#else
+#define DRAW_RULE (2 * 70)
+#endif
 
 #if TBPIECES < 7
 #define MAX_STATS 1536
@@ -23,6 +27,10 @@
 
 #ifndef COMPRESSION_THREADS
 #define COMPRESSION_THREADS 1
+#endif
+
+#ifndef ZSTD_LEVEL
+#define ZSTD_LEVEL 1
 #endif
 
 #define MAX_VALS (((MAX_STATS / 2) - DRAW_RULE) / 2)

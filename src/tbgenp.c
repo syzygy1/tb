@@ -61,6 +61,7 @@ static int pcs2[MAX_PIECES];
 
 static int ply;
 static int finished;
+static int plyacc = 0;
 static int ply_accurate_w, ply_accurate_b;
 
 static int file;
@@ -297,12 +298,23 @@ static void tc_loop(struct thread_data *thread)
         break;
       case 2:
         tc_closs = 1;
+#ifndef SHATRANJ
         if (num_saves == 0)
           for (i = DRAW_RULE; i < REDUCE_PLY; i++)
             v[LOSS_IN_ONE - i] = 0;
         else
           for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
             v[i] = 0;
+#else
+        if (num_saves == 0) // FIXME
+          do {} while (0);
+        else if (num_saves == 1)
+          for (i = DRAW_RULE - REDUCE_PLY + 2; i < REDUCE_PLY_RED1; i++)
+            v[LOSS_IN_ONE - i] = 0;
+        else
+          for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED2 - 1; i--)
+            v[i] = 0;
+#endif
         break;
       }
       if (tc_capt_closs && tc_closs)
@@ -323,12 +335,16 @@ void test_closs(uint64_t *restrict stats, uint8_t *restrict table, int to_fix)
     for (i = 0; i < 256; i++)
       v[i] = 0;
     v[CAPT_CLOSS] = 1;
+#ifndef SHATRANJ
     if (num_saves == 0)
       for (i = DRAW_RULE; i < REDUCE_PLY; i++)
         v[LOSS_IN_ONE - i] = 2;
     else
       for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
         v[i] = 2;
+#else
+    // FIXME
+#endif
     run_threaded(tc_loop, work_g, 0);
   } else {
     for (i = DRAW_RULE + 1; i <= MAX_PLY; i++)
@@ -405,6 +421,7 @@ void prepare_wdl_map(uint64_t *stats, uint8_t *v, int pa_w, int pa_l)
     vals[0] = 1;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   v[ILLEGAL] = 8;
   v[BROKEN] = 8;
   v[CAPT_WIN] = 8;
@@ -432,7 +449,43 @@ void prepare_wdl_map(uint64_t *stats, uint8_t *v, int pa_w, int pa_l)
       v[LOSS_IN_ONE - i] = 1;
     v[MATE] = 0;
   }
-#else
+#else /* SHATRANJ */
+  v[ILLEGAL] = 8;
+  v[BROKEN] = 8;
+  v[CAPT_WIN] = 8;
+  v[CAPT_DRAW] = 6;
+  v[CAPT_CLOSS] = 5;
+  v[UNKNOWN] = v[PAWN_DRAW] = 2;
+  v[MATE] = 0;
+  if (num_saves == 0) {
+    v[PAWN_WIN] = 4;
+    for (i = 0; i < REDUCE_PLY - 1; i++) {
+      v[WIN_IN_ONE + i] = 4;
+      v[LOSS_IN_ONE - i] = 0;
+    }
+  } else if (num_saves == 1) {
+    v[CAPT_CWIN_RED1] = 7;
+    v[PAWN_CWIN_RED1] = 3;
+    v[WIN_RED] = 4;
+    for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++) {
+      v[WIN_RED + i + 1] = 4;
+      v[LOSS_IN_ONE - i] = 0;
+    }
+    for (; i <= REDUCE_PLY_RED1 + 2; i++) {
+      v[WIN_RED + i + 3] = 3;
+      v[LOSS_IN_ONE - i] = 1;
+    }
+  } else {
+    v[WIN_RED] = 4;
+    v[CAPT_CWIN_RED2] = 7;
+    v[CAPT_CWIN_RED2 + 1] = 3;
+    for (i = 0; i <= REDUCE_PLY_RED2 + 2; i++) {
+      v[CAPT_CWIN_RED2 + i + 2] = 3;
+      v[LOSS_IN_ONE - i - 1] = 1;
+    }
+  }
+#endif
+#else /* SUICIDE */
 // FIXME: THREAT_CLOSS
   v[BROKEN] = 8;
   v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = 8;
@@ -580,6 +633,7 @@ void prepare_dtz_map_u8(uint8_t *v, struct dtz_map *map)
       v[i] = 0;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
     v[ILLEGAL] = num;
     v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
     v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
@@ -602,7 +656,27 @@ void prepare_dtz_map_u8(uint8_t *v, struct dtz_map *map)
       v[WIN_IN_ONE + i + 2] = inv_map[2][(i - DRAW_RULE) / 2];
       v[LOSS_IN_ONE - i] = inv_map[3][(i - DRAW_RULE) / 2];
     }
-#else
+#else /* SHATRANJ */
+    v[ILLEGAL] = num;
+    v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
+    v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
+    v[PAWN_WIN] = v[PAWN_CWIN] = num;
+
+    v[MATE] = inv_map[1][0];
+    if (map->ply_accurate_win)
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i];
+    else
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i / 2];
+    if (map->ply_accurate_loss)
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i];
+    else
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
+#endif
+#else /* SUICIDE */
     v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
     v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
     v[CAPT_CLOSS] = v[CAPT_LOSS] = num;
@@ -648,6 +722,7 @@ void prepare_dtz_map_u16(uint16_t *v, struct dtz_map *map)
       v[i] = 0;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
     v[ILLEGAL] = num;
     v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
     v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
@@ -670,7 +745,27 @@ void prepare_dtz_map_u16(uint16_t *v, struct dtz_map *map)
       v[WIN_IN_ONE + i + 2] = inv_map[2][(i - DRAW_RULE) / 2];
       v[LOSS_IN_ONE - i] = inv_map[3][(i - DRAW_RULE) / 2];
     }
-#else
+#else /* SHATRANJ */
+    v[ILLEGAL] = num;
+    v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
+    v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
+    v[PAWN_WIN] = v[PAWN_CWIN] = num;
+
+    v[MATE] = inv_map[1][0];
+    if (map->ply_accurate_win)
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i];
+    else
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[WIN_IN_ONE + i] = inv_map[0][i / 2];
+    if (map->ply_accurate_loss)
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i];
+    else
+      for (i = 0; i < REDUCE_PLY - 1; i++)
+        v[LOSS_IN_ONE - i] = inv_map[1][i / 2];
+#endif
+#else /* SUICIDE */
     v[UNKNOWN] = v[BROKEN] = v[PAWN_DRAW] = num;
     v[CAPT_WIN] = v[CAPT_CWIN] = v[CAPT_DRAW] = num;
     v[CAPT_CLOSS] = v[CAPT_LOSS] = num;
@@ -730,7 +825,7 @@ int main(int argc, char **argv)
   numthreads = 1;
   thread_affinity = 0;
   do {
-    val = getopt_long(argc, argv, "at:gwzsd2", options, &longindex);
+    val = getopt_long(argc, argv, "at:gwzsd2p", options, &longindex);
     switch (val) {
     case 'a':
       thread_affinity = 1;
@@ -756,6 +851,10 @@ int main(int argc, char **argv)
       break;
     case '2':
       compress_wide = 1;
+      break;
+    case 'p':
+      plyacc = 1;
+      break;
     }
   } while (val != EOF);
 
@@ -1143,11 +1242,11 @@ int main(int argc, char **argv)
 
     if (G || H) {
 
-      ply_accurate_w = 0;
+      ply_accurate_w = plyacc;
       if (total_stats_w[DRAW_RULE] || total_stats_b[STAT_MATE - DRAW_RULE])
         ply_accurate_w = 1;
 
-      ply_accurate_b = 0;
+      ply_accurate_b = plyacc;
       if (total_stats_b[DRAW_RULE] || total_stats_w[STAT_MATE - DRAW_RULE])
         ply_accurate_b = 1;
 

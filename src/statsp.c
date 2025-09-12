@@ -149,13 +149,23 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
   count_stats_table_u8 = table;
   run_threaded(count_stats_u8, work, 0);
 
+#ifndef SHATRANJ
   if (local == 0)
     n = REDUCE_PLY - 2;
   else
     n = REDUCE_PLY_RED;
+#else
+  if (local == 0)
+    n = REDUCE_PLY - 1;
+  else if (local == 1)
+    n = REDUCE_PLY_RED1;
+  else
+    n = REDUCE_PLY_RED2;
+#endif
   if (phase == 1) n += 2;
 
 #ifndef SUICIDE
+#ifndef SHATRANJ
   for (i = 0; i < numthreads; i++) {
     uint64_t *stats = thread_data[i].stats;
     if (local == 0) {
@@ -180,6 +190,36 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
       }
     }
   }
+#else /* SHATRANJ */
+  for (i = 0; i < numthreads; i++) {
+    uint64_t *stats = thread_data[i].stats;
+    if (local == 0) {
+      total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
+      total_stats[STAT_PAWN_WIN] += stats[PAWN_WIN];
+      total_stats[STAT_MATE] += stats[MATE];
+      for (j = 0; j < n; j++) {
+        total_stats[1 + j] += stats[WIN_IN_ONE + j];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+      }
+    } else if (local == 1) {
+      for (j = 0; j < DRAW_RULE - REDUCE_PLY + 1; j++) {
+        total_stats[1 + sval + j] += stats[WIN_RED + j + 1];
+        total_stats[STAT_MATE - 1 - sval - j] += stats[LOSS_IN_ONE - j];
+      }
+      total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN_RED1];
+      total_stats[STAT_PAWN_CWIN] += stats[PAWN_CWIN_RED1];
+      for (; j < n; j++) {
+        total_stats[1 + sval + j] += stats[WIN_RED + j + 3];
+        total_stats[STAT_MATE - 1 - sval - j] += stats[LOSS_IN_ONE - j];
+      }
+    } else {
+      for (j = 0; j < n; j++) {
+        total_stats[1 + sval + j] += stats[CAPT_CWIN_RED2 + j + 2];
+        total_stats[STAT_MATE - sval - j - 2] += stats[LOSS_IN_ONE - j - 1];
+      }
+    }
+  }
+#endif
 #else
   for (i = 0; i < numthreads; i++) {
     uint64_t *stats = thread_data[i].stats;
@@ -210,12 +250,24 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
   }
 #endif
 
+#ifndef SHATRANJ
   if (local == 0) {
     for (i = DRAW_RULE; i >= 0; i--)
       if (total_stats[i]) break;
+#else
+  if (local < 2) {
+    if (local == 0) {
+      for (i = REDUCE_PLY - 2; i >= 0; i--)
+        if (total_stats[i]) break;
+    } else {
+      for (i = DRAW_RULE; i >= REDUCE_PLY - 1; i--)
+        if (total_stats[i]) break;
+      if (i < REDUCE_PLY - 1) i = -1;
+    }
+#endif
     if (i >= 0) {
 #ifndef SUICIDE
-      j = WIN_IN_ONE + i - 1;
+      j = local == 0 ? WIN_IN_ONE + i - 1 : WIN_RED + i - sval;
 #else
       j = (i < 2) ? STALE_WIN + i : BASE_WIN + i;
 #endif
@@ -233,11 +285,22 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
         }
       }
     }
+#ifndef SHATRANJ
     for (i = DRAW_RULE; i >= 0; i--)
       if (total_stats[STAT_MATE - i]) break;
+#else
+    if (local == 0) {
+      for (i = REDUCE_PLY - 2; i >= 0; i--)
+        if (total_stats[STAT_MATE - i]) break;
+    } else {
+      for (i = DRAW_RULE; i >= REDUCE_PLY - 1; i--)
+        if (total_stats[STAT_MATE - i]) break;
+      if (i < REDUCE_PLY - 1) i = -1;
+    }
+#endif
     if (i >= 0) {
 #ifndef SUICIDE
-      j = MATE - i;
+      j = local == 0 ? MATE - i : LOSS_IN_ONE + 1 + sval - i;
 #else
       j = BASE_LOSS - i;
 #endif
@@ -261,10 +324,11 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     if (total_stats[i]) break;
   if (i > DRAW_RULE) {
 #ifndef SUICIDE
-    if (local == 0)
-      j = WIN_IN_ONE + i + 1;
-    else
-      j = CAPT_CWIN_RED + 1 + i - sval;
+#ifndef SHATRANJ
+    j = local == 0 ? WIN_IN_ONE + i + 1 : CAPT_CWIN_RED + 1 + i - sval;
+#else
+    j = local == 1 ? WIN_RED + i - sval : CAPT_CWIN_RED2 + 1 + i - sval;
+#endif
 #else
     if (local == 0)
       j = (i == DRAW_RULE + 1) ? BASE_WIN + i : BASE_WIN + i + 2;
@@ -290,12 +354,13 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     if (total_stats[STAT_MATE - i]) break;
   if (i > DRAW_RULE) {
 #ifndef SUICIDE
+#ifndef SHATRANJ
     j = MATE - i + sval;
 #else
-    if (local == 0)
-      j = BASE_LOSS - i;
-    else
-      j = BASE_CLOSS_RED - i + 1 + sval;
+    j = local == 1 ? MATE - i + sval : LOSS_IN_ONE + sval - i;
+#endif
+#else
+    j = local == 0 ? BASE_LOSS - i : BASE_CLOSS_RED - i + 1 + sval;
 #endif
     if (wtm) {
       if (i > lcb_ply) {
@@ -334,10 +399,19 @@ void collect_stats(uint64_t *work, int phase, int local)
   int i;
 
   if (local == num_saves) {
+#ifndef SHATRANJ
     if (num_saves == 0)
       stats_val[0] = REDUCE_PLY - 2;
     else
       stats_val[num_saves] = stats_val[num_saves - 1] + REDUCE_PLY_RED;
+#else
+    if (num_saves == 0)
+      stats_val[0] = REDUCE_PLY - 1;
+    else if (num_saves == 1)
+      stats_val[1] = stats_val[0] + REDUCE_PLY_RED1;
+    else
+      stats_val[num_saves] += stats_val[num_saves - 1] + REDUCE_PLY_RED2;
+#endif
   }
 
   if (thread_stats == NULL) {

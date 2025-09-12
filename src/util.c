@@ -282,7 +282,8 @@ static void file_write(void *ptr, size_t size, FILE *F)
 static size_t compress(struct CompressState *state, void *dst, void *src,
     size_t chunk)
 {
-  return ZSTD_compressCCtx(state->c_ctx, dst, compress_bound, src, chunk, 1);
+  return ZSTD_compressCCtx(state->c_ctx, dst, compress_bound, src, chunk,
+      ZSTD_LEVEL);
 }
 
 static void decompress(struct CompressState *state, void *dst, size_t chunk,

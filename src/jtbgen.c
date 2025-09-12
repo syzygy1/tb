@@ -1,11 +1,12 @@
 /*
-  Copyright (c) 2011-2013, 2018 Ronald de Man
+  Copyright (c) 2011-2013, 2018, 2024 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#define REDUCE_PLY 122
-#define REDUCE_PLY_RED 119
+#define REDUCE_PLY 118
+#define REDUCE_PLY_RED1 118
+#define REDUCE_PLY_RED2 118
 
 #define STAT_DRAW (MAX_STATS/2) // 512
 #define STAT_CAPT_CWIN (STAT_DRAW - 2) // 510
@@ -27,8 +28,9 @@
 #define LOSS_IN_ONE 0xf9
 #define CAPT_WIN 1
 #define WIN_IN_ONE 2
-#define CAPT_CWIN (WIN_IN_ONE + DRAW_RULE)
-#define CAPT_CWIN_RED (WIN_IN_ONE + 1)
+#define CAPT_CWIN 125
+#define CAPT_CWIN_RED1 (WIN_IN_ONE + DRAW_RULE - REDUCE_PLY + 2)
+#define CAPT_CWIN_RED2 (WIN_IN_ONE + 1)
 
 #define SET_CHANGED(x) \
 do { uint8_t dummy = CHANGED; \
@@ -195,38 +197,6 @@ static void calc_broken(struct thread_data *thread)
     }
   }
 }
-
-#if 0
-static void calc_mates(struct thread_data *thread)
-{
-  uint64_t idx, idx2;
-  bitboard occ, bb;
-  int i;
-  int n = numpcs;
-  assume(n >= 3 && n <= TBPIECES);
-  int p[MAX_PIECES];
-  uint64_t end = thread->end;
-
-  for (idx = thread->begin; idx < end; idx += 64) {
-    FILL_OCC64 {
-      for (i = 0, bb = 1; i < 64; i++, bb <<= 1) {
-        if (occ & bb) continue;
-        int chk_b = (table_w[idx + i] == ILLEGAL);
-        int chk_w = (table_b[idx + i] == ILLEGAL);
-        if (chk_w == chk_b) continue;
-        p[n - 1] = i;
-        if (chk_w) {
-          if (table_w[idx + i] == UNKNOWN && check_mate(white_pcs, idx + i, table_b, occ | bb, p))
-            table_w[idx + i] = MATE;
-        } else {
-          if (table_b[idx + i] == UNKNOWN && check_mate(black_pcs, idx + i, table_w, occ | bb, p))
-            table_b[idx + i] = MATE;
-        }
-      }
-    }
-  }
-}
-#endif
 
 static void calc_mates_w(struct thread_data *thread)
 {
@@ -695,7 +665,7 @@ static void iterate(void)
 
   tbl[CAPT_WIN] = 0;
   finished = 0;
-  while (!finished && ply < DRAW_RULE - 1) {
+  while (!finished && ply <= REDUCE_PLY) {
     finished = 1;
     ply++;
     tbl[WIN_IN_ONE + ply - 3] = 0;
@@ -704,83 +674,111 @@ static void iterate(void)
     loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply;
     run_iter();
   }
-
   tbl[WIN_IN_ONE + ply - 2] = 0;
-  if (!finished) {
-    finished = 1;
-    // ply = 100
-    ply++;
-    tbl[WIN_IN_ONE + ply - 1] = 2;
-    win_loss[WIN_IN_ONE + ply - 2] = LOSS_IN_ONE - ply + 1;
-    // skip WIN_IN_ONE + 100, which is CAPT_CWIN
-    loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 1;
-    run_iter();
-    tbl[WIN_IN_ONE + ply - 2] = 0;
-  }
   tbl[WIN_IN_ONE + ply - 1] = 0;
 
+  // since DRAW_RULE == 140, we need to reduce once before reaching DRAW_RULE
   if (!finished || has_cursed_capts) {
-    finished = 1;
-    ply = DRAW_RULE + 1;
-    tbl[WIN_IN_ONE + ply - 2] = 2;
-    tbl[CAPT_CWIN] = 2;
-    tbl[WIN_IN_ONE + ply] = 2;
-    win_loss[WIN_IN_ONE + ply - 2] = LOSS_IN_ONE - ply + 1;
-    loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 1;
-    tbl[CAPT_CLOSS] = 4;
-    run_iter();
+    reduce_tables();
+    num_saves++;
 
-    // ply = 102
-    ply++;
-    tbl[WIN_IN_ONE + ply - 3] = 0;
-    tbl[WIN_IN_ONE + ply] = 2;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - ply + 1;
-    win_loss[WIN_IN_ONE + ply - 1] = LOSS_IN_ONE - ply + 1;
-    loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 1;
-    run_iter();
+    for (i = 0; i < 256; i++)
+      win_loss[i] = loss_win[i] = 0;
+    for (i = 0; i <= WIN_IN_ONE; i++)
+      win_loss[i] = 0xff;
 
-    tbl[CAPT_CWIN] = 0;
+    ply = 0;
+    tbl[WIN_IN_ONE + ply + 2] = 2;
+    win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1;
+    loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 3;
 
-    while (!finished && ply < REDUCE_PLY) {
+    // iterate until DRAW_RULE
+    while (!finished && ply < DRAW_RULE - REDUCE_PLY - 2) {
       finished = 1;
       ply++;
-      tbl[WIN_IN_ONE + ply - 2] = 0;
-      tbl[WIN_IN_ONE + ply] = 2;
-      win_loss[WIN_IN_ONE + ply - 1] = LOSS_IN_ONE - ply + 1;
-      loss_win[LOSS_IN_ONE - ply + 1] = WIN_IN_ONE + ply + 1;
+      tbl[WIN_IN_ONE + ply] = 0;
+      tbl[WIN_IN_ONE + ply + 2] = 2;
+      win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1;
+      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 3;
       run_iter();
     }
 
-    tbl[WIN_IN_ONE + ply - 1] = 0;
-    tbl[WIN_IN_ONE + ply] = 0;
+    tbl[WIN_IN_ONE + ply + 1] = 0;
+    if (!finished) {
+      finished = 1;
+      ply++;  // ply = DRAW_RULE - REDUCE_PLY - 1
+      tbl[WIN_IN_ONE + ply + 2] = 2;
+      win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1;
+      // skip WIN_IN_ONE + 2 + DRAW_RULE - REDUCE_PLY, which is CAPT_CWIN_RED1
+      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4;
+      run_iter();
+      tbl[WIN_IN_ONE + ply + 1] = 0;
+    }
+    tbl[WIN_IN_ONE + ply + 2] = 0;
 
-    while (!finished) {
-      reduce_tables();
-      num_saves++;
+    if (!finished || has_cursed_capts) {
+      finished = 1;
+      ply = DRAW_RULE - REDUCE_PLY;
+      tbl[WIN_IN_ONE + ply + 1] = 2;
+      tbl[CAPT_CWIN_RED1] = 2;
+      tbl[WIN_IN_ONE + ply + 3] = 2;
+      win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1; // check
+      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4; // check
+      run_iter();
 
-      for (i = 0; i < 256; i++)
-        win_loss[i] = loss_win[i] = 0;
-      for (i = 0; i <= CAPT_CWIN_RED + 1; i++)
-        win_loss[i] = 0xff;
+      ply++;
+      tbl[WIN_IN_ONE + ply] = 0;
+      tbl[WIN_IN_ONE + ply + 3] = 2;
+      win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - ply - 1; // check
+      win_loss[WIN_IN_ONE + ply + 2] = LOSS_IN_ONE - ply - 1;
+      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4;
+      run_iter();
 
-      ply = 0;
-      tbl[CAPT_CWIN_RED + ply + 3] = 2;
-      win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
-      loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
+      tbl[CAPT_CWIN_RED1] = 0;
 
-      while (ply < REDUCE_PLY_RED && !finished) {
+      // iterate until we need to reduce for the second time
+      while (ply < REDUCE_PLY_RED1 && !finished) {
         finished = 1;
         ply++;
-        tbl[CAPT_CWIN_RED + ply + 1] = 0;
-        tbl[CAPT_CWIN_RED + ply + 3] = 2;
-        win_loss[CAPT_CWIN_RED + ply + 2] = LOSS_IN_ONE - ply - 1;
-        loss_win[LOSS_IN_ONE - ply - 1] = CAPT_CWIN_RED + ply + 4;
+        tbl[WIN_IN_ONE + ply + 1] = 0;
+        tbl[WIN_IN_ONE + ply + 3] = 2;
+        win_loss[WIN_IN_ONE + ply + 2] = LOSS_IN_ONE - ply - 1;
+        loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4;
         run_iter();
       }
 
-      tbl[CAPT_CWIN_RED + ply + 2] = 0;
-      tbl[CAPT_CWIN_RED + ply + 3] = 0;
+      tbl[WIN_IN_ONE + ply + 2] = 0;
+      tbl[WIN_IN_ONE + ply + 3] = 0;
     }
+  }
+
+  // reduce and iterate until we are finished
+  while (!finished) {
+    reduce_tables();
+    num_saves++;
+
+    for (i = 0; i < 256; i++)
+      win_loss[i] = loss_win[i] = 0;
+    for (i = 0; i <= CAPT_CWIN_RED2 + 1; i++)
+      win_loss[i] = 0xff;
+
+    ply = 0;
+    tbl[CAPT_CWIN_RED2 + ply + 3] = 2;
+    win_loss[CAPT_CWIN_RED2 + ply + 2] = LOSS_IN_ONE - ply - 2;
+    loss_win[LOSS_IN_ONE - ply - 2] = CAPT_CWIN_RED2 + ply + 4;
+
+    while (ply < REDUCE_PLY_RED2 && !finished) {
+      finished = 1;
+      ply++;
+      tbl[CAPT_CWIN_RED2 + ply + 1] = 0;
+      tbl[CAPT_CWIN_RED2 + ply + 3] = 2;
+      win_loss[CAPT_CWIN_RED2 + ply + 2] = LOSS_IN_ONE - ply - 2;
+      loss_win[LOSS_IN_ONE - ply - 2] = CAPT_CWIN_RED2 + ply + 4;
+      run_iter();
+    }
+
+    tbl[CAPT_CWIN_RED2 + ply + 2] = 0;
+    tbl[CAPT_CWIN_RED2 + ply + 3] = 0;
   }
 }
 
@@ -859,16 +857,18 @@ static void reset_captures_w(void)
   int n = numpcs;
   uint8_t v[256];
 
+  if (num_saves == 0) return;
+
   reset_v = v;
 
   for (i = 0; i < 256; i++)
     v[i] = 0;
 
-  if (num_saves == 0)
-    for (i = DRAW_RULE; i < REDUCE_PLY; i++)
+  if (num_saves == 1)
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1 + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
   else
-    for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
+    for (i = 0; i <= REDUCE_PLY_RED2 + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
 
   to_fix_w = 0;
@@ -897,16 +897,19 @@ static void reset_captures_b(void)
   int n = numpcs;
   uint8_t v[256];
 
+  if (num_saves == 0)
+    return;
+
   reset_v = v;
 
   for (i = 0; i < 256; i++)
     v[i] = 0;
 
-  if (num_saves == 0)
-    for (i = DRAW_RULE; i < REDUCE_PLY; i++)
+  if (num_saves == 1)
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1 + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
   else
-    for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
+    for (i = 0; i <= REDUCE_PLY_RED2 + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
 
   to_fix_b = 0;
@@ -998,15 +1001,17 @@ static void fix_closs_worker_b(struct thread_data *thread)
   }
 }
 
-static void fix_closs_w(void)
+static void fix_closs_w(void) // FIXME
 {
   int i;
 
   if (!to_fix_w) return;
 
+  if (num_saves == 0) return;
+
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
-  if (num_saves == 0) {
+  if (num_saves == 1) {
     // if no legal moves or all moves lose, then CLOSS capture was best
     for (i = 0; i < CAPT_CWIN; i++)
       win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
@@ -1015,10 +1020,10 @@ static void fix_closs_w(void)
       win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
-    for (i = 0; i < CAPT_CWIN_RED + 2; i++)
+    for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
-    for (i = 0; i < REDUCE_PLY_RED; i++)
-      win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
+    for (i = 0; i < REDUCE_PLY_RED2; i++)
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
   }
 
   printf("fixing cursed white losses.\n");
@@ -1040,12 +1045,14 @@ static void fix_closs_b(void)
     win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
     for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
       win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
+  } else if (num_saves == 1) {
+    //
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
-    for (i = 0; i < CAPT_CWIN_RED + 2; i++)
+    for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
-    for (i = 0; i < REDUCE_PLY_RED; i++)
-      win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
+    for (i = 0; i < REDUCE_PLY_RED2; i++)
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
   }
 
   printf("fixing cursed black losses.\n");

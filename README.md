@@ -80,6 +80,9 @@ tables are temporarily saved to disk. **This option is necessary to
 generate 6-piece tables on systems with 16 GB RAM.** This option is
 not needed on systems with 24 GB RAM or more.
 
+-p
+Always store DTZ values for non-cursed positions ply-accurate (at the cost of slightly larger DTZ tables). Without this option, DTZ can be off by one unless the table has position with DTZ=100 ply. The original Syzygy tables were generated without this option.
+
 **Usage:** `rtbver KQRvKR`   (or `rtbverp KRPvKR`)  
 Verifies consistency of KQRvKR.rtbw and KQRvKR.rtbz. This should detect
 (hardware) errors during generation and compression. For technical reasons
