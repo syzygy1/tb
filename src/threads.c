@@ -147,7 +147,7 @@ void init_threads(int pawns)
 
   for (i = 0; i < numthreads - 1; i++) {
     int rc = thrd_create(&threads[i], worker, (void *)&(thread_data[i]));
-    if (rc) {
+    if (rc != thrd_success) {
       fprintf(stderr, "ERROR: thrd_create() returned %d\n", rc);
       exit(EXIT_FAILURE);
     }
@@ -267,8 +267,8 @@ void create_compression_threads(void)
 
   for (int i = 0; i < COMPRESSION_THREADS - 1; i++) {
     int rc = thrd_create(&cmprs_threads[i], cmprs_worker, &cmprs_data[i]);
-    if (rc) {
-      fprintf(stderr, "ERROR: phtread_create() return %d\n", rc);
+    if (rc != thrd_success) {
+      fprintf(stderr, "ERROR: thrd_create() returned %d\n", rc);
       exit(EXIT_FAILURE);
     }
   }

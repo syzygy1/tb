@@ -197,7 +197,7 @@ static void reduce_tables(void)
     v[CAPT_CWIN_RED2 + REDUCE_PLY_RED2 + 4] = CAPT_CWIN_RED2 + 4;
   }
 #endif
-#else
+#else /* SUICIDE */
   v[BROKEN] = BROKEN;
   v[UNKNOWN] = UNKNOWN;
   v[CHANGED] = CHANGED;

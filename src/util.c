@@ -1,3 +1,9 @@
+/*
+  Copyright (c) 2011-2013, 2018, 2024, 2025 Ronald de Man
+
+  This file is distributed under the terms of the GNU GPL, version 2.
+*/
+
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>

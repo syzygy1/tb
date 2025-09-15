@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, 2024 Ronald de Man
+  Copyright (c) 2018, 2024, 2025 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */

@@ -80,7 +80,7 @@ tables are temporarily saved to disk. **This option is necessary to
 generate 6-piece tables on systems with 16 GB RAM.** This option is
 not needed on systems with 24 GB RAM or more.
 
--p
+-p  
 Always store DTZ values for non-cursed positions ply-accurate (at the cost of slightly larger DTZ tables). Without this option, DTZ can be off by one unless the table has position with DTZ=100 ply. The original Syzygy tables were generated without this option.
 
 **Usage:** `rtbver KQRvKR`   (or `rtbverp KRPvKR`)  
@@ -187,8 +187,10 @@ The files lz4.c and lz4.h in src/ are copyrighted by Yann Collet and were
 released under the BSD 2-Clause License. The files city-c.c, city-c.h and
 citycrc.h in src/ (ported by me from C++ to C) are copyrighted by Google,
 Inc. and were released under an even more liberal license. Both licenses
-are compatible with the GPL. All other files in src/ are released under
-the GNU Public License, version 2 (only).
+are compatible with the GPL. The files c11threads_win32.c and c11threads.h
+are copyrighted by John Tsiombikas and Oliver Old and were placed in the
+public domain. All other files in src/ are released under the GNU Public
+License, version 2 (only).
 
 The files main.cpp, search.cpp and types.h in interface/ obviously are
 copyrighted by the Stockfish authors and covered by the Stockfish GPL with
