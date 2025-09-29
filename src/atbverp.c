@@ -1291,6 +1291,40 @@ error("DTZ_ERROR: idx = %"PRIu64", v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx, v
   }
 }
 
+void load_dtz_mapped16(struct thread_data *thread)
+{
+  uint64_t idx, idx2;
+  int i, v1, v2;
+  int n = numpcs;
+  uint8_t *table = load_table;
+  uint8_t *src = tb_table;
+  int *perm = tb_perm;
+  uint64_t end = thread->end;
+  int pos[MAX_PIECES];
+  uint8_t *norm = load_entry->file[file].norm[load_bside];
+  uint64_t *factor = load_entry->file[file].factor[load_bside];
+  struct TBEntry_pawn *entry = load_entry;
+  uint16_t (*map16)[MAX_VALS] = load_map16;
+
+  for (idx = thread->begin; idx < end; idx++) {
+    v1 = table[idx];
+    if (v1 >= WDL_ERROR) {
+      table[idx] = wdl_to_dtz_c[v1 - WDL_ERROR];
+      continue;
+    }
+    int wdl = wdl_tbl_to_wdl[v1];
+    for (i = n - 1, idx2 = idx ^ pw_mask; i > 0; i--, idx2 >>= 6)
+      pos[perm[i]] = idx2 & 0x3f;
+    pos[perm[0]] = piv_sq[idx2];
+    idx2 = encode_pawn_ver(entry, norm, pos, factor);
+    v2 = map16[wdl][src[idx2]];
+    v2 = v2 > 255 ? 255 : v2;
+    table[idx] = wdl_to_dtz[v1][v2];
+if(table[idx]==DTZ_ERROR)
+error("DTZ_ERROR: idx = %"PRIu64", v1 = %d, v2 = %d, idx2 = %"PRIu64"\n", idx, v1, v2, idx2);
+  }
+}
+
 static int has_moves_pieces(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ, int *p)
 {
   int sq;

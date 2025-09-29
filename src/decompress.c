@@ -26,7 +26,6 @@ extern int numpawns;
 static int enc_type;
 
 int pawns0, pawns1;
-int use_envdirs = 0;
 
 void decomp_init_piece(int *pcs)
 {
@@ -490,24 +489,21 @@ uint8_t *decompress_table(struct tb_handle *H, int bside, int f)
   return table;
 }
 
-struct tb_handle *open_tb(char *tablename, int wdl)
+struct tb_handle *open_tb_handle(char *tablename, int wdl)
 {
   char name[128];
   struct tb_handle *H = malloc(sizeof(struct tb_handle));
 
-  char *dirptr = getenv(wdl ? WDLDIR : DTZDIR);
-  if (use_envdirs && dirptr && strlen(dirptr) < 100)
-    strcpy(name, dirptr);
-  else
-    strcpy(name, ".");
-  strcat(name, "/");
-  strcat(name, tablename);
+  strcpy(name, tablename);
   strcat(name, wdl ? WDLSUFFIX : DTZSUFFIX);
   if (!(H->F = fopen(name, "rb"))) {
     fprintf(stderr, "Could not open %s for reading.\n", name);
     exit(EXIT_FAILURE);
   }
-  H->data = (uint8_t *)map_file(name, 1, &(H->data_size));
+  FD fd = open_file(name);
+  H->data_size = file_size(fd);
+  H->data = (uint8_t *)map_file(fd, 1, &(H->mmap));
+  close_file(fd);
   H->wdl = wdl;
 
   return H;
@@ -519,7 +515,7 @@ void close_tb(struct tb_handle *H)
   int f;
 
   fclose(H->F);
-  unmap_file((char *)H->data, H->data_size);
+  unmap_file((char *)H->data, H->mmap);
 
   if (!H->has_pawns) {
     struct TBEntry_piece *entry = &(H->entry_piece);
@@ -586,8 +582,16 @@ int get_dtz_side(struct tb_handle *H, int f)
 
 uint8_t (*get_dtz_map(struct tb_handle *H, int f))[256]
 {
-  if (H->dtz_flags[f] & 0x02)
+  if ((H->dtz_flags[f] & 0x02) && !(H->dtz_flags[0] & 16))
     return H->map[f];
+  else
+    return NULL;
+}
+
+uint16_t (*get_dtz_map16(struct tb_handle *H, int f))[MAX_VALS]
+{
+  if ((H->dtz_flags[f] & 0x02) && (H->dtz_flags[0] & 16))
+    return H->map16[f];
   else
     return NULL;
 }

@@ -5,18 +5,17 @@
 */
 
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#else
-#include <windows.h>
 #endif
 
 #ifdef USE_ZSTD
@@ -29,90 +28,96 @@
 #include "threads.h"
 #include "util.h"
 
-void *map_file(char *name, int shared, uint64_t *size)
+FD open_file(const char *name)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
+  return open(name, O_RDONLY);
+#else
+  return CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+      FILE_FLAG_RANDOM_ACCESS, NULL);
+#endif
+}
 
+void close_file(FD fd)
+{
+#ifndef _WIN32
+  close(fd);
+#else
+  CloseHandle(fd);
+#endif
+}
+
+size_t file_size(FD fd)
+{
+#ifndef _WIN32
   struct stat statbuf;
-  int fd = open(name, O_RDONLY);
-  if (fd < 0) {
-    fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(EXIT_FAILURE);
-  }
   fstat(fd, &statbuf);
-  *size = statbuf.st_size;
+  return statbuf.st_size;
+#else
+  DWORD sizeLow, sizeHigh;
+  sizeLow = GetFileSize(fd, &sizeHigh);
+  return ((size_t)sizeHigh << 32) | sizeLow;
+#endif
+}
+
+void *map_file(FD fd, bool shared, map_t *map)
+{
+#ifndef _WIN32
+  *map = file_size(fd);
 #ifdef __linux__
-  void *data = mmap(NULL, statbuf.st_size, PROT_READ,
-                    shared ? MAP_SHARED : MAP_PRIVATE | MAP_POPULATE, fd, 0);
+  void *data = mmap(NULL, *map, PROT_READ,
+      shared ? MAP_SHARED : MAP_PRIVATE | MAP_POPULATE, fd, 0);
 #else
   void *data = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 #endif
+#ifdef MADV_RANDOM
+  madvise(data, *map, MADV_RANDOM);
+#endif
   if (data == MAP_FAILED) {
-    fprintf(stderr, "Could not mmap() %s.\n", name);
+    fprintf(stderr, "mmap() failed.\n");
     exit(EXIT_FAILURE);
   }
-  close(fd);
   return data;
 
 #else
-
-  HANDLE h = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (h == INVALID_HANDLE_VALUE) {
-    fprintf(stderr, "Could not open %s for reading.\n", name);
-    exit(EXIT_FAILURE);
-  }
-  DWORD size_low, size_high;
-  size_low = GetFileSize(h, &size_high);
-  *size = ((uint64_t)size_high << 32) | (uint64_t)size_low;
-  HANDLE map = CreateFileMapping(h, NULL, PAGE_READONLY, size_high, size_low,
-                                 NULL);
-  if (map == NULL) {
+  DWORD sizeLow, sizeHigh;
+  sizeLow = GetFileSize(fd, &sizeHigh);
+  *map = CreateFileMapping(fd, NULL, PAGE_READONLY, sizeHigh, sizeLow, NULL);
+  if (*map == NULL) {
     fprintf(stderr, "CreateFileMapping() failed.\n");
     exit(EXIT_FAILURE);
   }
-  void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
-  if (data == NULL) {
-    fprintf(stderr, "MapViewOfFile() failed.\n");
-    exit(EXIT_FAILURE);
-  }
-  CloseHandle(h);
-  return data;
+  return MapViewOfFile(*map, FILE_MAP_READ, 0, 0, 0);
 
 #endif
 }
 
-void unmap_file(void *data, uint64_t size)
+void unmap_file(void *data, map_t map)
 {
-#ifndef __WIN32__
+  if (!data) return;
 
-  munmap(data, size);
+#ifndef _WIN32
+  munmap((void *)data, map);
 
 #else
-
   UnmapViewOfFile(data);
+  CloseHandle(map);
 
 #endif
 }
 
 void *alloc_aligned(uint64_t size, uintptr_t alignment)
 {
-#ifndef __WIN32__
-
   void *ptr;
 
+#ifndef __WIN32__
   posix_memalign(&ptr, alignment, size);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
     exit(EXIT_FAILURE);
   }
 
-  return ptr;
-
 #else
-
-  void *ptr;
-
   ptr = malloc(size + alignment - 1);
   if (ptr == NULL) {
     fprintf(stderr, "Could not allocate sufficient memory.\n");
@@ -120,9 +125,9 @@ void *alloc_aligned(uint64_t size, uintptr_t alignment)
   }
   ptr = (void *)((uintptr_t)(ptr + alignment - 1) & ~(alignment - 1));
 
-  return ptr;
-
 #endif
+
+  return ptr;
 }
 
 void *alloc_huge(uint64_t size)

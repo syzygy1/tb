@@ -69,11 +69,12 @@ void save_table(uint8_t *table, char color, int local, uint64_t begin,
     }
   } else if (local == 1) {
     for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++) {
-      v[WIN_RED + 1 + i] = 1 + i;
+      v[WIN_RED + 1 + i] = 2 + i;
       v[LOSS_IN_ONE - i] = 255 - i;
     }
+    v[PAWN_CWIN_RED1] = 1;
     for (; i < REDUCE_PLY_RED1; i++) {
-      v[WIN_RED + 3 + i] = 1 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2;
+      v[WIN_RED + 3 + i] = 2 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2;
       v[LOSS_IN_ONE - i] = 255 - (DRAW_RULE - REDUCE_PLY + 1) - (i - DRAW_RULE + REDUCE_PLY - 1) / 2;
     }
   } else {
@@ -190,6 +191,7 @@ void reduce_tables(int local)
       v[WIN_IN_ONE + i] = WIN_RED;
       v[LOSS_IN_ONE - i] = MATE;
     }
+    v[CAPT_CLOSS] = CAPT_CLOSS;
     v[CAPT_CWIN] = CAPT_CWIN_RED1;
     v[PAWN_CWIN] = PAWN_CWIN_RED1;
     v[LOSS_IN_ONE - REDUCE_PLY + 1] = LOSS_IN_ONE;
@@ -204,15 +206,16 @@ void reduce_tables(int local)
       v[LOSS_IN_ONE - i] = MATE;
     }
     v[CAPT_CWIN_RED1] = CAPT_CWIN_RED2;
+    v[PAWN_CWIN_RED1] = CAPT_CWIN_RED2 + 1;
     for (; i < REDUCE_PLY_RED1; i++) {
-      v[WIN_RED + i + 2] = CAPT_CWIN_RED2 + 1;
+      v[WIN_RED + i + 3] = CAPT_CWIN_RED2 + 1;
       v[LOSS_IN_ONE - i] = LOSS_IN_ONE;
     }
     v[LOSS_IN_ONE - REDUCE_PLY_RED1] = LOSS_IN_ONE - 1;
     v[LOSS_IN_ONE - REDUCE_PLY_RED1 - 1] = LOSS_IN_ONE - 2;
-    v[WIN_RED + REDUCE_PLY_RED1 + 2] = CAPT_CWIN_RED2 + 2;
-    v[WIN_RED + REDUCE_PLY_RED1 + 3] = CAPT_CWIN_RED2 + 3;
-    v[WIN_RED + REDUCE_PLY_RED1 + 4] = CAPT_CWIN_RED2 + 4;
+    v[WIN_RED + REDUCE_PLY_RED1 + 3] = CAPT_CWIN_RED2 + 2;
+    v[WIN_RED + REDUCE_PLY_RED1 + 4] = CAPT_CWIN_RED2 + 3;
+    v[WIN_RED + REDUCE_PLY_RED1 + 5] = CAPT_CWIN_RED2 + 4;
   } else {
     v[WIN_RED] = WIN_RED;
     v[LOSS_IN_ONE] = LOSS_IN_ONE;
@@ -220,7 +223,7 @@ void reduce_tables(int local)
     v[CAPT_CWIN_RED2 + 1] = CAPT_CWIN_RED2 + 1;
     for (i = 0; i < REDUCE_PLY_RED2; i++) {
       v[CAPT_CWIN_RED2 + i + 2] = CAPT_CWIN_RED2 + 1;
-      v[LOSS_IN_ONE - 1 - i] = LOSS_IN_ONE;
+      v[LOSS_IN_ONE - i - 1] = LOSS_IN_ONE;
     }
     v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 1] = LOSS_IN_ONE - 1;
     v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 2] = LOSS_IN_ONE - 2;

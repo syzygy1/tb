@@ -195,7 +195,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     } else {
       for (j = 0; j < n; j++) {
         total_stats[1 + stats_val + j] += stats[CAPT_CWIN_RED + j + 2];
-        total_stats[STAT_MATE - 1 - stats_val - j - 1] += stats[LOSS_IN_ONE - j - 1];
+        total_stats[STAT_MATE - stats_val - j - 2] += stats[LOSS_IN_ONE - j - 1];
       }
     }
   }
@@ -216,13 +216,13 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
       }
       total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN_RED1];
       for (; j < n; j++) {
-        total_stats[1 + stats_val + j] += stats[WIN_IN_ONE + 2 + j];
+        total_stats[1 + stats_val + j] += stats[WIN_IN_ONE + j + 2];
         total_stats[STAT_MATE - 1 - stats_val - j] += stats[LOSS_IN_ONE - j];
       }
     } else {
       for (j = 0; j < n; j++) {
         total_stats[1 + stats_val + j] += stats[CAPT_CWIN_RED2 + j + 2];
-        total_stats[STAT_MATE - 1 - stats_val - j] += stats[LOSS_IN_ONE - j - 1];
+        total_stats[STAT_MATE - stats_val - j - 1] += stats[LOSS_IN_ONE - j - 1];
       }
     }
   }

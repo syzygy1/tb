@@ -215,12 +215,12 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
     } else {
       for (j = 0; j < n; j++) {
         total_stats[1 + sval + j] += stats[CAPT_CWIN_RED2 + j + 2];
-        total_stats[STAT_MATE - sval - j - 2] += stats[LOSS_IN_ONE - j - 1];
+        total_stats[STAT_MATE - 1 - sval - j] += stats[LOSS_IN_ONE - j - 1];
       }
     }
   }
 #endif
-#else
+#else /* SUICIDE */
   for (i = 0; i < numthreads; i++) {
     uint64_t *stats = thread_data[i].stats;
     if (local == 0) {
@@ -327,7 +327,7 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
 #ifndef SHATRANJ
     j = local == 0 ? WIN_IN_ONE + i + 1 : CAPT_CWIN_RED + 1 + i - sval;
 #else
-    j = local == 1 ? WIN_RED + i - sval : CAPT_CWIN_RED2 + 1 + i - sval;
+    j = local == 1 ? WIN_RED + i - sval + 2 : CAPT_CWIN_RED2 + 1 + i - sval;
 #endif
 #else
     if (local == 0)

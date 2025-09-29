@@ -103,7 +103,9 @@ uint64_t tb_piece_key[] = {
 
 static LOCK_T TB_mutex, fail_mutex;
 
-char WDLdir[128];
+static int numPaths;
+static char *pathString;
+static char **paths;
 
 static int TBnum_piece, TBnum_pawn;
 static struct TBEntry_piece TB_piece[TBMAX_PIECE];
@@ -111,6 +113,22 @@ static struct TBEntry_pawn TB_pawn[TBMAX_PAWN];
 static struct TBHashEntry TB_hash[1 << TBHASHBITS][HSHMAX];
 
 void init_indices(void);
+
+static FD open_tb(const char *str)
+{
+  char name[256];
+
+  for (int i = 0; i < numPaths; i++) {
+    strcpy(name, paths[i]);
+    strcat(name, "/");
+    strcat(name, str);
+    strcat(name, WDLSUFFIX);
+    FD fd = open_file(name);
+    if (fd != FD_ERR)
+      return fd;
+  }
+  return FD_ERR;
+}
 
 void add_to_hash(struct TBEntry *ptr, uint64_t key)
 {
@@ -133,20 +151,14 @@ static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
 static void init_tb(char *str)
 {
-  char file[256];
-  int fd;
   struct TBEntry *entry;
   int i, j, pcs[16];
   uint64_t key, key2;
   int color;
 
-  strcpy(file, WDLdir);
-  strcat(file, "/");
-  strcat(file, str);
-  strcat(file, WDLSUFFIX);
-  fd = open(file, O_RDONLY);
-  if (fd < 0) return;
-  close(fd);
+  int fd = open_tb(str);
+  if (fd == FD_ERR) return;
+  close_file(fd);
 
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
@@ -232,7 +244,7 @@ static void init_tb(char *str)
 
 void init_tablebases(void)
 {
-  char str[16], *dirptr;
+  char str[16];
   int i, j, k, l;
 #ifdef SUICIDE
   int m, n;
@@ -251,11 +263,29 @@ void init_tablebases(void)
     for (j = 0; j < HSHMAX; j++)
       TB_hash[i][j].ptr = NULL;
 
-  dirptr = getenv(WDLDIR);
-  if (dirptr && strlen(dirptr) < 100)
-    strcpy(WDLdir, dirptr);
-  else
-    strcpy(WDLdir, ".");
+  const char *p = getenv(TBPATH);
+  if (!p || strlen(p) == 0)
+    p = ".";
+
+  pathString = malloc(strlen(p) + 1);
+  strcpy(pathString, p);
+  numPaths = 0;
+  for (int i = 0;; i++) {
+    if (pathString[i] != SEP_CHAR)
+      numPaths++;
+    while (pathString[i] && pathString[i] != SEP_CHAR)
+      i++;
+    if (!pathString[i]) break;
+    pathString[i] = 0;
+  }
+  paths = malloc(numPaths * sizeof(*paths));
+  for (int i = 0, j = 0; i < numPaths; i++) {
+    while (!pathString[j])
+      j++;
+    paths[i] = &pathString[j];
+    while (pathString[j])
+      j++;
+  }
 
 #if defined(SUICIDE)
   for (i = 0; i < 6; i++)
@@ -2176,8 +2206,6 @@ static void init_table(struct TBEntry *entry, uint64_t key)
     key2 += tb_piece_key[i + 1] * (k1 & 0x0f);
 #endif
 
-  strcpy(file, WDLdir);
-  strcat(file, "/");
   k1 = key & WHITEMATMASK;
   k2 = key & BLACKMATMASK;
 #if defined(SUICIDE)
@@ -2193,7 +2221,7 @@ static void init_table(struct TBEntry *entry, uint64_t key)
     key = key2;
     key2 = tmp;
   }
-  char *str = file + strlen(file);
+  char *str = file;
 #if defined(SUICIDE)
   str = prt_str(str, k1);
   *str++ = 'v';
@@ -2206,9 +2234,14 @@ static void init_table(struct TBEntry *entry, uint64_t key)
   str = prt_str(str, k2);
 #endif
   *str++ = 0;
-  strcat(file, WDLSUFFIX);
-  uint64_t dummy;
-  entry->data = map_file(file, 1, &dummy);
+  FD fd = open_tb(file);
+  if (fd == FD_ERR) {
+    fprintf(stderr, "Failed to open %s%s.\n", str, WDLSUFFIX);
+    exit(EXIT_FAILURE);
+  }
+  map_t dummy;
+  entry->data = map_file(fd, true, &dummy);
+  close_file(fd);
   uint8_t *data = (uint8_t *)entry->data;
 
 #if !defined(SUICIDE)
@@ -3255,5 +3288,6 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
         str[k++] = pchr[i];
   str[k] = 0;
   fprintf(stderr, "Missing table: %s\n", str);
+  fprintf(stderr, "Did you set "TBPATH" correctly?\n");
   exit(1);
 }

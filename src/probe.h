@@ -8,6 +8,7 @@
 #define PROBE_H
 
 #include "defs.h"
+#include "util.h"
 #include "types.h"
 
 #define TBPIECES 7
@@ -16,51 +17,44 @@
 #if !defined(GIVEAWAY)
 #define WDLSUFFIX ".stbw"
 #define DTZSUFFIX ".stbz"
-#define WDLDIR "STBWDIR"
-#define DTZDIR "STBZDIR"
+#define TBPATH "STBPATH"
 #define STATSDIR "STBSTATSDIR"
 #define LOGFILE "stblog.txt"
 #else
 #define WDLSUFFIX ".gtbw"
 #define DTZSUFFIX ".gtbz"
-#define WDLDIR "GTBWDIR"
-#define DTZDIR "GTBZDIR"
+#define TBPATH "GTBPATH"
 #define STATSDIR "GTBSTATSDIR"
 #define LOGFILE "gtblog.txt"
 #endif
 #elif defined(LOSER)
 #define WDLSUFFIX ".ltbw"
 #define DTZSUFFIX ".ltbz"
-#define WDLDIR "LTBWDIR"
-#define DTZDIR "LTBZDIR"
+#define TBPATH "LTBPATH"
 #define STATSDIR "LTBSTATSDIR"
 #define LOGFILE "ltblog.txt"
 #elif defined(GIVEAWAY)
 #define WDLSUFFIX ".gtbw"
 #define DTZSUFFIX ".gtbz"
-#define WDLDIR "GTBWDIR"
-#define DTZDIR "GTBZDIR"
+#define TBPATH "GTBPATH"
 #define STATSDIR "GTBSTATSDIR"
 #define LOGFILE "gtblog.txt"
 #elif defined(ATOMIC)
 #define WDLSUFFIX ".atbw"
 #define DTZSUFFIX ".atbz"
-#define WDLDIR "ATBWDIR"
-#define DTZDIR "ATBZDIR"
+#define TBPATH "ATBPATH"
 #define STATSDIR "ATBSTATSDIR"
 #define LOGFILE "atblog.txt"
 #elif defined(SHATRANJ)
 #define WDLSUFFIX ".jtbw"
 #define DTZSUFFIX ".jtbz"
-#define WDLDIR "JTBWDIR"
-#define DTZDIR "JTBZDIR"
+#define TBPATH "JTBPATH"
 #define STATSDIR "JTBSTATSDIR"
 #define LOGFILE "jtblog.txt"
 #else
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
-#define WDLDIR "RTBWDIR"
-#define DTZDIR "RTBZDIR"
+#define TBPATH "RTBPATH"
 #define STATSDIR "RTBSTATSDIR"
 #define LOGFILE "rtblog.txt"
 #endif

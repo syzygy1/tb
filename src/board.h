@@ -1,11 +1,11 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2013, 2024 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
-#ifndef BOARD_BB_H
-#define BOARD_BB_H
+#ifndef BOARD_H
+#define BOARD_H
 
 #include "defs.h"
 #include "types.h"
@@ -14,17 +14,13 @@ extern bitboard bit[64];
 
 static __inline__ int FirstOne(bitboard x)
 {
-  bitboard res;
-  __asm__("bsfq %1, %0" : "=r" (res) : "g" (x));
-  return (int)res;
+  return __builtin_ctzll(x);
 }
 
 #ifdef USE_POPCNT
 static __inline__ int PopCount(bitboard x)
 {
-  bitboard res;
-  __asm__("popcnt %1, %0" : "=r" (res) : "g" (x));
-  return (int)res;
+  return __builtin_popcountll(x);
 }
 #endif
 

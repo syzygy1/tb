@@ -31,8 +31,7 @@ $(NAME): $(OBJS) # $(OBJS:%=$(OBJDIR)/%)
 
 $(DEPDIR)/%.P: %.c
 	@mkdir -p $(DEPDIR)
-	$(SHELL) -ec '$(CC) -M $(FLAGS) -msse4.2 -march=corei7 $*.c \
-		| sed s/$*\.o/$*\.o\ $*\.P/ >$@'
+	$(SHELL) -ec '$(CC) -M $(FLAGS) $*.c | sed s/$*\.o/$*\.o\ $*\.P/ >$@'
 
 $(CLEAN):
 	rm -f $(TBOBJS:%=$(OBJDIR)/%)

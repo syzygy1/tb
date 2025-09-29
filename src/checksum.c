@@ -47,12 +47,14 @@ static void checksum_worker(struct thread_data *thread)
 
 static void calc_checksum(char *name)
 {
-  uint64_t orig_size;
+  map_t map;
 
   if (!work) work = alloc_work(total_work);
 
-  data = map_file(name, 0, &size);
-  orig_size = size;
+  FD fd = open_file(name);
+  size = file_size(fd);
+  data = map_file(fd, false, &map);
+  close_file(fd);
   if ((size & 0x3f) == 0x10) {
     size &= ~0x3fULL;
     memcpy(checksum1, data + size, 16);
@@ -60,7 +62,7 @@ static void calc_checksum(char *name)
   } else {
     if (size & 0x3f) {
       fprintf(stderr, "Size of %s is not a multiple of 64.\n", name);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     checksum_found = 0;
   }
@@ -70,7 +72,7 @@ static void calc_checksum(char *name)
   fill_work(total_work, chunks, 0, work);
   run_threaded(checksum_worker, work, 0);
   CityHashCrc128((char *)results, 32 * chunks, checksum2);
-  unmap_file(data, orig_size);
+  unmap_file(data, map);
   free(results);
 
   if (checksum_found)
@@ -80,14 +82,19 @@ static void calc_checksum(char *name)
 
 void print_checksum(char *name, char *sum)
 {
-  data = map_file(name, 1, &size);
+  map_t map;
+
+  FD fd = open_file(name);
+  size = file_size(fd);
+  data = map_file(fd, true, &map);
+  close_file(fd);
   if ((size & 0x3f) == 0x10) {
     memcpy(checksum1, data + (size & ~0x3fULL), 16);
   } else {
     fprintf(stderr, "No checksum found.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
-  unmap_file(data, size);
+  unmap_file(data, map);
 
   int i;
   static char nibble[16] = "0123456789abcdef";
@@ -106,12 +113,12 @@ void add_checksum(char *name)
   calc_checksum(name);
   if (checksum_found) {
     fprintf(stderr, "%s checksum already present.\n", checksum_match ? "Matching" : "Non-matching");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   FILE *F = fopen(name, "ab");
   if (!F) {
     fprintf(stderr, "Could not open %s for appending.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   fwrite(checksum2, 16, 1, F);
   fclose(F);
@@ -123,7 +130,7 @@ void verify_checksum(char *name)
   calc_checksum(name);
   if (!checksum_found) {
     fprintf(stderr, "No checksum present.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if (!checksum_match)
     printf("FAIL!\n");

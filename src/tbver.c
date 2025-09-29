@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013, 2018 Ronald de Man
+  Copyright (c) 2011-2013, 2018, 2025 Ronald de Man
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */
@@ -28,8 +28,6 @@ static int white_king, black_king;
 
 void error(char *str, ...);
 
-extern int use_envdirs;
-
 extern int total_work;
 extern struct thread_data *thread_data;
 extern int numthreads;
@@ -53,6 +51,7 @@ struct TBEntry_piece *load_entry;
 uint8_t *load_opp_table;
 int *load_pieces, *load_opp_pieces;
 uint8_t (*load_map)[256];
+uint16_t (*load_map16)[MAX_VALS];
 uint8_t *tb_table;
 int tb_perm[MAX_PIECES];
 
@@ -78,6 +77,8 @@ static int pcs2[MAX_PIECES];
 #include "atbver.c"
 #elif defined(LOSER)
 #include "ltbver.c"
+#elif defined(SHATRANJ)
+#include "jtbver.c"
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -113,7 +114,7 @@ void error(char *str, ...)
 
 static void check_huffman_tb(int wdl)
 {
-  struct tb_handle *F = open_tb(tablename, wdl);
+  struct tb_handle *F = open_tb_handle(tablename, wdl);
   decomp_init_table(F);
   struct TBEntry_piece *entry = &(F->entry_piece);
   printf("%s%s:", tablename, wdl ? WDLSUFFIX : DTZSUFFIX);
@@ -160,7 +161,7 @@ int main(int argc, char **argv)
 
   do {
 //    val = getopt_long(argc, argv, "t:lwc", options, &longindex);
-    val = getopt_long(argc, argv, "t:ldh", options, &longindex);
+    val = getopt_long(argc, argv, "t:lh", options, &longindex);
     switch (val) {
     case 't':
       numthreads = atoi(optarg);
@@ -170,9 +171,6 @@ int main(int argc, char **argv)
       break;
     case 'w':
       wdl_only = 1;
-      break;
-    case 'd':
-      use_envdirs = 1;
       break;
     case 'h':
       check_huff = 1;
@@ -186,14 +184,20 @@ int main(int argc, char **argv)
   }
   tablename = argv[optind];
 
+  char *table = strrchr(tablename, '/');
+  if (table)
+    table++;
+  else
+    table = tablename;
+
   for (i = 0; i < 16; i++)
     pcs[i] = 0;
 
-  numpcs = strlen(tablename) - 1;
+  numpcs = strlen(table) - 1;
   color = 0;
   j = 0;
-  for (i = 0; i < strlen(tablename); i++)
-    switch (tablename[i]) {
+  for (i = 0; i < strlen(table); i++)
+    switch (table[i]) {
     case 'P':
       pcs[PAWN | color]++;
       pt[j++] = PAWN | color;
@@ -351,8 +355,15 @@ int main(int argc, char **argv)
   printf("Calculating black captures.\n");
   calc_captures_b();
 #ifndef SUICIDE
+#ifndef SHATRANJ
   printf("Calculating mate positions.\n");
   run_threaded(calc_mates, work_g, 1);
+#else
+  printf("Calculating white mate positions.\n");
+  run_threaded(calc_mates_w, work_g, 1);
+  printf("Calculating black mate positions.\n");
+  run_threaded(calc_mates_b, work_g, 1);
+#endif
 #else
   init_capt_threat();
   printf("Calculating white threats.\n");
@@ -368,7 +379,7 @@ int main(int argc, char **argv)
 #endif
 
   // open wdl table
-  struct tb_handle *H = open_tb(tablename, 1);
+  struct tb_handle *H = open_tb_handle(tablename, 1);
   decomp_init_table(H);
   load_entry = (struct TBEntry_piece *)get_entry(H);
 
@@ -391,12 +402,14 @@ int main(int argc, char **argv)
     close_tb(H);
 
     // open dtz table
-    H = open_tb(tablename, 0);
+    H = open_tb_handle(tablename, 0);
     decomp_init_table(H);
     load_entry = (struct TBEntry_piece *)get_entry(H);
     ply_accurate_win = get_ply_accurate_win(H, 0);
     ply_accurate_loss = get_ply_accurate_loss(H, 0);
     load_map = get_dtz_map(H, 0);
+    if (!load_map)
+      load_map16 = get_dtz_map16(H, 0);
     int dtz_side = get_dtz_side(H, 0);
     init_wdl_dtz();
 
@@ -408,6 +421,8 @@ int main(int argc, char **argv)
     load_bside = 0;
     if (load_map)
       run_threaded(load_dtz_mapped, work_g, 1);
+    else if (load_map16)
+      run_threaded(load_dtz_mapped16, work_g, 1);
     else
       run_threaded(load_dtz, work_g, 1);
     close_tb(H);

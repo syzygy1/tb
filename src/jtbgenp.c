@@ -563,8 +563,8 @@ static void iter(struct thread_data *thread)
     case 4: /* CAPT_CLOSS */
       v  = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-        if (v > LOSS_IN_ONE - DRAW_RULE)
-          v = LOSS_IN_ONE - DRAW_RULE;
+        if (v > LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1)
+          v = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1;
         table[idx] = v;
         RETRO(mark_wins, loss_win[v]);
       } else {
@@ -651,7 +651,7 @@ static void iterate()
   tbl[WIN_IN_ONE + ply - 2] = 0;
   tbl[WIN_IN_ONE + ply - 1] = 0;
 
-  if (!finished || has_cursed_capts) {
+  if (!finished || has_cursed_capts || has_cursed_pawn_moves) {
     if (num_saves == 0)
       set_tbl_to_wdl(1);
     reduce_tables(local_num_saves);
@@ -680,7 +680,7 @@ static void iterate()
     tbl[WIN_RED + ply + 1] = 0;
     if (!finished) {
       finished = 1;
-      ply++; // ply = DRAW_RLE - REDUCE_PLY - 1
+      ply++; // ply = DRAW_RULE - REDUCE_PLY - 1
       tbl[WIN_RED + ply + 2] = 2;
       win_loss[WIN_RED + ply + 1] = LOSS_IN_ONE - ply - 1;
       // skip WIN_RED + 2 + DRAW_RULE - REDUCE_PLY, which is CAPT_CWIN_RED1
@@ -691,7 +691,7 @@ static void iterate()
     }
     tbl[WIN_RED + ply + 2] = 0;
 
-    if (!finished || has_cursed_capts) {
+    if (!finished || has_cursed_capts || has_cursed_pawn_moves) {
       finished = 1;
       ply = DRAW_RULE - REDUCE_PLY;
       tbl[WIN_RED + ply + 1] = 2;
@@ -699,6 +699,7 @@ static void iterate()
       tbl[WIN_RED + ply + 4] = 2;
       win_loss[WIN_RED + ply + 1] = LOSS_IN_ONE - ply - 1;
       loss_win[LOSS_IN_ONE - ply - 1] = WIN_RED + ply + 5;
+      tbl[CAPT_CLOSS] = 4;
       run_iter();
 
       ply++;
@@ -1062,7 +1063,7 @@ static void reset_piece_captures_w(void)
     for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1; i++)
       v[LOSS_IN_ONE - i] = 1;
   else
-    for (i = 0; i <= REDUCE_PLY_RED2+ 1; i++)
+    for (i = 0; i <= REDUCE_PLY_RED2 + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
 
   to_fix_w = 0;
@@ -1266,34 +1267,34 @@ static void fix_closs_worker_b(struct thread_data *thread)
   }
 }
 
-static void fix_closs_w(void) // FIXME
+static void fix_closs_w(void)
 {
   int i;
 
   if (!to_fix_w && !cursed_pawn_capt_w) return;
 
+  if (num_saves == 0) return;
+
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
-  if (num_saves == 0) {
+  if (num_saves == 1) {
     // if no legal moves or all moves lose, then CLOSS capture was best
-    for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    win_loss[PAWN_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
+    for (i = 0; i < CAPT_CWIN_RED1; i++)
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1;
+    win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    win_loss[PAWN_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1; i++)
+      win_loss[WIN_RED + i + 3] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
     for (i = 0; i < REDUCE_PLY_RED2; i++)
-      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 2;
   }
 
-  if (to_fix_w || cursed_pawn_capt_w) {
-    printf("fixing cursed white losses.\n");
-    run_threaded(fix_closs_worker_w, work_g, 1);
-  }
+  printf("fixing cursed white losses.\n");
+  run_threaded(fix_closs_worker_w, work_g, 1);
 }
 
 static void fix_closs_b(void)
@@ -1302,26 +1303,26 @@ static void fix_closs_b(void)
 
   if (!to_fix_b && !cursed_pawn_capt_b) return;
 
+    if (num_saves == 0) return;
+
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
-  if (num_saves == 0) {
+  if (num_saves == 1) {
     // if no legal moves or all moves lose, then CLOSS capture was best
-    for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    win_loss[PAWN_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
+    for (i = 0; i < CAPT_CWIN_RED1; i++)
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1;
+    win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    win_loss[PAWN_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1; i++)
+      win_loss[WIN_RED + i + 3] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
     for (i = 0; i < REDUCE_PLY_RED2; i++)
-      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 2;
   }
 
-  if (to_fix_b || cursed_pawn_capt_b) {
-    printf("fixing cursed black losses.\n");
-    run_threaded(fix_closs_worker_b, work_g, 1);
-  }
+  printf("fixing cursed black losses.\n");
+  run_threaded(fix_closs_worker_b, work_g, 1);
 }

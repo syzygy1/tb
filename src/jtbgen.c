@@ -589,8 +589,8 @@ static void iter(struct thread_data *thread)
     case 4: /* CAPT_CLOSS */
       v  = check_loss(pcs, idx, table_opp, occ, p);
       if (v) {
-        if (v > LOSS_IN_ONE - DRAW_RULE)
-          v = LOSS_IN_ONE - DRAW_RULE;
+        if (v > LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1)
+          v = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1;
         table[idx] = v;
         RETRO(mark_wins, loss_win[v]);
       } else {
@@ -722,14 +722,15 @@ static void iterate(void)
       tbl[WIN_IN_ONE + ply + 1] = 2;
       tbl[CAPT_CWIN_RED1] = 2;
       tbl[WIN_IN_ONE + ply + 3] = 2;
-      win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1; // check
-      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4; // check
+      win_loss[WIN_IN_ONE + ply + 1] = LOSS_IN_ONE - ply - 1;
+      loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4;
+      tbl[CAPT_CLOSS] = 4;
       run_iter();
 
       ply++;
       tbl[WIN_IN_ONE + ply] = 0;
       tbl[WIN_IN_ONE + ply + 3] = 2;
-      win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - ply - 1; // check
+      win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - ply - 1;
       win_loss[WIN_IN_ONE + ply + 2] = LOSS_IN_ONE - ply - 1;
       loss_win[LOSS_IN_ONE - ply - 1] = WIN_IN_ONE + ply + 4;
       run_iter();
@@ -1001,7 +1002,7 @@ static void fix_closs_worker_b(struct thread_data *thread)
   }
 }
 
-static void fix_closs_w(void) // FIXME
+static void fix_closs_w(void)
 {
   int i;
 
@@ -1013,17 +1014,17 @@ static void fix_closs_w(void) // FIXME
     win_loss[i] = 0;
   if (num_saves == 1) {
     // if no legal moves or all moves lose, then CLOSS capture was best
-    for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
+    for (i = 0; i < CAPT_CWIN_RED1; i++)
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1; // dtz = -101
+    win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1; i++)
+      win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
     for (i = 0; i < REDUCE_PLY_RED2; i++)
-      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 2;
   }
 
   printf("fixing cursed white losses.\n");
@@ -1036,23 +1037,23 @@ static void fix_closs_b(void)
 
   if (!to_fix_b) return;
 
+  if (num_saves == 0) return;
+
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
-  if (num_saves == 0) {
+  if (num_saves == 1) {
     // if no legal moves or all moves lose, then CLOSS capture was best
-    for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
-    for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
-  } else if (num_saves == 1) {
-    //
+    for (i = 0; i < CAPT_CWIN_RED1; i++)
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 1; // dtz = -101
+    win_loss[CAPT_CWIN_RED1] = LOSS_IN_ONE - DRAW_RULE + REDUCE_PLY - 2;
+    for (i = DRAW_RULE - REDUCE_PLY + 1; i <= REDUCE_PLY_RED1; i++)
+      win_loss[WIN_IN_ONE + i + 2] = LOSS_IN_ONE - i - 1;
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED2 + 2; i++)
       win_loss[i] = CAPT_CLOSS;
     for (i = 0; i < REDUCE_PLY_RED2; i++)
-      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 1;
+      win_loss[CAPT_CWIN_RED2 + i + 2] = LOSS_IN_ONE - i - 2;
   }
 
   printf("fixing cursed black losses.\n");

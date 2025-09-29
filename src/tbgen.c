@@ -181,10 +181,8 @@ static void tc_loop(struct thread_data *thread)
           for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
             v[i] = 0;
 #else
-        if (num_saves == 0) // FIXME
-          do {} while (0);
-        else if (num_saves == 1)
-          for (i = DRAW_RULE - REDUCE_PLY + 2; i < REDUCE_PLY_RED1; i++)
+        if (num_saves == 1)
+          for (i = DRAW_RULE - REDUCE_PLY + 1; i < REDUCE_PLY_RED1; i++)
             v[LOSS_IN_ONE - i] = 0;
         else
           for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED2 - 1; i--)
@@ -204,6 +202,11 @@ void test_closs(uint64_t *stats, uint8_t *table, int to_fix)
   uint8_t v[256];
 
   tc_capt_closs = tc_closs = 0;
+
+#ifdef SHATRANJ
+  if (num_saves == 0) return;
+#endif
+
   if (to_fix) {
     tc_table = table;
     tc_v = v;
@@ -218,7 +221,12 @@ void test_closs(uint64_t *stats, uint8_t *table, int to_fix)
       for (i = LOSS_IN_ONE; i >= LOSS_IN_ONE - REDUCE_PLY_RED - 1; i--)
         v[i] = 2;
 #else
-    // FIXME
+    if (num_saves == 1)
+      for (i = DRAW_RULE - REDUCE_PLY + 1; i < REDUCE_PLY_RED1; i++)
+        v[LOSS_IN_ONE - i] = 2;
+    else
+      for (i = LOSS_IN_ONE; i >= 0; i--)
+        v[i] = 2;
 #endif
     run_threaded(tc_loop, work_g, 0);
   } else {

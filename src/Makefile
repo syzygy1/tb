@@ -48,7 +48,7 @@ stbgen stbgenp sclean:
 gtbgen gtbgenp gclean:
 	@$(MAKE) -f Makefile.giveaway $@
 
-jtbgen jtbgenp jclean:
+jtbgen jtbgenp jtbver jtbverp jclean:
 	@$(MAKE) -f Makefile.shatranj $@
 
 #atbgen atbgenp atbver atbverp aclean:
@@ -64,4 +64,4 @@ shatranj: jtbgen jtbgenp tbcheck
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp sclean \
 	gtbgen gtbgenp gclean \
-	jtbgen jtbgenp jclean
+	jtbgen jtbgenp jtbver jtbverp jclean

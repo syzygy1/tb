@@ -159,6 +159,7 @@ static void reduce_tables(void)
       v[WIN_IN_ONE + i] = WIN_IN_ONE;
       v[LOSS_IN_ONE - i] = MATE;
     }
+    v[CAPT_CLOSS] = CAPT_CLOSS;
     v[CAPT_CWIN] = CAPT_CWIN_RED1;
     v[LOSS_IN_ONE - REDUCE_PLY + 1] = LOSS_IN_ONE;
     v[LOSS_IN_ONE - REDUCE_PLY] = LOSS_IN_ONE - 1;
@@ -188,7 +189,7 @@ static void reduce_tables(void)
     v[CAPT_CWIN_RED2 + 1] = CAPT_CWIN_RED2 + 1;
     for (i = 0; i < REDUCE_PLY_RED2; i++) {
       v[CAPT_CWIN_RED2 + i + 2] = CAPT_CWIN_RED2 + 1;
-      v[LOSS_IN_ONE - 1 - i] = LOSS_IN_ONE;
+      v[LOSS_IN_ONE - i - 1] = LOSS_IN_ONE;
     }
     v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 1] = LOSS_IN_ONE - 1;
     v[LOSS_IN_ONE - REDUCE_PLY_RED2 - 2] = LOSS_IN_ONE - 2;

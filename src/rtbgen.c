@@ -683,8 +683,7 @@ static void iterate(void)
     tbl[CAPT_CLOSS] = 4;
     run_iter();
 
-    // ply = 102
-    ply++;
+    ply++; // ply = 102
     tbl[WIN_IN_ONE + ply - 3] = 0;
     tbl[WIN_IN_ONE + ply] = 2;
     win_loss[CAPT_CWIN] = LOSS_IN_ONE - ply + 1;
@@ -962,10 +961,10 @@ static void fix_closs_w(void)
   if (num_saves == 0) {
     // if no legal moves or all moves lose, then CLOSS capture was best
     for (i = 0; i < CAPT_CWIN; i++)
-      win_loss[i] = LOSS_IN_ONE - DRAW_RULE;
-    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1;
+      win_loss[i] = LOSS_IN_ONE - DRAW_RULE; // dtz = -101
+    win_loss[CAPT_CWIN] = LOSS_IN_ONE - DRAW_RULE - 1; // 101 -> -102
     for (i = DRAW_RULE; i < REDUCE_PLY - 1; i++)
-      win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1;
+      win_loss[WIN_IN_ONE + i + 1] = LOSS_IN_ONE - i - 1; // i + 1 -> -i - 2
   } else {
     // CAPT_CLOSS will be set to 0, then overridden by what was saved before
     for (i = 0; i < CAPT_CWIN_RED + 2; i++)

@@ -77,6 +77,7 @@ void NAME(verify_stats)(T *table, uint64_t *tot_stats, struct dtz_map *map)
 
 void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
 {
+printf("reconstruct_table, num_saves = %d\n", num_saves);
   int i, k;
   int num = map->max_num;
   uint16_t (*inv_map)[MAX_VALS] = map->inv_map;
@@ -122,7 +123,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     v[CAPT_CWIN_RED1] = num;
     v[PAWN_CWIN_RED1] = num;
     for (i = 0; i < REDUCE_PLY_RED1 - DRAW_RULE + REDUCE_PLY - 1; i++) {
-      v[WIN_RED + i + 2 + DRAW_RULE - REDUCE_PLY + 1] = inv_map[2][(reduce_cnt[0] + i) / 2];
+      v[WIN_RED + i + 3 + DRAW_RULE - REDUCE_PLY + 1] = inv_map[2][(reduce_cnt[0] + i) / 2];
       v[LOSS_IN_ONE - i - DRAW_RULE + REDUCE_PLY - 1] = inv_map[3][(reduce_cnt[0] + i) / 2];
     }
   } else {
@@ -162,10 +163,10 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
       v[1] = num;
       if (map->ply_accurate_win)
         for (i = 0; i < DRAW_RULE; i++)
-          v[i + 2] = inv_map[0][i];
+          v[2 + i] = inv_map[0][i];
       else
         for (i = 0; i < DRAW_RULE; i++)
-          v[i + 2] = inv_map[0][i / 2];
+          v[2 + i] = inv_map[0][i / 2];
       if (map->ply_accurate_loss)
         for (i = 0; i < DRAW_RULE; i++)
           v[254 - i] = inv_map[1][i];
@@ -193,10 +194,10 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
       v[1] = num;
       if (map->ply_accurate_win)
         for (i = 0; i < REDUCE_PLY - 1; i++)
-          v[i + 2] = inv_map[0][i];
+          v[2 + i] = inv_map[0][i];
       else
         for (i = 0; i < REDUCE_PLY - 1; i++)
-          v[i + 2] = inv_map[0][i / 2];
+          v[2 + i] = inv_map[0][i / 2];
       if (map->ply_accurate_loss)
         for (i = 0; i < REDUCE_PLY - 1; i++)
           v[254 - i] = inv_map[1][i];
@@ -205,12 +206,13 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
           v[254 - i] = inv_map[1][i / 2];
       red_cnt = 0;
     } else if (k == 1) {
+      v[1] = num;
       if (map->ply_accurate_win)
         for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
-          v[i + 1] = inv_map[0][i + REDUCE_PLY - 1];
+          v[2 + i] = inv_map[0][i + REDUCE_PLY - 1];
       else
         for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
-          v[i + 1] = inv_map[0][(i + REDUCE_PLY - 1) / 2];
+          v[2 + i] = inv_map[0][(i + REDUCE_PLY - 1) / 2];
       if (map->ply_accurate_loss)
         for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
           v[255 - i] = inv_map[1][i + REDUCE_PLY - 1];
@@ -218,7 +220,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
         for (i = 0; i < DRAW_RULE - REDUCE_PLY + 1; i++)
           v[255 - i] = inv_map[1][(i + REDUCE_PLY - 1) / 2];
       for (; i < REDUCE_PLY_RED1; i += 2) {
-        v[1 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2] = inv_map[2][(i - DRAW_RULE + REDUCE_PLY - 1) / 2];
+        v[2 + (DRAW_RULE - REDUCE_PLY + 1) + (i - DRAW_RULE + REDUCE_PLY - 1) / 2] = inv_map[2][(i - DRAW_RULE + REDUCE_PLY - 1) / 2];
         v[255 - (DRAW_RULE - REDUCE_PLY + 1) - (i - DRAW_RULE + REDUCE_PLY - 1) / 2] = inv_map[3][(i - DRAW_RULE + REDUCE_PLY - 1) / 2];
       }
       red_cnt = REDUCE_PLY_RED1 - (DRAW_RULE - REDUCE_PLY + 1);
@@ -232,7 +234,7 @@ void NAME(reconstruct_table)(T *table, char color, struct dtz_map *map)
     NAME(reconstruct_table_pass)(table, color, k, v);
   }
 #endif
-#else
+#else /* SUICIDE */
   for (k = 0; k < num_saves; k++) {
     if (k == 0) {
       v[1] = inv_map[0][0];
