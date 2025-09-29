@@ -81,7 +81,7 @@ def process_tb(tb, args):
 
 def main():
     # Default RTBWDIR="." as in Perl
-    os.environ.setdefault("RTBWDIR", ".")
+    os.environ.setdefault("RTBPATH", ".")
 
     args = build_parser().parse_args()
 

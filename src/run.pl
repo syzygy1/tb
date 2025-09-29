@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-$ENV{'RTBWDIR'} = '.';
+$ENV{'RTBPATH'} = '.';
 
 use Getopt::Long;
 
