@@ -156,7 +156,7 @@ static void init_tb(char *str)
   uint64_t key, key2;
   int color;
 
-  int fd = open_tb(str);
+  FD fd = open_tb(str);
   if (fd == FD_ERR) return;
   close_file(fd);
 

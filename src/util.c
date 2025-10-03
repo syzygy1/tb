@@ -19,7 +19,11 @@
 #endif
 
 #ifdef USE_ZSTD
+#ifdef _WIN32
+#include <zstd/zstd.h>
+#else
 #include <zstd.h>
+#endif
 #else
 #include "lz4.h"
 #endif

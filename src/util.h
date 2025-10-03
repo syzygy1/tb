@@ -32,7 +32,7 @@ void close_file(FD fd);
 
 size_t file_size(FD fd);
 
-void *map_file(int fd, bool shared, map_t *map);
+void *map_file(FD fd, bool shared, map_t *map);
 void unmap_file(void *data, map_t map);
 
 void *alloc_aligned(uint64_t size, uintptr_t alignment);
