@@ -720,8 +720,7 @@ int main(int argc, char **argv)
   int switched = 0;
 
   numthreads = 1;
-  do {
-    val = getopt_long(argc, argv, "at:gwzsdp", options, &longindex);
+  while ((val = getopt_long(argc, argv, "at:gwzsdp", options, &longindex)) != -1) {
     switch (val) {
     case 'a':
       thread_affinity = 1;

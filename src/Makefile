@@ -14,7 +14,8 @@ FLAGS += -DUSE_POPCNT
 FLAGS += -DTBPIECES=7
 
 # Use libzstd instead of LZ4 for compression of temporary files, and set
-# compression level.
+# compression level. Comment out ("#") the next two lines if the ZSTD library
+# or header files are not found.
 FLAGS += -DUSE_ZSTD -DZSTD_LEVEL=6
 LDFLAGS += -lzstd
 

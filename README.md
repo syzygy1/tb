@@ -1,14 +1,15 @@
 ### Overview
 
-Included are a tablebase generator and probing code for adding tablebase
-probing to a chess engine. The tablebase generator is able to generate
-all tablebases for up to 6 pieces.
+This a generator for generating chess endgame database ("tablebases") for up
+to 7 pieces.
 
-Requirements for the generator:
-* 16 GB of RAM for 6-piece tables (much less for 5-piece tables).
-* x86-64 CPU.
-* 64-bit OS.
-* Sufficiently recent gcc (producing 64-bit executables).
+The generator requires at least 16 GB of RAM for 6-piece tables and at least
+1 TB of RAM for 7-piece tables.
+
+Probing code for adding tablebase support to a chess engine or GUI
+as well as a simple command line tool for probing the tablebases can be
+found here:
+https://github.com/syzygy1/probetool
 
 
 ### Tablebase files
@@ -17,39 +18,44 @@ File names encode the type of tablebase: K+R+P vs K+R becomes KRPvKR.
 Each tablebase corresponds to two files: KRPvKR.rtbw and KRPvKR.rtbz.
 Note that KRPvKR also covers K+R vs K+R+P.
 
-The .rtbw files store win/draw/loss information including, where applicable,
-information on the 50-move rule. During the search only the .rtbw files
-are accessed. These files are "two-sided": they store information for both
-white to move and black to move.
+The .rtbw files store win/draw/loss (WDL) information including, where
+applicable, information on the 50-move rule. During the search only the
+.rtbw files are accessed. These files are "two-sided": they store
+information for both white to move and black to move.
 
-The .rtbz files store the distance-to-zero: the number of moves to the next
-capture or pawn move. These files only need to be accessed when the root
-position has 6 pieces or less. They are "single-sided".
+The .rtbz files store distance-to-zero (DTZ/DTZ50) information: the number
+of moves to the next capture or pawn move. These files only need to be
+accessed when the root position has 6 (or 7) pieces or less. They are
+"single-sided".
 
 The 6-piece WDL tables are 68.2 GB in total. The DTZ tables take up 81.9 GB.
-For up to 5 pieces, the numbers are 378 MB and 561 MB. Ideally, the WDL
-tables are stored on an SSD.
+For up to 5 pieces, the numbers are 378 MB and 561 MB. At least the WDL
+tables should be stored on an SSD for decent performance (when used by
+a chess engine during search).
 
 
 ### Tablebase generator
 
 The directory src/ contains the tablebase generator code. It should be
-easy to build on x86-64 Linux system and on 64-bit Windows with MinGW
-("make all"). It might be necessary to edit src/Makefile. In particular,
-**if your CPU does not support the popcnt instruction**, the line `FLAGS +=
--DUSE_POPCNT` should be commented out.
+easy to build on x86-64 Linux and on 64-bit Windows with MinGW installed
+("make all"). It might be useful (or necessary) to edit src/Makefile.
+The Makefile expects the ZSTD compression library and header files to be
+available. If they are not installed or not found, you can switch to LZ4
 
 There are five programs:
 * rtbgen for generating pawnless tablebases.
 * rtbgenp for generating pawnful tablebases.
 * rtbver for verifying pawnless tablebases.
 * rtbverp for verifying pawnful tablebases.
-* tbcheck for verifying integrity of tablebase files based on an embedded
+* tbcheck for verifying the integrity of tablebase files based on an embedded
 checksum.
 
-**Note 1:** Since a correct set of checksums is known, there is no need for anyone to run rtbver and rtbverp.
+**Note 1:** Since a correct set of checksums is known, there is no real need
+to run rtbver and rtbverp.
 
-**Note 2:** The checksums are **not** md5sums. However, correct md5sums are known as well, and these can also be used to verify integrity. See http://kirill-kryukov.com/chess/tablebases-online/
+**Note 2:** The checksums are **not** md5sums. However, correct md5sums are
+known as well, and these can also be used to verify integrity.
+See http://kirill-kryukov.com/chess/tablebases-online/
 
 **Usage:** `rtbgen KQRvKR`   (or `rtbgenp KRPvKR`)  
 Produces two compressed files: KQRvKR.rtbw and KQRvKR.rtbz. Both files
@@ -81,7 +87,10 @@ generate 6-piece tables on systems with 16 GB RAM.** This option is
 not needed on systems with 24 GB RAM or more.
 
 -p  
-Always store DTZ values for non-cursed positions ply-accurate (at the cost of slightly larger DTZ tables). Without this option, DTZ can be off by one unless the table has position with DTZ=100 ply. The original Syzygy tables were generated without this option.
+Always store DTZ values for non-cursed positions ply-accurate (at the
+cost of slightly larger DTZ tables). Without this option, DTZ can be off
+by one unless the table has position with DTZ=100 ply. The original Syzygy
+tables were generated without this option.
 
 **Usage:** `rtbver KQRvKR`   (or `rtbverp KRPvKR`)  
 Verifies consistency of KQRvKR.rtbw and KQRvKR.rtbz. This should detect
@@ -119,17 +128,17 @@ with the checksum specified in wdl345.txt. Note that these are not md5sums.
 
 Note: The programs rtbgen, rtbgenp, rtbver and rtbverp require access
 to WDL tablebase files for "subtables". These should be present in
-the directory $RTBWDIR. The program tbcheck only looks in the current working
-directory.
+directories/folders listed in the **$RTPATH** environment variable. The
+program tbcheck only looks in the current working directory.
 
 
 ### Scripts
 
-The somewhat primitive perl script src/run.pl can be used for generating
-and verifying all or part of the tables. Make sure the location of rtbgen,
-rtbgenp, rtbver and rtbverp is in your $PATH variable.
+The perl script src/run.pl or the python script src/run.py can be used for
+generating and verifying all or part of the tables. Make sure the location
+of rtbgen, rtbgenp, rtbver and rtbverp is in your $PATH environment variable.
 
-**Usage:** `run.pl --generate`
+**Usage:** `run.pl --generate` (or `run.py --generate`)
 
 **Options:**  
 --threads n  (or -t n)  
@@ -152,34 +161,9 @@ Only treat tablebases with at most n pieces.
 Use this option to generate 6-piece tables on a system with 16 GB of RAM.
 
 
-### Probing code
-
-The directory interface/ contains probing code. It does not come in the
-form of a shared library, and requires some work to integrate into an
-engine. The main reason for this is efficiency. There are four files:
-tbcore.c, tbcore.h, tbprobe.cpp, tbprobe.h.
-
-The files tbcore.c and tbcore.h should not require many changes, although
-engine authors might want to replace some printf()s with suitable logging
-statements. The files tbprobe.cpp and tbprobe.h do require some changes
-but these should be fairly straightforward when following the comments.
-The only reason for tbprobe.cpp having the .cpp extension is that I have
-used Stockfish as example. The probing code is initialised by calling
-init_tablebases(path), where path contains the directories (separated with
-a colon on Linux and with a semicolon on Windows) where the WDL and DTZ
-files are to be found.
-
-The files main.cpp, search.cpp and types.h are from Stockfish with calls
-to the probing code added (see // TB comments). The change in types.h is
-necessary in order to make room for "tablebase win in n" values distinct
-from "mate in n" values. Please note that the integration of probing code
-into Stockfish is merely intended as a proof of concept.
-
-Note that when properly integrating the interface code in an engine that is
-not Stockfish, no trace of Stockfish will be left. The engine author will
-have to rewrite the Stockfish-specific glueing code to match his or her
-engine. Therefore no copyright issues can arise (see also below).
-
+### Adding tablebase support to your program
+See here:
+https://github.com/syzygy1/probetool
 
 ### Terms of use
 
@@ -187,7 +171,7 @@ The files lz4.c and lz4.h in src/ are copyrighted by Yann Collet and were
 released under the BSD 2-Clause License. The files city-c.c, city-c.h and
 citycrc.h in src/ (ported by me from C++ to C) are copyrighted by Google,
 Inc. and were released under an even more liberal license. Both licenses
-are compatible with the GPL. The files c11threads_win32.c and c11threads.h
+are compatible with the GPL. The files c11threads\_win32.c and c11threads.h
 are copyrighted by John Tsiombikas and Oliver Old and were placed in the
 public domain. All other files in src/ are released under the GNU Public
 License, version 2 (only).
@@ -206,5 +190,5 @@ Others (C-604/10)).
 
 
 Ronald de Man  
-syzygy_tb@yahoo.com
+syzygy\_tb@yahoo.com
 

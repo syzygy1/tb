@@ -833,8 +833,9 @@ int main(int argc, char **argv)
 
   numthreads = 1;
   thread_affinity = 0;
-  do {
-    val = getopt_long(argc, argv, "at:gwzsd2p", options, &longindex);
+  while ((val = getopt_long(argc, argv, "at:gwzsd2p", options,
+                            &longindex)) != -1)
+  {
     switch (val) {
     case 'a':
       thread_affinity = 1;
