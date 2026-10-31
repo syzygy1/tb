@@ -79,6 +79,8 @@ static int pcs2[MAX_PIECES];
 #include "ltbver.c"
 #elif defined(SHATRANJ)
 #include "jtbver.c"
+#elif defined(RACING)
+#include "kbver.c"
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -261,6 +263,10 @@ int main(int argc, char **argv)
 
 #ifndef SMALL
   size = 10ULL << (6 * (numpcs-1));
+#elif defined(RACING)
+  size = (uint64_t)KK_NUM << (6 * (numpcs-2));
+
+  mask[0] = 0x7ffULL << shift[1];
 #else
   size = 462ULL << (6 * (numpcs-2));
 
@@ -272,7 +278,11 @@ int main(int argc, char **argv)
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
 #else
   work_piv0 = create_work(total_work, 1ULL << shift[0], 0);
+#ifndef RACING
   work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+#else
+  work_piv1 = create_work(total_work, 32ULL << shift[1], 0);
+#endif
 #endif
 
   static int piece_order[16] = {
@@ -355,7 +365,10 @@ int main(int argc, char **argv)
   printf("Calculating black captures.\n");
   calc_captures_b();
 #ifndef SUICIDE
-#ifndef SHATRANJ
+#if defined(RACING)
+  printf("Calculating terminal positions.\n");
+  run_threaded(calc_terminal, work_g, 1);
+#elif !defined(SHATRANJ)
   printf("Calculating mate positions.\n");
   run_threaded(calc_mates, work_g, 1);
 #else

@@ -31,6 +31,10 @@ void decomp_init_piece(int *pcs)
 {
   int i, k;
 
+#ifdef RACING
+  (void)i; (void)k;
+  enc_type = 1;
+#else
   for (i = 0, k = 0; i < 16; i++)
     if (pcs[i] == 1) k++;
   if (k >= 3) enc_type = 0;
@@ -41,6 +45,7 @@ void decomp_init_piece(int *pcs)
       if (pcs[i] < k && pcs[i] > 1) k = pcs[i];
     enc_type = 1 + k;
   }
+#endif
   pawns0 = pawns1 = 0;
 }
 

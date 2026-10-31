@@ -9,7 +9,7 @@
 
 #include <inttypes.h>
 
-#if defined(REGULAR) || defined(SHATRANJ)
+#if defined(REGULAR) || defined(SHATRANJ) || defined(RACING)
 #define SMALL
 #endif
 

@@ -33,6 +33,10 @@
 #define TBMAX_PIECE 1260
 #define TBMAX_PAWN 1386
 #define HSHMAX 12
+#elif defined(RACING)
+#define TBMAX_PIECE 1300
+#define TBMAX_PAWN 1
+#define HSHMAX 16
 #elif defined(SHATRANJ)
 #define TBMAX_PIECE 590
 #define TBMAX_PAWN 570
@@ -53,7 +57,8 @@
 #define CONNECTED_KINGS
 #endif
 
-#if defined(REGULAR) || defined(ATOMIC) || defined(LOSER) || defined(SHATRANJ)
+#if defined(REGULAR) || defined(ATOMIC) || defined(LOSER) || defined(SHATRANJ) \
+    || defined(RACING)
 uint64_t tb_piece_key[] = {
   0ULL,
   0x5ced000000000001ULL,
@@ -213,7 +218,12 @@ static void init_tb(char *str)
   entry->num = 0;
   for (i = 0; i < 16; i++)
     entry->num += pcs[i];
+#ifndef RACING
   entry->symmetric = (key == key2);
+#else
+  // no color symmetry in Racing Kings: KRvK and KvKR are different tables
+  entry->symmetric = 0;
+#endif
   entry->has_pawns = (pcs[WPAWN] + pcs[BPAWN] > 0);
 
   if (entry->has_pawns) {
@@ -226,6 +236,10 @@ static void init_tb(char *str)
     }
   } else {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
+#ifdef RACING
+    (void)j;
+    ptr->enc_type = 1;
+#else
     for (i = 0, j = 0; i < 16; i++)
       if (pcs[i] == 1) j++;
     if (j >= 3) ptr->enc_type = 0;
@@ -237,10 +251,39 @@ static void init_tb(char *str)
         ptr->enc_type = 1 + j;
       }
     }
+#endif
   }
   add_to_hash(entry, key);
+#ifndef RACING
   if (key2 != key) add_to_hash(entry, key2);
+#endif
 }
+
+#ifdef RACING
+// Enumerate all tables K<white>vK<black> with at most TBPIECES pieces.
+// White and black material are not interchangeable in Racing Kings.
+static void init_racing(char *str, int len, int first, int black, int left)
+{
+  int i;
+
+  if (!black) {
+    str[len] = 'v';
+    str[len + 1] = 'K';
+    init_racing(str, len + 2, 1, 1, left);
+  } else {
+    str[len] = 0;
+    if (len > 3)
+      init_tb(str);
+  }
+  if (left == 0) return;
+  for (i = first; i < 5; i++) {
+    str[len] = pchr[i];
+    init_racing(str, len + 1, i, black, left - 1);
+  }
+}
+
+static void init_kvk(void);
+#endif
 
 void init_tablebases(void)
 {
@@ -248,7 +291,7 @@ void init_tablebases(void)
   int i, j, k, l;
 #ifdef SUICIDE
   int m, n;
-#else
+#elif !defined(RACING)
 #if TBPIECES == 7
   int m;
 #endif
@@ -287,7 +330,12 @@ void init_tablebases(void)
       j++;
   }
 
-#if defined(SUICIDE)
+#if defined(RACING)
+  (void)i; (void)j; (void)k; (void)l;
+  str[0] = 'K';
+  init_racing(str, 1, 1, 0, TBPIECES - 2);
+  init_kvk();
+#elif defined(SUICIDE)
   for (i = 0; i < 6; i++)
     for (j = i; j < 6; j++) {
       sprintf(str, "%cv%c", pchr[i], pchr[j]);
@@ -871,7 +919,42 @@ void init_indices(void)
 #endif
 }
 
-#ifndef CONNECTED_KINGS
+#if defined(RACING)
+// Racing Kings: the leading piece is a single piece mirrored to files a-d.
+uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
+                      uint8_t *restrict norm, int *restrict pos,
+                      uint64_t *restrict factor)
+{
+  uint64_t idx;
+  int i, j, k, m, l, p;
+  int n = ptr->num;
+
+  if (pos[0] & 0x04)
+    for (i = 0; i < n; i++)
+      pos[i] ^= 0x07;
+
+  idx = ((pos[0] >> 3) << 2) | (pos[0] & 0x03);
+  idx *= factor[0];
+
+  for (i = 1; i < n;) {
+    int t = norm[i];
+    for (j = i; j < i + t; j++)
+      for (k = j + 1; k < i + t; k++)
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+    uint64_t s = 0;
+    for (m = i; m < i + t; m++) {
+      p = pos[m];
+      for (l = 0, j = 0; l < i; l++)
+        j += (p > pos[l]);
+      s += binomial[m - i + 1][p - j];
+    }
+    idx += s * factor[i];
+    i += t;
+  }
+
+  return idx;
+}
+#elif !defined(CONNECTED_KINGS)
 uint64_t encode_piece(struct TBEntry_piece *restrict ptr,
                       uint8_t *restrict norm, int *restrict pos,
                       uint64_t *restrict factor)
@@ -1355,6 +1438,12 @@ void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm,
   }
   sub[order[i]] = idx;
 
+#ifdef RACING
+  q = sub[0];
+  sort[0] = pos[0] = ((q >> 2) << 3) | (q & 0x03);
+  i = 1;
+  (void)p;
+#else
   switch (ptr->enc_type) {
 
   case 0: /* 111 */
@@ -1557,6 +1646,7 @@ void decode_piece(struct TBEntry_piece *restrict ptr, uint8_t *restrict norm,
 
 #endif
   }
+#endif
 
   for (; i < n;) {
     q = sub[i];
@@ -1860,7 +1950,9 @@ uint64_t calc_factors_piece(uint64_t *factor, int num, int order,
 {
   int i, k, n;
   uint64_t f;
-#ifndef CONNECTED_KINGS
+#if defined(RACING)
+  static int pivfac[] = { 0, 32 };
+#elif !defined(CONNECTED_KINGS)
   static int pivfac[] = { 31332, 28056, 462 };
 #else
   static int pivfac[] = { 31332, 0, 518, 278 };
@@ -1928,6 +2020,9 @@ void set_norm_piece(struct TBEntry_piece *ptr, uint8_t *norm, uint8_t *pieces,
   for (i = 0; i < ptr->num; i++)
     norm[i] = 0;
 
+#ifdef RACING
+  norm[0] = 1;
+#else
   switch (ptr->enc_type) {
   case 0:
     norm[0] = 3;
@@ -1939,6 +2034,7 @@ void set_norm_piece(struct TBEntry_piece *ptr, uint8_t *norm, uint8_t *pieces,
     norm[0] = ptr->enc_type - 1;
     break;
   }
+#endif
 
   for (i = norm[0]; i < ptr->num; i += norm[i])
     for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++)
@@ -2458,6 +2554,118 @@ extern int numpawns;
 
 static __attribute__ ((noinline)) void probe_failed(int *pieces);
 
+#ifdef RACING
+#define RANK8 0xff00000000000000ULL
+
+// KvK is not stored in a file. Its WDL values (from the point of view of
+// the side to move) are computed at startup.
+static int8_t kvk_wdl[2][64][64];
+static int8_t kvk_dtz[2][64][64];
+
+static bitboard kvk_range[64];
+
+static int kvk_legal(int wk, int bk)
+{
+  return wk != bk && !(kvk_range[wk] & (1ULL << bk));
+}
+
+static void init_kvk(void)
+{
+  int stm, wk, bk, changed;
+  static int8_t known[2][64][64], known2[2][64][64];
+
+  for (wk = 0; wk < 64; wk++) {
+    kvk_range[wk] = 0;
+    for (bk = 0; bk < 64; bk++) {
+      int df = (wk & 7) - (bk & 7), dr = (wk >> 3) - (bk >> 3);
+      if (wk != bk && df >= -1 && df <= 1 && dr >= -1 && dr <= 1)
+        kvk_range[wk] |= 1ULL << bk;
+    }
+  }
+
+  for (stm = 0; stm < 2; stm++)
+    for (wk = 0; wk < 64; wk++)
+      for (bk = 0; bk < 64; bk++) {
+        int w8 = wk >= 56, b8 = bk >= 56;
+        kvk_wdl[stm][wk][bk] = 0;
+        kvk_dtz[stm][wk][bk] = 0;
+        known[stm][wk][bk] = 1;
+        if (!kvk_legal(wk, bk) || (!w8 && !b8))
+          known[stm][wk][bk] = !kvk_legal(wk, bk);
+        else if (w8 && b8)
+          kvk_wdl[stm][wk][bk] = 0;
+        else if (stm == 0)
+          kvk_wdl[stm][wk][bk] = b8 ? -2 : 2;
+        else if (b8)
+          kvk_wdl[stm][wk][bk] = 2;
+        else
+          kvk_wdl[stm][wk][bk] =
+                    (kvk_range[bk] & RANK8 & ~kvk_range[wk]) ? 0 : -2;
+      }
+
+  // Each pass only uses the results of earlier passes, so that the
+  // distances (in plies) to the end of the race come out right.
+  do {
+    changed = 0;
+    memcpy(known2, known, sizeof(known));
+    for (stm = 0; stm < 2; stm++)
+      for (wk = 0; wk < 64; wk++)
+        for (bk = 0; bk < 64; bk++) {
+          if (known2[stm][wk][bk]) continue;
+          int own = stm ? bk : wk, opp = stm ? wk : bk;
+          bitboard bb = kvk_range[own] & ~kvk_range[opp];
+          int num = 0, num_won = 0, win = 0, loss = 0;
+          for (; bb; ClearFirst(bb)) {
+            int sq = FirstOne(bb);
+            int w = stm ? wk : sq, b = stm ? sq : bk;
+            num++;
+            if (!known2[!stm][w][b]) continue;
+            int d = kvk_dtz[!stm][w][b];
+            if (kvk_wdl[!stm][w][b] == -2) {
+              if (!win || -d + 1 < win) win = -d + 1;
+            } else if (kvk_wdl[!stm][w][b] == 2) {
+              num_won++;
+              if (d + 1 > loss) loss = d + 1;
+            }
+          }
+          if (win) {
+            kvk_wdl[stm][wk][bk] = 2;
+            kvk_dtz[stm][wk][bk] = win;
+            known[stm][wk][bk] = changed = 1;
+          } else if (num == num_won) {
+            // all moves lose; no moves at all means stalemate
+            kvk_wdl[stm][wk][bk] = num ? -2 : 0;
+            kvk_dtz[stm][wk][bk] = num ? -loss : 0;
+            known[stm][wk][bk] = changed = 1;
+          }
+        }
+  } while (changed);
+}
+
+static int probe_kvk(int *restrict pieces, int *restrict gpos, int wtm)
+{
+  int i, wk = 0, bk = 0;
+
+  for (i = 0; i < numpcs; i++)
+    if (pieces[i] == WKING) wk = gpos[i];
+    else if (pieces[i] == BKING) bk = gpos[i];
+
+  return kvk_wdl[!wtm][wk][bk];
+}
+
+// DTZ (number of plies until the race is decided) of a KvK position
+int probe_kvk_dtz(int *restrict pieces, int *restrict gpos, int wtm)
+{
+  int i, wk = 0, bk = 0;
+
+  for (i = 0; i < numpcs; i++)
+    if (pieces[i] == WKING) wk = gpos[i];
+    else if (pieces[i] == BKING) bk = gpos[i];
+
+  return kvk_dtz[!wtm][wk][bk];
+}
+#endif
+
 int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 {
   struct TBEntry *ptr;
@@ -2471,7 +2679,9 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
   for (i = 0; i < numpcs; i++)
     key += tb_piece_key[pieces[i]];
 
-#if !defined(SUICIDE) && !defined(LOSER) && !defined(GIVEAWAY)
+#if defined(RACING)
+  if (!key) return probe_kvk(pieces, gpos, wtm);
+#elif !defined(SUICIDE) && !defined(LOSER) && !defined(GIVEAWAY)
   if (!key) return 0;
 #endif
 #ifdef LOSER
@@ -2656,6 +2866,121 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
   }
 
   int v = probe_table(pieces, gpos, wtm);
+  return alpha > v ? alpha : v;
+}
+#elif defined(RACING)
+// Is square sq attacked by a piece of the given color (0 or 8)?
+static int rk_attacked(int sq, int *restrict pieces, int *restrict gpos,
+                       bitboard occ, int color)
+{
+  for (int k = 0; k < numpcs; k++) {
+    int t = pieces[k];
+    if (!t || (t & 0x08) != color) continue;
+    if (PieceRange(gpos[k], t, occ) & bit[sq]) return 1;
+  }
+  return 0;
+}
+
+// Black to move, white king on the 8th rank, black king not: can black
+// draw by moving its king to the 8th rank? The move must be legal, i.e.
+// neither king may be attacked afterwards.
+static int rk_black_reaches(int *restrict pieces, int *restrict gpos,
+                            bitboard occ)
+{
+  int bk_sq = gpos[black_king];
+  bitboard bb = king_range[bk_sq] & RANK8;
+
+  for (; bb; ClearFirst(bb)) {
+    int sq = FirstOne(bb);
+    int k, capt = -1;
+    if (occ & bit[sq]) {
+      for (k = 0; k < numpcs; k++)
+        if (pieces[k] && gpos[k] == sq) break;
+      if (pieces[k] & 0x08) continue;
+      capt = k;
+    }
+    bitboard occ2 = (occ & ~bit[bk_sq]) | bit[sq];
+    int s = 0;
+    if (capt >= 0) {
+      s = pieces[capt];
+      pieces[capt] = 0;
+    }
+    gpos[black_king] = sq;
+    int legal = !rk_attacked(sq, pieces, gpos, occ2, 0)
+                && !rk_attacked(gpos[white_king], pieces, gpos, occ2, 8);
+    gpos[black_king] = bk_sq;
+    if (capt >= 0)
+      pieces[capt] = s;
+    if (legal) return 1;
+  }
+
+  return 0;
+}
+
+// Returns 1 if the game is over (or decided by the race rule) and stores
+// the result from the point of view of the side to move in *v.
+static int rk_terminal(int *restrict pieces, int *restrict gpos, int wtm,
+                       bitboard occ, int *v)
+{
+  int w8 = gpos[white_king] >= 56;
+  int b8 = gpos[black_king] >= 56;
+
+  if (!w8 && !b8) return 0;
+
+  if (w8 && b8)
+    *v = 0;
+  else if (wtm)
+    *v = b8 ? -2 : 2;
+  else if (b8)
+    *v = 2;
+  else
+    *v = rk_black_reaches(pieces, gpos, occ) ? 0 : -2;
+
+  return 1;
+}
+
+int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
+             int alpha, int beta)
+{
+  int i, j, s, t, v;
+  int sq, sq2;
+  bitboard bb;
+
+  if (rk_terminal(pieces, gpos, wtm, occ, &v))
+    return v;
+
+  int color = wtm ? 0 : 8;
+  int own_king = wtm ? white_king : black_king;
+  int opp_king = wtm ? black_king : white_king;
+
+  for (i = 0; i < numpcs; i++) {
+    s = pieces[i];
+    if (!s || (s & 0x08) == color || i == opp_king) continue;
+    sq = gpos[i];     /* square of piece to be captured */
+    for (j = 0; j < numpcs; j++) {
+      t = pieces[j];
+      if (!t || (t & 0x08) != color) continue;
+      sq2 = gpos[j];
+      if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+      pieces[i] = 0;
+      gpos[j] = sq;
+      bb = occ & ~bit[sq2];
+      // the move is legal if neither king is attacked afterwards
+      if (!rk_attacked(gpos[own_king], pieces, gpos, bb, color ^ 0x08)
+          && !rk_attacked(gpos[opp_king], pieces, gpos, bb, color))
+      {
+        v = -probe_tb(pieces, gpos, !wtm, bb, -beta, -alpha);
+        if (v > alpha)
+          alpha = v;
+      }
+      gpos[j] = sq2;
+      pieces[i] = s;
+      if (alpha >= beta)
+        return alpha;
+    }
+  }
+
+  v = probe_table(pieces, gpos, wtm);
   return alpha > v ? alpha : v;
 }
 #elif defined(SHATRANJ)
