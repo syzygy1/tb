@@ -100,6 +100,8 @@ u16 *transform_tbl_u16;
 #include "ltbgen.c"
 #elif defined(SHATRANJ)
 #include "jtbgen.c"
+#elif defined(RACING)
+#include "kbgen.c"
 #endif
 
 #define HUGEPAGESIZE 2*1024*1024
@@ -853,7 +855,10 @@ int main(int argc, char **argv)
   }
 #endif
 
-#if defined(SMALL)
+#if defined(RACING)
+  size = (uint64_t)KK_NUM << (6 * (numpcs-2));
+  mask[0] = 0x7ffULL << shift[1];
+#elif defined(SMALL)
   size = 462ULL << (6 * (numpcs-2));
   mask[0] = 0x1ffULL << shift[1];
 #elif defined(SMALL2)
@@ -868,7 +873,11 @@ int main(int argc, char **argv)
   work_piv = create_work(total_work, 1ULL << shift[0], 0);
 #else
   work_piv0 = create_work(total_work, 1ULL << shift[0], 0);
+#ifndef RACING
   work_piv1 = create_work(total_work, 10ULL << shift[1], 0);
+#else
+  work_piv1 = create_work(total_work, 32ULL << shift[1], 0);
+#endif
 #endif
 
   static int piece_order[16] = {
@@ -943,6 +952,10 @@ int main(int argc, char **argv)
   for (i = 0; i < 8; i++)
     if (pcs[i] != pcs[i + 8]) break;
   symmetric = (i == 8);
+#ifdef RACING
+  // white and black are never interchangeable
+  symmetric = 0;
+#endif
   split = !symmetric;
 
   for (i = 0; i < numpcs; i++)
@@ -950,10 +963,18 @@ int main(int argc, char **argv)
   has_cursed_capts = 0;
 
   uint64_t alloc_size = 0ULL;
+#ifndef RACING
   if (numpcs == 3)
     alloc_size = 31332 + 1;
   else if (numpcs == 4)
     alloc_size = 31332 * 61 + 1;
+#else
+  // upper bound for the size of the permuted table
+  alloc_size = 32;
+  for (i = 1; i < numpcs; i++)
+    alloc_size *= 64 - i;
+  alloc_size++;
+#endif
   if (alloc_size < size)
     alloc_size = size;
 
@@ -983,7 +1004,10 @@ int main(int argc, char **argv)
       break;
     }
 #ifndef SUICIDE
-#ifndef SHATRANJ
+#if defined(RACING)
+  printf("Calculating terminal positions.\n");
+  run_threaded(calc_terminal, work_g, 1);
+#elif !defined(SHATRANJ)
   printf("Calculating mate positions.\n");
   run_threaded(calc_mates, work_g, 1);
 #else
@@ -1119,7 +1143,7 @@ int main(int argc, char **argv)
         load_table_u8(table_w, 'w');
         unlink_table('w');
       }
-#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ)
+#if defined(REGULAR) || defined(ATOMIC) || defined(SHATRANJ) || defined(RACING)
       else
         fix_closs_w();
 

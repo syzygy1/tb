@@ -7,6 +7,7 @@
 static uint64_t mask_a1h8;
 static uint64_t idx_mask1[8], idx_mask2[8];
 
+#ifndef RACING
 static const int16_t KK_init[10][64] = {
   { -1, -1, -1,  0,  1,  2,  3,  4,
     -1, -1, -1,  5,  6,  7,  8,  9,
@@ -90,10 +91,23 @@ static const int16_t KK_init[10][64] = {
     -1, -1, -1, -1, -1, -1, -1,461 }
 };
 
+#endif
+
+#ifndef RACING
+#define KK_NUM 462
+#else
+// Racing Kings: only the left-right symmetry can be used. The white king
+// is restricted to files a-d, the black king can be on any square that is
+// not occupied by or adjacent to the white king.
+#define KK_NUM 1806
+#endif
+
 int16_t KK_map[64][64];
-static uint8_t KK_inv[462][2];
+static uint8_t KK_inv[KK_NUM][2];
 
 int8_t mirror[64][64];
+
+#ifndef RACING
 
 static const uint8_t in_triangle[64] = {
   1, 1, 1, 1, 0, 0, 0, 0,
@@ -109,12 +123,22 @@ static const uint8_t in_triangle[64] = {
 static const int inv_tri0x40[] = {
   1, 2, 3, 10, 11, 19, 0, 9, 18, 27
 };
+#else
+// squares on files a-d
+static const int inv_tri0x40[] = {
+   0,  1,  2,  3,  8,  9, 10, 11,
+  16, 17, 18, 19, 24, 25, 26, 27,
+  32, 33, 34, 35, 40, 41, 42, 43,
+  48, 49, 50, 51, 56, 57, 58, 59
+};
+#endif
 
 static uint64_t mask[MAX_PIECES];
 int shift[MAX_PIECES];
 
 uint64_t sq_mask[64];
 
+#ifndef RACING
 static const uint8_t tri0x40_init[32] = {
   6, 0, 1, 2, 0, 0, 0, 0,
   0, 7, 3, 4, 0, 0, 0, 0,
@@ -122,8 +146,11 @@ static const uint8_t tri0x40_init[32] = {
   0, 0, 0, 9, 0, 0, 0, 0
 };
 
+#endif
+
 uint64_t diagonal;
 
+#ifndef RACING
 void init_tables(void)
 {
   int i, j, sq;
@@ -181,6 +208,56 @@ void init_tables(void)
 
   set_up_tables();
 }
+#else
+void init_tables(void)
+{
+  int i, j, sq, num;
+
+  for (i = 0; i < 64; i++)
+    for (j = 0; j < 64; j++) {
+      KK_map[i][j] = -1;
+      mirror[i][j] = 1;
+    }
+
+  num = 0;
+  for (i = 0; i < 64; i++) {
+    if (i & 0x04) continue;
+    for (j = 0; j < 64; j++) {
+      int df = (i & 7) - (j & 7), dr = (i >> 3) - (j >> 3);
+      if (df >= -1 && df <= 1 && dr >= -1 && dr <= 1) continue;
+      KK_inv[num][0] = i;
+      KK_inv[num][1] = j;
+      KK_map[i][j] = num++;
+    }
+  }
+  if (num != KK_NUM) {
+    fprintf(stderr, "init_tables: wrong number of king pairs (%d).\n", num);
+    exit(EXIT_FAILURE);
+  }
+
+  for (i = 0; i < 64; i++) {
+    if (!(i & 0x04)) continue;
+    for (j = 0; j < 64; j++)
+      KK_map[i][j] = KK_map[i ^ 0x07][j ^ 0x07];
+  }
+
+  uint64_t mask_a1h1 = 0;
+  mask_a1h8 = 0;
+  for (i = 2; i < numpcs; i++) {
+    mask_a1h1 = (mask_a1h1 << 6) | 0x07;
+    mask_a1h8 = (mask_a1h8 << 6) | 0x07;
+  }
+
+  for (sq = 0; sq < 64; sq++)
+    sq_mask[sq] = (sq & 0x04) ? mask_a1h1 : 0;
+
+  // index of a broken position (all other pieces on a1, the white king's
+  // square), used for king pairs that cannot be encoded
+  diagonal = (uint64_t)KK_map[0][18] << shift[1];
+
+  set_up_tables();
+}
+#endif
 
 #define MIRROR_A1H8(x) ((((x) & mask_a1h8) << 3) | (((x) >> 3) & mask_a1h8))
 
@@ -207,8 +284,13 @@ static uint64_t __inline__ MakeMove2(uint64_t idx, int k, int sq)
   return idx | ((uint64_t)sq << shift[k]);
 }
 
+#ifndef RACING
 #define CHECK_DIAG int flag = idx < diagonal
 #define PIVOT_ON_DIAG(idx2) (flag && idx2 >= diagonal)
+#else
+#define CHECK_DIAG do {} while (0)
+#define PIVOT_ON_DIAG(idx2) 0
+#endif
 #define PIVOT_MIRROR(idx) (MIRROR_A1H8(idx) | (idx & mask[0]))
 
 #define bit_set(x,y) { uint64_t dummy = y; __asm__("bts %1,%0" : "+r" (x) : "r" (dummy));}
@@ -457,10 +539,16 @@ static void func##_pivot1(uint8_t *restrict table, uint64_t idx, bitboard occ, i
 #define MAKE_IDX2_PIVOT0 \
   idx2 = idx & ~mask[0]
 
+#ifndef RACING
+#define PIVOT0_MASK 0x24
+#else
+#define PIVOT0_MASK 0x04
+#endif
+
 #define LOOP_BLACK_PIECES_PIVOT0(func, ...) \
   do { for (j = 1; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
-    if ((p[k] & 0x24) || KK_map[p[k]][p[1]] < 0 || mirror[p[k]][p[1]] < 0) \
+    if ((p[k] & PIVOT0_MASK) || KK_map[p[k]][p[1]] < 0 || mirror[p[k]][p[1]] < 0) \
       continue; \
     uint64_t idx3 = idx2 | ((uint64_t)KK_map[p[k]][p[1]] << shift[1]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \

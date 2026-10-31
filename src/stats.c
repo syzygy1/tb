@@ -97,6 +97,13 @@ static void count_stats_u8(struct thread_data *thread)
   uint64_t *stats = thread->stats;
   uint8_t *table = count_stats_table_u8;
 
+#ifdef RACING
+  // no positions on a symmetry axis
+  for (idx = thread->begin; idx < end; idx++)
+    stats[table[idx]] += 2;
+  return;
+#endif
+
   if (end <= diagonal) {
     for (idx = thread->begin; idx < end; idx++)
       stats[table[idx]] += 2;
@@ -121,6 +128,13 @@ static void count_stats_u16(struct thread_data *thread)
   uint64_t end = thread->end;
   uint64_t *stats = thread->stats;
   uint16_t *table = count_stats_table_u16;
+
+#ifdef RACING
+  // no positions on a symmetry axis
+  for (idx = thread->begin; idx < end; idx++)
+    stats[table[idx]] += 2;
+  return;
+#endif
 
   if (end <= diagonal) {
     for (idx = thread->begin; idx < end; idx++)

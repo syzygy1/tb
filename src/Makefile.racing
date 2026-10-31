@@ -1,0 +1,12 @@
+GENTBNAME = ktbgen
+GENTBPNAME = ktbgenp
+VERTBNAME = ktbver
+VERTBPNAME = ktbverp
+CLEAN = kclean
+
+DEPDIR = .depsk
+OBJDIR = objsk
+
+FLAGS += -DRACING
+
+include Makefile.general

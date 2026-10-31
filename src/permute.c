@@ -231,6 +231,9 @@ static void p_set_norm_piece(int *pcs, uint8_t *type_perm, uint8_t *norm, int or
   for (i = 0; i < entry_piece.num; i++)
     norm[i] = 0;
 
+#ifdef RACING
+  norm[0] = 1;
+#else
   switch (entry_piece.enc_type) {
   case 0:
     norm[0] = 3;
@@ -242,6 +245,7 @@ static void p_set_norm_piece(int *pcs, uint8_t *type_perm, uint8_t *norm, int or
     norm[0] = entry_piece.enc_type - 1;
     break;
   }
+#endif
 
   if (entry_piece.enc_type <= 2) {
     for (i = 0, j = norm[0]; i < num_types;)
@@ -311,6 +315,9 @@ uint64_t init_permute_piece(int *pcs, int *pt)
     if (pcs[i]) type[k++] = i;
   num_types = k;
 
+#ifdef RACING
+  entry_piece.enc_type = 1;
+#else
   for (i = 0, k = 0; i < 16; i++)
     if (pcs[i] == 1) k++;
   if (k >= 3) entry_piece.enc_type = 0;
@@ -321,6 +328,7 @@ uint64_t init_permute_piece(int *pcs, int *pt)
       if (pcs[i] < k && pcs[i] > 1) k = pcs[i];
     entry_piece.enc_type = 1 + k;
   }
+#endif
 
   entry_piece.num = 0;
   for (i = 0; i < 16; i++)
@@ -334,6 +342,19 @@ uint64_t init_permute_piece(int *pcs, int *pt)
     tidx[type[i]] = j;
   }
   
+#ifdef RACING
+  /* a single unique piece (e.g. a king) is mirrored to files a-d */
+  for (i = 0; i < num_type_perms; i++) {
+    for (j = num_types - 1; j >= 0; j--)
+      if (pcs[type_perm_list[i][j]] == 1) break;
+    piece_perm_list[i][0] = tidx[type_perm_list[i][j]];
+    for (k = 0, m = 1; k < num_types; k++)
+      if (k != j)
+        for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
+          piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
+    order_list[i] = j;
+  }
+#else
   if (entry_piece.enc_type == 0) { /* 111 */
     for (i = 0; i < num_type_perms;) {
       for (j = num_types - 3; j >= 0; j--)
@@ -398,6 +419,7 @@ uint64_t init_permute_piece(int *pcs, int *pt)
       i++;
     }
   }
+#endif
 
   for (i = 0; i < num_type_perms; i++)
     for (j = i + 1; j < num_type_perms; j++) {
